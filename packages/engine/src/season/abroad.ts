@@ -26,7 +26,7 @@ export function settleForeignLeagues(
     const scored = league.clubs.map((club) => {
       const manager = club.managerId === null ? undefined : managerById(world, club.managerId)
       const tactical = manager ? manager.ability.tactical : T.CARETAKER_ABILITY
-      const score = club.strength + (T.ABILITY_WEIGHT * (tactical - 50)) / 50 + rng.normal(0, T.FOREIGN_SEASON_NOISE_SD)
+      const score = club.strength + (T.ABILITY_WEIGHT * (tactical - T.SCALE_MIDPOINT)) / T.SCALE_MIDPOINT + rng.normal(0, T.FOREIGN_SEASON_NOISE_SD)
       return { club, manager, score }
     })
     scored.sort((a, b) => b.score - a.score || a.club.id - b.club.id)
@@ -55,6 +55,7 @@ export function settleForeignLeagues(
           boardRows: 0,
         }
         manager.history.seasons.push(record)
+        emit(world, 'season.record', { managerId: manager.id, ...record })
       }
       club.strength = round1(
         clamp(
@@ -74,7 +75,7 @@ export function settleForeignLeagues(
 }
 
 function awardForeignTitle(world: World, club: ForeignClub, manager: Manager | undefined): void {
-  if (manager) manager.history.honours.push({ season: world.season, competition: 'foreignLeague', league: club.league })
+  if (manager) manager.history.honours.push({ season: world.season, competition: 'foreignLeague', clubId: club.id, league: club.league })
   emit(world, 'trophy', {
     clubId: club.id,
     managerId: manager ? manager.id : null,

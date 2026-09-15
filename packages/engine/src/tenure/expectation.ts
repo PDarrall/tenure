@@ -26,7 +26,7 @@ export function structuralTarget(world: World, post: Post): number {
 }
 
 function ambitionOf(world: World, post: Post): number {
-  return post.kind === 'home' ? clubById(world, post.clubId).owner.ambition : 0.5
+  return post.kind === 'home' ? clubById(world, post.clubId).owner.ambition : T.ABROAD_AMBITION
 }
 
 /** Board target at hire: structural rank, lifted by ambition, shifted by the promise. */
@@ -37,9 +37,20 @@ export function expectationAtHire(world: World, post: Post, promise: Promise): n
 }
 
 /**
- * Summer reset against last season. Beat it and the bar rises to your
- * finish; miss it and it eases one place toward the structural target. A
- * club that changed tier starts again from the structural target.
+ * The rule itself: beat or meet the target and the bar rises to your
+ * finish; miss it and it eases one place, but never past the structural
+ * target and never tighter.
+ */
+export function nextExpectation(current: number, structural: number, finish: number): number {
+  if (finish <= current) return finish
+  if (current < structural) return Math.min(structural, current + T.EXPECT_EASE_PER_MISS)
+  return current
+}
+
+/**
+ * Summer reset against last season, with the structural target recomputed
+ * from the squads as they stand after the window. A club that changed tier
+ * starts again from the structural target and ambition.
  */
 export function resetExpectation(world: World, spell: Spell): void {
   const pending = spell.pendingReset
@@ -49,11 +60,8 @@ export function resetExpectation(world: World, spell: Spell): void {
   spell.structuralTarget = structuralTarget(world, spell.post)
   if (pending.movedTier) {
     spell.expectation = spell.structuralTarget - Math.round(ambitionOf(world, spell.post) * T.EXPECT_AMBITION_PLACES)
-  } else if (pending.finish <= spell.expectation) {
-    spell.expectation = pending.finish
   } else {
-    const direction = Math.sign(spell.structuralTarget - spell.expectation)
-    spell.expectation += direction * T.EXPECT_EASE_PER_MISS
+    spell.expectation = nextExpectation(spell.expectation, spell.structuralTarget, pending.finish)
   }
   spell.expectation = clamp(spell.expectation, 1, divisionSize(world, spell.post))
   spell.budgetMultiplier = T.PROMISE_EFFECTS[spell.contract.promise].budget

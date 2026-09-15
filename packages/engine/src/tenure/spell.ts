@@ -7,6 +7,9 @@ import { isElite } from '../managers/reputation.js'
 import { seasonWeek } from '../season/calendar.js'
 import type { Manager, OwnerType, Post, Promise, Spell, SpellEndReason, World } from '../types.js'
 import { expectationAtHire, structuralTarget } from './expectation.js'
+import { ceilingFor } from './credit.js'
+
+export { ceilingFor }
 
 export function thresholdFor(rng: Rng, owner: OwnerType): number {
   if (owner === 'erratic') return rng.int(T.SACK_THRESHOLD_ERRATIC[0], T.SACK_THRESHOLD_ERRATIC[1])
@@ -48,11 +51,6 @@ export function remainingValue(world: World, spell: Spell): number {
   return round1((spell.contract.salary * weeks) / T.SEASON_WEEKS)
 }
 
-export function ceilingFor(seasonsCompleted: number): number {
-  if (seasonsCompleted <= T.CEILING_FULL_SEASONS) return T.CREDIT_CEILING
-  return Math.max(0, T.CREDIT_CEILING - T.CEILING_STALENESS_PER_SEASON * (seasonsCompleted - T.CEILING_FULL_SEASONS))
-}
-
 export interface HireTerms {
   years: number
   promise: Promise
@@ -60,21 +58,28 @@ export interface HireTerms {
   /** Override the tier × reputation salary (interview trade-offs). */
   salary?: number
   genesis?: boolean
+  /** Genesis only: seasons already served at the club. */
+  servedSeasons?: number
 }
 
 /** Create a spell, seat the manager, and log the hire. */
 export function startSpell(world: World, rng: Rng, manager: Manager, post: Post, terms: HireTerms): Spell {
+  if (manager.status.kind === 'employed') throw new Error(`startSpell: manager ${manager.id} is already employed`)
+  const occupant = post.kind === 'home' ? clubById(world, post.clubId).managerId : (foreignClubById(world, post.clubId)?.managerId ?? null)
+  if (occupant !== null) throw new Error(`startSpell: post ${post.clubId} is not vacant`)
+  const served = terms.servedSeasons ?? 0
+  const ceiling = ceilingFor(served)
   const eliteHire = post.kind === 'home' && isElite(world, clubById(world, post.clubId))
   const credit = clamp(
     T.CREDIT_ON_HIRE + (terms.crisis ? T.CREDIT_CRISIS_BONUS : 0) + (eliteHire ? T.CREDIT_ELITE_PENALTY : 0),
     0,
-    T.CREDIT_CEILING,
+    ceiling,
   )
   const spell: Spell = {
     id: world.nextSpellId++,
     managerId: manager.id,
     post,
-    startWeek: world.week,
+    startWeek: world.week - served * T.SEASON_WEEKS,
     endWeek: null,
     endReason: null,
     contract: {
@@ -87,10 +92,10 @@ export function startSpell(world: World, rng: Rng, manager: Manager, post: Post,
     expectation: expectationAtHire(world, post, terms.promise),
     structuralTarget: structuralTarget(world, post),
     credit,
-    ceiling: T.CREDIT_CEILING,
+    ceiling,
     threshold: thresholdFor(rng, ownerTypeOf(world, post)),
-    seasonsCompleted: 0,
-    ownership: 0,
+    seasonsCompleted: served,
+    ownership: clamp(served * T.GENESIS_OWNERSHIP_PER_SEASON, 0, 1),
     weeksBelowThreshold: 0,
     consecutiveDefeats: 0,
     crisisHire: terms.crisis,
@@ -121,6 +126,8 @@ export function startSpell(world: World, rng: Rng, manager: Manager, post: Post,
     crisis: terms.crisis,
     expectation: spell.expectation,
     credit: spell.credit,
+    ceiling: spell.ceiling,
+    seasonsServed: served,
     genesis: terms.genesis === true,
     season: world.season,
   })
@@ -161,11 +168,6 @@ export function seatIncumbents(world: World, rng: Rng, assignments: { managerId:
     if (!manager || manager.id !== managerId) throw new Error(`seatIncumbents: no manager ${managerId}`)
     const years = rng.int(T.GENESIS_CONTRACT_YEARS[0], T.GENESIS_CONTRACT_YEARS[1])
     const served = rng.int(T.GENESIS_TENURE_SEASONS[0], T.GENESIS_TENURE_SEASONS[1])
-    const spell = startSpell(world, rng, manager, post, { years, promise: 'top-half', crisis: false, genesis: true })
-    spell.startWeek = 0 - served * T.SEASON_WEEKS
-    spell.seasonsCompleted = served
-    spell.ceiling = ceilingFor(served)
-    spell.credit = Math.min(spell.credit, spell.ceiling)
-    spell.ownership = clamp(served * T.GENESIS_OWNERSHIP_PER_SEASON, 0, 1)
+    startSpell(world, rng, manager, post, { years, promise: 'top-half', crisis: false, genesis: true, servedSeasons: served })
   }
 }

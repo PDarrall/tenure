@@ -1,3 +1,4 @@
+import * as T from '../tunables.js'
 import type { ClubId, Fixture, TableRow, Tier, World } from '../types.js'
 
 export function resetTables(world: World): void {
@@ -53,10 +54,10 @@ export function applyResult(world: World, fixture: Fixture): void {
     row.goalsAgainst += ga
     if (gf > ga) {
       row.won++
-      row.points += 3
+      row.points += T.POINTS_WIN
     } else if (gf === ga) {
       row.drawn++
-      row.points += 1
+      row.points += T.POINTS_DRAW
     } else {
       row.lost++
     }

@@ -140,8 +140,8 @@ export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFix
     expHome = exp.home
     expAway = exp.away
   }
-  const homePoints = homeResult === 'W' ? 3 : homeResult === 'D' ? 1 : 0
-  const awayPoints = awayResult === 'W' ? 3 : awayResult === 'D' ? 1 : 0
+  const homePoints = homeResult === 'W' ? T.POINTS_WIN : homeResult === 'D' ? T.POINTS_DRAW : 0
+  const awayPoints = awayResult === 'W' ? T.POINTS_WIN : awayResult === 'D' ? T.POINTS_DRAW : 0
   const homeManager = homeClub ? managerAt(world, homeClub) : undefined
   const awayManager = awayClub ? managerAt(world, awayClub) : undefined
 
@@ -288,14 +288,20 @@ export function endSeason(world: World, rng: Rng, extrasFor: ExtrasFor = noExtra
         boardRows: extras.boardRows,
       }
       manager.history.seasons.push(record)
+      emit(world, 'season.record', { managerId: manager.id, ...record })
     }
     club.netSpendThisSeason = 0
   }
 
+  let aged = 0
   for (const manager of world.managers) {
     manager.seasonGames = 0
-    if (manager.status.kind !== 'retired') manager.age++
+    if (manager.status.kind !== 'retired') {
+      manager.age++
+      aged++
+    }
   }
+  emit(world, 'managers.aged', { season: world.season, count: aged })
   for (const club of world.clubs) summerSquad(world, rng, club)
 
   emit(world, 'season.end', {

@@ -15,8 +15,12 @@ export function normalBudget(club: Club): number {
 }
 
 export function updateMorale(club: Club, result: Result, motivation: number): void {
-  const scale = 0.5 + motivation / 100
-  const delta = result === 'W' ? T.MORALE_WIN * scale : result === 'L' ? T.MORALE_LOSS * (1.5 - motivation / 100) : 0
+  const delta =
+    result === 'W'
+      ? T.MORALE_WIN * (T.MORALE_WIN_MOTIVATION_BASE + motivation / 100)
+      : result === 'L'
+        ? T.MORALE_LOSS * (T.MORALE_LOSS_MOTIVATION_BASE - motivation / 100)
+        : 0
   club.squad.morale = round1(clamp(club.squad.morale + delta, 0, 100))
 }
 
@@ -40,13 +44,13 @@ export interface WindowSummary {
  */
 export function runWindow(world: World, club: Club, summer: boolean, budgetMultiplier: number): WindowSummary {
   const manager = managerOf(world, club)
-  const dealing = manager ? manager.ability.dealing : 50
-  const development = manager ? manager.ability.development : 50
+  const dealing = manager ? manager.ability.dealing : T.SCALE_MIDPOINT
+  const development = manager ? manager.ability.development : T.SCALE_MIDPOINT
   const normal = normalBudget(club)
   const pot = summer ? normal * budgetMultiplier : normal * T.WINTER_BUDGET_SHARE
   const spend = round1(Math.max(0, pot * (summer ? T.AI_SPEND_FRACTION : 1)))
   const r = normal > 0 ? spend / normal : 0
-  const gain = round1(((T.SPEND_GAIN_MAX * r) / (r + 1)) * (1 + (T.DEALING_EFFECT * (dealing - 50)) / 50))
+  const gain = round1(((T.SPEND_GAIN_MAX * r) / (r + 1)) * (1 + (T.DEALING_EFFECT * (dealing - T.SCALE_MIDPOINT)) / T.SCALE_MIDPOINT))
   let turnover = summer ? T.TURNOVER_BASE + T.TURNOVER_PER_BUDGET * r : T.TURNOVER_PER_BUDGET * r
   turnover = clamp(turnover, 0, T.TURNOVER_MAX)
 
@@ -56,13 +60,13 @@ export function runWindow(world: World, club: Club, summer: boolean, budgetMulti
     club.squad.academyInXi = youth
     club.thisSeason.academyPromoted = youth
     club.pendingYouthGain = round1(club.pendingYouthGain + T.YOUTH_GAIN_PER_PLAYER * youth)
-    if (T.ACADEMY_COUNTS_AS_SIGNING) turnover = clamp(turnover + youth / 11, 0, 1)
+    if (T.ACADEMY_COUNTS_AS_SIGNING) turnover = clamp(turnover + youth / T.FIRST_XI, 0, 1)
   }
 
   const oldAge = club.squad.avgAge
-  const seniorShare = summer ? Math.max(0, turnover - youth / 11) : turnover
+  const seniorShare = summer ? Math.max(0, turnover - youth / T.FIRST_XI) : turnover
   club.squad.avgAge = round1(
-    oldAge * (1 - turnover) + T.SIGNING_AGE * seniorShare + (summer ? (T.ACADEMY_AGE * youth) / 11 : 0),
+    oldAge * (1 - turnover) + T.SIGNING_AGE * seniorShare + (summer ? (T.ACADEMY_AGE * youth) / T.FIRST_XI : 0),
   )
   club.squad.strength = round1(clamp(club.squad.strength + gain - T.YOUTH_COST_PER_PLAYER * youth, 1, 100))
   club.netSpendThisSeason = round1(club.netSpendThisSeason + spend)

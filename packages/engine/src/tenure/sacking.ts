@@ -1,10 +1,10 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import * as T from '../tunables.js'
-import { clamp } from '../world/gen.js'
 import { managerById } from '../lookup.js'
 import type { Spell, World } from '../types.js'
 import { endSpell, yearsLeft } from './spell.js'
+import { bumpReputation } from './exits.js'
 
 /** Weekly roll while below threshold: 10% × (1 − 0.2 × years left), floor 3%. */
 export function rollProbability(world: World, spell: Spell): number {
@@ -18,8 +18,7 @@ export function sack(world: World, spell: Spell, cause: SackCause): void {
   const manager = managerById(world, spell.managerId)
   const deserved = cause === 'credit' && spell.weeksBelowThreshold >= T.DESERVED_WEEKS
   spell.deserved = deserved
-  const repDelta = deserved ? T.REP_SACKED_DESERVED : T.REP_SACKED_UNJUST
-  manager.reputation = clamp(manager.reputation + repDelta, 0, 100)
+  const repDelta = bumpReputation(world, manager.id, deserved ? T.REP_SACKED_DESERVED : T.REP_SACKED_UNJUST, deserved ? 'sacked (deserved)' : 'sacked (unjust)')
   endSpell(world, spell, 'sacked', 1)
   emit(world, 'manager.sacked', {
     managerId: manager.id,

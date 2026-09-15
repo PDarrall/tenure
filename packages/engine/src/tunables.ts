@@ -279,12 +279,24 @@ export const AI_MENTALITY_GAP = 12
 /** Goals per side considered when summing outcome probabilities. */
 export const MAX_GOALS = 10
 
+/** League points for a win and a draw. */
+export const POINTS_WIN = 3
+export const POINTS_DRAW = 1
+
+/** Midpoint of the 0–100 ability and morale scales; effects are measured from here. */
+export const SCALE_MIDPOINT = 50
+
+/** Players in the first XI; ownership and youth counts are shares of this. */
+export const FIRST_XI = 11
+
 /** Tactical ability assumed for a club with no manager or an abstract foreign side. */
 export const CARETAKER_ABILITY = 40
 
-/** Morale change per result, scaled by the manager's motivation. */
+/** Morale change per result, scaled by the manager's motivation: win × (base + motivation/100), loss × (base − motivation/100). */
 export const MORALE_WIN = 4
 export const MORALE_LOSS = -5
+export const MORALE_WIN_MOTIVATION_BASE = 0.5
+export const MORALE_LOSS_MOTIVATION_BASE = 1.5
 /** Morale drifts back toward MORALE_INITIAL by this share each week. */
 export const MORALE_DECAY = 0.1
 
@@ -386,6 +398,8 @@ export const FOREIGN_STRENGTH_SHOCK_SD = 2
 
 /** Owner ambition lifts the target by up to this many places (ambition 1). */
 export const EXPECT_AMBITION_PLACES = 3
+/** Ambition assumed for the abstract foreign clubs. */
+export const ABROAD_AMBITION = 0.5
 
 /** After a missed target, the target eases one place toward the structural one. */
 export const EXPECT_EASE_PER_MISS = 1

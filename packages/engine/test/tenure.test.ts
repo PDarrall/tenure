@@ -3,8 +3,8 @@ import { createWorld } from '../src/world/gen.js'
 import { createRng } from '../src/rng.js'
 import { runSeasons, runWeeks } from '../src/sim/advance.js'
 import { activeSpells, ceilingFor, contractEndWeek, remainingValue, salaryFor, startSpell } from '../src/tenure/spell.js'
-import { addCredit, advanceCeiling, blameScale, matchCreditDelta, monthlyGapDelta, seasonEndDelta } from '../src/tenure/credit.js'
-import { expectationAtHire, resetExpectation, structuralTarget } from '../src/tenure/expectation.js'
+import { addCredit, advanceCeiling, blameScale, clampToCeiling, matchCreditDelta, monthlyGapDelta, seasonEndDelta } from '../src/tenure/credit.js'
+import { expectationAtHire, nextExpectation, resetExpectation, structuralTarget } from '../src/tenure/expectation.js'
 import { rollProbability, sack, weeklySackingCheck } from '../src/tenure/sacking.js'
 import { checkExpiry, leaveByMutualConsent, resign } from '../src/tenure/exits.js'
 import { clubById, managerById, spellOf } from '../src/lookup.js'
@@ -72,16 +72,35 @@ describe('expectation', () => {
   })
 
   it('rises to your finish when beaten and eases one place toward structural when missed', () => {
+    expect(nextExpectation(10, 10, 4)).toBe(4) // beaten: the bar rises to meet you
+    expect(nextExpectation(10, 10, 10)).toBe(10) // met: stays
+    expect(nextExpectation(4, 10, 9)).toBe(5) // missed: eases one place toward structural
+    expect(nextExpectation(10, 10, 15)).toBe(10) // already at structural: no further easing
+    expect(nextExpectation(12, 10, 15)).toBe(12) // easier than structural already: never tightens
     const world = createWorld(2)
     const spell = freshSpell(world, 3)
-    spell.expectation = 10
-    spell.structuralTarget = 10
-    spell.pendingReset = { finish: 4, movedTier: false }
+    const structural = structuralTarget(world, spell.post)
+    spell.expectation = 1
+    spell.pendingReset = { finish: 20, movedTier: false }
     resetExpectation(world, spell)
-    expect(spell.expectation).toBe(4)
-    spell.pendingReset = { finish: 15, movedTier: false }
-    resetExpectation(world, spell)
-    expect(spell.expectation).toBe(5)
+    expect(spell.structuralTarget).toBe(structural)
+    expect(spell.expectation).toBe(Math.min(structural, 1 + T.EXPECT_EASE_PER_MISS))
+    expect(world.log.at(-1)!.type).toBe('expectation.reset')
+  })
+
+  it('adds the crisis bonus at hire', () => {
+    const world = createWorld(2)
+    const club = clubById(world, 30)
+    const incumbent = managerById(world, club.managerId!)
+    const current = spellOf(world, incumbent)!
+    current.endWeek = 0
+    current.endReason = 'sacked'
+    club.managerId = null
+    incumbent.status = { kind: 'unemployed', sinceWeek: 0, activity: 'wait', monthsSinceShortlisted: 0 }
+    const entrant = world.managers.find((m) => m.status.kind === 'unemployed' && m.history.spellIds.length === 0)!
+    const spell = startSpell(world, createRng(3), entrant, { kind: 'home', clubId: 30 }, { years: 1, promise: 'top-half', crisis: true })
+    expect(spell.credit).toBe(T.CREDIT_ON_HIRE + T.CREDIT_CRISIS_BONUS)
+    expect(spell.crisisHire).toBe(true)
   })
 })
 
@@ -128,20 +147,26 @@ describe('credit', () => {
     expect(seasonEndDelta(spell, { finish: 8, ...none, relegated: true })).toBe(T.CREDIT_RELEGATION)
   })
 
-  it('keeps the ceiling at 100 for three seasons, then loses 10 a season unless reset', () => {
+  it('keeps the ceiling at 100 for seasons one to three, then 90 for season four, unless reset', () => {
     spell.seasonsCompleted = 0
     spell.ceiling = 100
     spell.credit = 100
-    for (let i = 0; i < 3; i++) advanceCeiling(spell, false)
+    advanceCeiling(spell, false) // season 1 done, season 2 at 100
+    advanceCeiling(spell, false) // season 2 done, season 3 at 100
     expect(spell.ceiling).toBe(100)
-    advanceCeiling(spell, false)
+    advanceCeiling(spell, false) // season 3 done, season 4 at 90
     expect(spell.ceiling).toBe(90)
+    expect(spell.credit).toBe(100) // clamp waits for the summer window
+    clampToCeiling(spell)
     expect(spell.credit).toBe(90)
     advanceCeiling(spell, false)
     expect(spell.ceiling).toBe(80)
     advanceCeiling(spell, true)
     expect(spell.ceiling).toBe(100)
-    expect(ceilingFor(13)).toBe(0)
+    expect(ceilingFor(0)).toBe(100)
+    expect(ceilingFor(2)).toBe(100)
+    expect(ceilingFor(3)).toBe(90)
+    expect(ceilingFor(12)).toBe(0)
   })
 })
 

@@ -16,10 +16,10 @@ export interface LeagueOutcome {
 }
 
 export function awardHonour(world: World, club: Club, competition: 'league' | 'nationalCup' | 'leagueCup' | 'european', tier?: Tier): void {
-  const honour = tier === undefined ? { season: world.season, competition } : { season: world.season, competition, tier }
+  const honour = tier === undefined ? { season: world.season, competition, clubId: club.id } : { season: world.season, competition, clubId: club.id, tier }
   club.honours.push(honour)
   const manager = managerAt(world, club)
-  if (manager) manager.history.honours.push(honour)
+  if (manager) manager.history.honours.push({ ...honour })
   emit(world, 'trophy', {
     clubId: club.id,
     managerId: manager ? manager.id : null,

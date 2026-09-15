@@ -47,6 +47,8 @@ export interface Squad {
 export interface Honour {
   season: number
   competition: Competition
+  /** Club it was won with. */
+  clubId?: ClubId
   /** Tier the honour was won in (home competitions). */
   tier?: Tier
   /** Foreign league kind for titles won abroad. */

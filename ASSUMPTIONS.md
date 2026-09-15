@@ -78,10 +78,18 @@ single branch, so they live here instead.
   the moment of sacking. Takeover replacements are always unjust.
 - The board rolls every week, including summer weeks.
 - Expectation: beating or meeting the target sets next target = finish;
-  missing it moves the target one place toward the structural target (in
-  whichever direction that lies). A promoted or relegated club restarts
-  from the structural target plus ambition. The structural target is the
-  squad's strength rank after the summer window.
+  missing it eases the target one place, but never past the structural
+  target and never tighter. A promoted or relegated club restarts from the
+  structural target plus ambition. The structural target is the squad's
+  strength rank after the summer window.
+- The ceiling is 100 for seasons one to three and 90 for season four; the
+  credit clamp to a lowered ceiling is applied after the summer window, so
+  a big turnover that resets the ceiling keeps the credit.
+- "Beat a top-three side" reads the opponent's position after the week's
+  results. Monthly rolls (shocks, gap check, mutual consent) happen every
+  four match weeks and not in the summer.
+- Trophies count for credit and reputation only for the spell they were
+  won in (honours record the club).
 - Blame applies while fewer than two seasons of the spell are complete.
 - Cup ties: points are 3 for the winner (shoot-outs included) and 0 for
   the loser; expected points fold the shoot-out into the win chance.

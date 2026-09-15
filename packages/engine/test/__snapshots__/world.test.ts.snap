@@ -126,7 +126,7 @@ exports[`world generation > seed 1 always produces the same world 1`] = `
     "mid Bundesland Liga: 1020 Oberbach mgr=137; 1021 SC Reutstadt mgr=138; 1022 Eintracht Kasshausen mgr=139; 1023 Mannhausen mgr=140; 1024 SV Rheinbach mgr=141; 1025 Mannbrück mgr=142; 1026 VfB Bergdorf mgr=143; 1027 SV Bergstadt mgr=144; 1028 VfB Berglingen mgr=145; 1029 Osnadorf mgr=146; 1030 Eintracht Kassbrück mgr=147; 1031 Reutheim mgr=148; 1032 Niederfeld mgr=149; 1033 Kasslingen mgr=150; 1034 Waldfurt mgr=151; 1035 Reutfurt mgr=152; 1036 FC Bergheim mgr=153; 1037 SC Rheinfeld mgr=154",
     "small Nordisk Serien: 1038 IF Lilkøb mgr=155; 1039 BK Varfjord mgr=156; 1040 Solfjord mgr=157; 1041 AIK Lilvik mgr=158; 1042 Solstad mgr=159; 1043 SK Norkøb mgr=160; 1044 IF Halstad mgr=161; 1045 BK Norfjord mgr=162; 1046 Viking Halvik mgr=163; 1047 Norvik mgr=164; 1048 Tromfjord mgr=165; 1049 FK Norfjord mgr=166; 1050 IF Kriskøb mgr=167; 1051 FK Haustad mgr=168; 1052 Solsund mgr=169; 1053 Viking Krisstad mgr=170",
   ],
-  "hash": "2a5ef227",
+  "hash": "aa830382",
   "managers": [
     "1 Stig Solberg (small, 57, ex-pro) rep=86 employed@1",
     "2 Stuart Oldfield (home, 46, ex-pro) rep=83 employed@2",

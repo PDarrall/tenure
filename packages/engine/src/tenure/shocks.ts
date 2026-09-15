@@ -27,9 +27,9 @@ export function monthlyShocks(world: World, rng: Rng, spell: Spell): void {
     }
     spell.threshold = thresholdFor(rng, club.owner.type)
     const replace = rng.chance(T.TAKEOVER_REPLACE_P)
-    if (replace) {
-      spell.takeover = { week: world.week, replaceWeek: world.week + rng.int(1, T.TAKEOVER_REPLACE_MONTHS * T.MONTH_WEEKS) }
-    }
+    spell.takeover = replace
+      ? { week: world.week, replaceWeek: world.week + rng.int(1, T.TAKEOVER_REPLACE_MONTHS * T.MONTH_WEEKS) }
+      : null
     emit(world, 'shock.takeover', {
       clubId: club.id,
       managerId: spell.managerId,
@@ -37,6 +37,7 @@ export function monthlyShocks(world: World, rng: Rng, spell: Spell): void {
       from: previous,
       to: club.owner.type,
       ambition: club.owner.ambition,
+      threshold: spell.threshold,
       willReplace: replace,
       season: world.season,
     })

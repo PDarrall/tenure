@@ -26,7 +26,7 @@ export interface MatchContext {
 
 /** Per-match credit: k × (points − expected), losses weighted, plus the DESIGN extras. */
 export function matchCreditDelta(spell: Spell, ctx: MatchContext): number {
-  const lost = ctx.points === 0
+  const lost = ctx.points < T.POINTS_DRAW
   let delta = T.CREDIT_K * (ctx.points - ctx.expected)
   if (lost) delta *= T.CREDIT_LOSS_WEIGHT
   if (lost) {
@@ -37,7 +37,7 @@ export function matchCreditDelta(spell: Spell, ctx: MatchContext): number {
   } else {
     spell.consecutiveDefeats = 0
     spell.falloutRolled = false
-    if (ctx.points === 3 && ctx.beatTopSide) delta += T.CREDIT_BEAT_TOP
+    if (ctx.points >= T.POINTS_WIN && ctx.beatTopSide) delta += T.CREDIT_BEAT_TOP
   }
   spell.season.games++
   spell.season.points += ctx.points
@@ -65,15 +65,29 @@ export function seasonEndDelta(spell: Spell, ctx: SeasonContext): number {
   return delta
 }
 
-/** Ceiling at season end: full for the first seasons, then staleness, unless reset. */
+/** The ceiling for the season about to be played, given seasons already completed. */
+export function ceilingFor(seasonsCompleted: number): number {
+  const stale = Math.max(0, seasonsCompleted + 1 - T.CEILING_FULL_SEASONS)
+  return Math.max(0, T.CREDIT_CEILING - T.CEILING_STALENESS_PER_SEASON * stale)
+}
+
+/**
+ * Ceiling at season end for the coming season: 100 through season three,
+ * then 10 lower each season, unless a trophy or promotion reset it. The
+ * credit clamp waits for the summer window, whose turnover may reset it.
+ */
 export function advanceCeiling(spell: Spell, reset: boolean): void {
   spell.seasonsCompleted++
   if (reset) {
     spell.ceiling = T.CREDIT_CEILING
     return
   }
-  if (spell.seasonsCompleted <= T.CEILING_FULL_SEASONS) spell.ceiling = T.CREDIT_CEILING
-  else spell.ceiling = Math.max(0, spell.ceiling - T.CEILING_STALENESS_PER_SEASON)
+  const decayed = Math.max(0, spell.ceiling - T.CEILING_STALENESS_PER_SEASON)
+  spell.ceiling = spell.seasonsCompleted + 1 <= T.CEILING_FULL_SEASONS ? T.CREDIT_CEILING : Math.min(decayed, ceilingFor(spell.seasonsCompleted))
+}
+
+/** Apply the ceiling to credit once resets have had their chance. */
+export function clampToCeiling(spell: Spell): void {
   spell.credit = Math.min(spell.credit, spell.ceiling)
 }
 

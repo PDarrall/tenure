@@ -52,8 +52,8 @@ export function effectiveStrength(p: Participant, home: boolean): number {
     p.strength +
     (home ? T.HOME_ADV : 0) +
     T.FORM_WEIGHT * formScore(p.form) +
-    (T.ABILITY_WEIGHT * (p.tactical - 50)) / 50 +
-    (T.MORALE_WEIGHT * (p.morale - 50)) / 50
+    (T.ABILITY_WEIGHT * (p.tactical - T.SCALE_MIDPOINT)) / T.SCALE_MIDPOINT +
+    (T.MORALE_WEIGHT * (p.morale - T.SCALE_MIDPOINT)) / T.SCALE_MIDPOINT
   )
 }
 
@@ -106,8 +106,8 @@ export function matchOdds(home: Participant, away: Participant): MatchOdds {
     pAway,
     lambdaHome,
     lambdaAway,
-    expHome: 3 * pHome + pDraw,
-    expAway: 3 * pAway + pDraw,
+    expHome: T.POINTS_WIN * pHome + T.POINTS_DRAW * pDraw,
+    expAway: T.POINTS_WIN * pAway + T.POINTS_DRAW * pDraw,
   }
 }
 
@@ -143,7 +143,7 @@ export function playMatch(rng: Rng, home: Participant, away: Participant, knocko
 export function knockoutExpected(odds: MatchOdds, home: Participant, away: Participant): { home: number; away: number } {
   const ph = shootoutHomeChance(home, away)
   return {
-    home: 3 * (odds.pHome + odds.pDraw * ph),
-    away: 3 * (odds.pAway + odds.pDraw * (1 - ph)),
+    home: T.POINTS_WIN * (odds.pHome + odds.pDraw * ph),
+    away: T.POINTS_WIN * (odds.pAway + odds.pDraw * (1 - ph)),
   }
 }

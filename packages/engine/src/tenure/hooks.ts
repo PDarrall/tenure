@@ -11,7 +11,7 @@ import { positionOf } from '../season/table.js'
 import type { PlayedFixture, SeasonEnd } from '../season/season.js'
 import type { WindowSummary } from '../season/squad.js'
 import type { Honour, Manager, Spell, World } from '../types.js'
-import { addCredit, advanceCeiling, matchCreditDelta, monthlyGapDelta, resetCeilingForTurnover, seasonEndDelta } from './credit.js'
+import { addCredit, advanceCeiling, clampToCeiling, matchCreditDelta, monthlyGapDelta, resetCeilingForTurnover, seasonEndDelta } from './credit.js'
 import { resetExpectation } from './expectation.js'
 import { weeklySackingCheck } from './sacking.js'
 import { maybeFallout, monthlyShocks } from './shocks.js'
@@ -70,7 +70,11 @@ export function weekly(world: World, rng: Rng): void {
 /** Monthly: erratic re-rolls, the position gap, shocks, mutual consent, AI resignations. */
 export function monthly(world: World, rng: Rng): void {
   for (const spell of activeSpells(world)) {
-    if (spell.post.kind !== 'home') continue
+    if (spell.post.kind !== 'home') {
+      if (monthlyMutualConsent(world, rng, spell)) continue
+      monthlyResignation(world, rng, spell)
+      continue
+    }
     const club = homeClub(world, spell.post.clubId)
     if (!club) continue
     if (club.owner.type === 'erratic') {
@@ -97,11 +101,16 @@ function trophyWeight(h: Honour): number {
   return T.REP_TROPHY_WEIGHT[key] ?? 0
 }
 
+/** Honours won this season with this spell's club. */
+function spellHonours(world: World, manager: Manager, spell: Spell): Honour[] {
+  return manager.history.honours.filter((h) => h.season === world.season && h.clubId === spell.post.clubId)
+}
+
 function seasonReputation(world: World, manager: Manager, spell: Spell, finish: number, promoted: boolean, relegated: boolean): void {
   const places = Math.max(-T.REP_SEASON_CLAMP, Math.min(T.REP_SEASON_CLAMP, (spell.expectation - finish) * T.REP_SEASON_PER_PLACE))
   if (places !== 0) bumpReputation(world, manager.id, places, 'season vs expectation')
-  for (const h of manager.history.honours) {
-    if (h.season === world.season) bumpReputation(world, manager.id, round1(T.REP_TROPHY * trophyWeight(h)), `trophy ${h.competition}`)
+  for (const h of spellHonours(world, manager, spell)) {
+    bumpReputation(world, manager.id, round1(T.REP_TROPHY * trophyWeight(h)), `trophy ${h.competition}`)
   }
   if (promoted) bumpReputation(world, manager.id, T.REP_PROMOTION, 'promotion')
   if (relegated) bumpReputation(world, manager.id, T.REP_RELEGATION, 'relegation')
@@ -122,7 +131,7 @@ export function seasonEnd(world: World, outcome: SeasonEnd): void {
       finish = outcome.foreignFinish.get(spell.post.clubId)
     }
     if (finish === undefined) continue
-    const trophies = manager.history.honours.filter((h) => h.season === world.season).length
+    const trophies = spellHonours(world, manager, spell).length
     const delta = seasonEndDelta(spell, { finish, promoted, relegated, trophies })
     const applied = addCredit(spell, delta)
     seasonReputation(world, manager, spell, finish, promoted, relegated)
@@ -153,11 +162,13 @@ export function afterSummerWindow(world: World, summaries: WindowSummary[]): voi
       if (summary) {
         spell.ownership = round1(Math.min(1, spell.ownership + summary.turnover * (1 - spell.ownership)) * 100) / 100
         spell.season.xiTurnover = summary.turnover
+        emit(world, 'ownership.changed', { spellId: spell.id, managerId: spell.managerId, turnover: summary.turnover, ownership: spell.ownership, window: 'summer', season: world.season })
         if (resetCeilingForTurnover(spell, summary.turnover)) {
           emit(world, 'credit.ceilingReset', { spellId: spell.id, managerId: spell.managerId, turnover: summary.turnover, season: world.season })
         }
       }
     }
+    clampToCeiling(spell)
     resetExpectation(world, spell)
   }
 }
@@ -168,7 +179,9 @@ export function afterWinterWindow(world: World, summaries: WindowSummary[]): voi
   for (const spell of activeSpells(world)) {
     if (spell.post.kind !== 'home') continue
     const summary = byClub.get(spell.post.clubId)
-    if (summary) spell.ownership = round1(Math.min(1, spell.ownership + summary.turnover * (1 - spell.ownership)) * 100) / 100
+    if (!summary) continue
+    spell.ownership = round1(Math.min(1, spell.ownership + summary.turnover * (1 - spell.ownership)) * 100) / 100
+    emit(world, 'ownership.changed', { spellId: spell.id, managerId: spell.managerId, turnover: summary.turnover, ownership: spell.ownership, window: 'winter', season: world.season })
   }
 }
 
