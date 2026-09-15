@@ -44,6 +44,7 @@ export function weeklySackingCheck(world: World, rng: Rng, spell: Spell): boolea
     return true
   }
   if (spell.credit <= T.CREDIT_INSTANT_SACK) {
+    if (spell.credit < spell.threshold) spell.weeksBelowThreshold++
     sack(world, spell, 'credit')
     return true
   }

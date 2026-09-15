@@ -89,6 +89,21 @@ describe('manager population', () => {
   })
 })
 
+describe('manager names', () => {
+  it('keeps producing unique names long after the plain pool is spent', async () => {
+    const { ManagerNamer } = await import('../src/managers/names.js')
+    const { createRng } = await import('../src/rng.js')
+    const namer = new ManagerNamer(createRng(1))
+    const seen = new Set<string>()
+    for (let i = 0; i < 6000; i++) {
+      const name = namer.next('home')
+      expect(seen.has(name)).toBe(false)
+      seen.add(name)
+    }
+    expect([...seen].some((n) => /\s[A-Z]\.\s/.test(n))).toBe(true)
+  })
+})
+
 describe('reputation bands', () => {
   it('maps reputation to the DESIGN bands', () => {
     expect(tiersForReputation(0)).toEqual([5])

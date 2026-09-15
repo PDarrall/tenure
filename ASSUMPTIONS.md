@@ -153,3 +153,18 @@ single branch, so they live here instead.
 - The Legacy weights are checked against two fixture careers (1,260 games,
   £35m, 30 points versus 600 games, £45m, 900 points) rather than drawn
   from the simulation.
+
+## Validation
+
+- A tracked career belongs to a manager whose first spell began after
+  genesis. `sim --careers N` follows the first N such managers to the end
+  of their careers (bounded by the age limit), so no career is censored.
+- Career length is seasons employed (sum of spell lengths), not calendar
+  years; "clubs" is the number of spells.
+- "Inside a season" means the first spell lasted fewer than 46 weeks.
+- "Unjust" means credit was below the threshold for fewer than eight
+  consecutive weeks at the sacking, or the sacking followed a takeover;
+  the share is over every sacking in the run, not only tracked careers.
+- Top-tier long tenures are counted at every season end from season nine,
+  at the clubs then in tier 1, and the reported figure is the mean.
+- "A handful" past 1,000 games is read as 2 to 15 of 500.

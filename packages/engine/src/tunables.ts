@@ -710,3 +710,38 @@ export const LEGACY_ARCHETYPES = {
   trophyLadenTwelveYears: { games: 600, earnings: 45, trophyPoints: 900 },
   tolerance: 0.2,
 } as const
+
+// ---------------------------------------------------------------------------
+// Validation targets (DESIGN.md "Validation targets"). Starting figures from
+// memory, TO VERIFY against the LMA end-of-season figures before locking in.
+// population.test.ts asserts these bands over 500 AI careers.
+// ---------------------------------------------------------------------------
+
+export const VALIDATION_TARGETS = {
+  /** Median first-spell length ≈ 1.5 seasons. To verify. */
+  firstSpellMedianSeasons: { target: 1.5, min: 1.2, max: 1.8 },
+  /** ~30% of first spells end inside a season. To verify. */
+  firstSpellInsideSeasonShare: { target: 0.3, min: 0.22, max: 0.38 },
+  /** ~40–50% of first-time managers never get a second job. To verify. */
+  neverSecondJobShare: { target: 0.45, min: 0.4, max: 0.5 },
+  /** Median career ≈ 6–8 seasons managed. To verify. */
+  careerMedianSeasons: { target: 7, min: 6, max: 8 },
+  /** ... across three or four clubs. To verify. */
+  careerMedianClubs: { target: 3.5, min: 3, max: 4 },
+  /** ~10% reach 20 seasons. To verify. */
+  twentySeasonShare: { target: 0.1, min: 0.07, max: 0.13 },
+  /** A handful pass 1,000 games (of 500 careers). To verify. */
+  thousandGameCount: { target: 5, min: 2, max: 15 },
+  /** At any moment, two to four top-tier managers have tenure over five years. To verify. */
+  topTierLongTenures: { target: 3, min: 2, max: 4 },
+  /** Unjust sackings ≈ 20–30% of all sackings. To verify. */
+  unjustSackingShare: { target: 0.25, min: 0.2, max: 0.3 },
+} as const
+
+/** Seasons skipped before sampling "at any moment" figures, so genesis spells can age. */
+export const VALIDATION_WARM_UP_SEASONS = 8
+/** A "long" top-tier tenure in seasons. */
+export const LONG_TENURE_SEASONS = 5
+/** A "20-season" career and a "1,000-game" career. */
+export const LONG_CAREER_SEASONS = 20
+export const LONG_CAREER_GAMES = 1000

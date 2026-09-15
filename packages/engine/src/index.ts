@@ -19,3 +19,7 @@ export { qualifies, wouldApply, poachable, agePenalty } from './market/shortlist
 export { reviewTags, assignTag, hasTag } from './market/tags.js'
 export { endCareer } from './market/retirement.js'
 export { careerScore, legacy, trophyPointsFor, promotionPointsFrom } from './scoring/score.js'
+export { runCareers } from './sim/run.js'
+export type { RunOptions, RunResult } from './sim/run.js'
+export { populationStats, countLongTopTierTenures, trackedManagers, median } from './stats/population.js'
+export type { PopulationStats, StatLine, Histogram } from './stats/population.js'

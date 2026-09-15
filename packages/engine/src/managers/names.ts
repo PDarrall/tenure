@@ -59,6 +59,11 @@ const POOLS: Record<Nationality, { first: string[]; last: string[] }> = {
   },
 }
 
+const INITIALS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W']
+/** Tries at a plain name before falling back to one with a middle initial. */
+const PLAIN_ATTEMPTS = 40
+const INITIAL_ATTEMPTS = 2000
+
 export class ManagerNamer {
   private readonly used: Set<string>
   constructor(
@@ -70,8 +75,16 @@ export class ManagerNamer {
 
   next(nationality: Nationality): string {
     const pool = POOLS[nationality]
-    for (let attempt = 0; attempt < 1000; attempt++) {
+    for (let attempt = 0; attempt < PLAIN_ATTEMPTS; attempt++) {
       const name = `${this.rng.pick(pool.first)} ${this.rng.pick(pool.last)}`
+      if (!this.used.has(name)) {
+        this.used.add(name)
+        return name
+      }
+    }
+    // The plain pool is nearly spent (a long-running world): add a middle initial.
+    for (let attempt = 0; attempt < INITIAL_ATTEMPTS; attempt++) {
+      const name = `${this.rng.pick(pool.first)} ${this.rng.pick(INITIALS)}. ${this.rng.pick(pool.last)}`
       if (!this.used.has(name)) {
         this.used.add(name)
         return name
