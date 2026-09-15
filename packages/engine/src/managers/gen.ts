@@ -51,6 +51,7 @@ function makeManager(rng: Rng, namer: ManagerNamer, id: number, draft: Draft, co
     name: namer.next(draft.nationality),
     nationality: draft.nationality,
     age: draft.age,
+    seasonGames: 0,
     background,
     reputation: clamp(draft.reputation + offsets.reputation, 0, 100),
     agent: rng.int(T.AGENT_RANGE[0], T.AGENT_RANGE[1]),

@@ -192,3 +192,189 @@ export const REPUTATION_BANDS: readonly {
 
 /** Tier-1 clubs ranked in the top N by prestige are "elite" (90+ band, −10 credit on hire). */
 export const ELITE_PRESTIGE_RANK = 6
+
+// ---------------------------------------------------------------------------
+// Calendar (DESIGN.md "Season and match": 38 or 46 league games, cups, two
+// windows, ~40 weekly turns). Weeks are shared by every tier; a week can hold
+// more than one match for a club.
+// ---------------------------------------------------------------------------
+
+/** Weeks in a season: MATCH_WEEKS of football then the summer. */
+export const MATCH_WEEKS = 40
+export const SUMMER_WEEKS = 6
+export const SEASON_WEEKS = MATCH_WEEKS + SUMMER_WEEKS
+
+/** "Monthly" rolls happen every this many weeks. */
+export const MONTH_WEEKS = 4
+
+/** League rounds per tier, index 0 = tier 1. DESIGN: 38 or 46. */
+export const LEAGUE_ROUNDS_BY_TIER: readonly number[] = [38, 46, 46, 46, 46]
+
+/** Season week of the winter window (played after that week's matches). */
+export const WINTER_WINDOW_WEEK = 20
+
+/** Season week of the summer window: the second summer week. */
+export const SUMMER_WINDOW_WEEK = MATCH_WEEKS + 1
+
+/** Season weeks each cup round is played in. Last entry is the final. */
+export const NATIONAL_CUP_ROUND_WEEKS: readonly number[] = [3, 8, 13, 18, 23, 28, 35]
+export const LEAGUE_CUP_ROUND_WEEKS: readonly number[] = [1, 6, 11, 16, 21, 26]
+export const EUROPEAN_ROUND_WEEKS: readonly number[] = [5, 12, 19, 27, 33]
+
+/** Tiers whose clubs enter the league cup. DESIGN: tiers 1–2. */
+export const LEAGUE_CUP_TIERS: readonly number[] = [1, 2]
+
+/** European places: top N of tier 1 plus the national cup winner. DESIGN: four. */
+export const EUROPEAN_LEAGUE_PLACES = 4
+
+/** Foreign entrants to the European competition, by league kind. Fills a 32-club bracket with the 5 home clubs. */
+export const EUROPEAN_FOREIGN_ENTRANTS: Readonly<Record<'big' | 'mid' | 'small', number>> = {
+  big: 12,
+  mid: 9,
+  small: 6,
+}
+
+/** Clubs promoted and relegated across each tier boundary. */
+export const UP_DOWN_PER_BOUNDARY = 3
+
+/** Size of the bottom zone: "bottom four" in crisis hires and survival tags. */
+export const BOTTOM_ZONE = 4
+
+// ---------------------------------------------------------------------------
+// Match model (DESIGN.md "Season and match"). Drives result variance and so
+// every credit-based target: median first spell, 30% inside a season.
+// ---------------------------------------------------------------------------
+
+/** Expected goals for two equal sides: home and away. */
+export const GOALS_BASE_HOME = 1.5
+export const GOALS_BASE_AWAY = 1.15
+
+/** Expected goals scale by exp(± sensitivity × strength difference). */
+export const GOAL_SENSITIVITY = 0.032
+
+/** Strength points added to the home side. */
+export const HOME_ADV = 0
+
+/** Results kept for form. DESIGN: last six. */
+export const FORM_WINDOW = 6
+
+/** Strength swing from form: ±this at all wins / all losses over the window. */
+export const FORM_WEIGHT = 3
+
+/** Strength swing from the manager's tactical ability: ±this at 100 / 0. */
+export const ABILITY_WEIGHT = 4
+
+/** Strength swing from squad morale: ±this at 100 / 0. */
+export const MORALE_WEIGHT = 3
+
+/** Shape matchup: winner's expected goals × (1 + this), loser's × (1 − this). DESIGN: ±5%. */
+export const TACTIC_RPS = 0.05
+
+/** Mentality: attack scales both sides' expected goals up, defend down, by this. */
+export const MENTALITY_VARIANCE = 0.2
+
+/** AI picks attack when the opponent is weaker by this many points, defend when stronger. */
+export const AI_MENTALITY_GAP = 12
+
+/** Goals per side considered when summing outcome probabilities. */
+export const MAX_GOALS = 10
+
+/** Tactical ability assumed for a club with no manager or an abstract foreign side. */
+export const CARETAKER_ABILITY = 40
+
+/** Morale change per result, scaled by the manager's motivation. */
+export const MORALE_WIN = 4
+export const MORALE_LOSS = -5
+/** Morale drifts back toward MORALE_INITIAL by this share each week. */
+export const MORALE_DECAY = 0.1
+
+/** Cup ties level after normal time go to a shoot-out; better side wins with base + this × strength gap share. */
+export const SHOOTOUT_STRENGTH_EDGE = 0.2
+
+// ---------------------------------------------------------------------------
+// Squad (DESIGN.md "Squad"). Serves: ceiling resets (turnover), ownership
+// and blame, and the long-tenure targets through strength maintenance.
+// ---------------------------------------------------------------------------
+
+/** Peak age band. Squads older than the top lose strength each summer. */
+export const PEAK_AGE: readonly [number, number] = [25, 29]
+
+/** Strength lost per summer by a squad past its peak, uniform. DESIGN: 3–5. */
+export const AGEING_LOSS: readonly [number, number] = [3, 5]
+
+/** Strength gained per summer by a squad younger than the peak band. */
+export const YOUNG_SQUAD_GROWTH = 1
+
+/** Mean age rises by this each summer before turnover. */
+export const AGE_DRIFT = 1
+
+/** Mean age of incoming signings; turnover pulls the squad toward it. */
+export const SIGNING_AGE = 26
+
+/** Mean age of promoted academy players. */
+export const ACADEMY_AGE = 19
+
+/** Share of the gap to the gravity target closed each summer. */
+export const GRAVITY_RATE = 0.3
+
+/** Transfer budget in £m per season = coefficient × wealth². Serves: earnings, big-spender ranks. */
+export const TRANSFER_BUDGET_PER_WEALTH_SQ = 0.012
+
+/** Spend returns: gain = SPEND_GAIN_MAX × r / (r + 1), r = spend / normal budget. Diminishing. */
+export const SPEND_GAIN_MAX = 9
+
+/** Dealing ability multiplies spend gain: 1 + this × (dealing − 50) / 50. */
+export const DEALING_EFFECT = 0.3
+
+/** AI spends this share of its summer budget. */
+export const AI_SPEND_FRACTION = 1
+/** The winter pot is this share of the normal budget. DESIGN: two windows. */
+export const WINTER_BUDGET_SHARE = 0.3
+
+/** First-XI turnover each summer = base + slope × (spend / normal budget), capped. */
+export const TURNOVER_BASE = 0.15
+export const TURNOVER_PER_BUDGET = 0.25
+export const TURNOVER_MAX = 0.7
+
+/** Academy players promoted into the XI = floor((development − offset) / step), clamped 0–max. */
+export const YOUTH_DEVELOPMENT_OFFSET = 25
+export const YOUTH_DEVELOPMENT_STEP = 12
+export const YOUTH_MAX_PER_SUMMER = 5
+
+/** Strength gained next season per academy player in the XI (slow, cheap). */
+export const YOUTH_GAIN_PER_PLAYER = 0.6
+
+/** Strength lost now per academy player replacing a senior (they are raw). */
+export const YOUTH_COST_PER_PLAYER = 0.4
+
+/** Age needed for a youth-promoted player to count as a signing for ownership. */
+export const ACADEMY_COUNTS_AS_SIGNING = true
+
+// ---------------------------------------------------------------------------
+// Prestige and wealth drift (DESIGN.md: prestige "slow-moving").
+// ---------------------------------------------------------------------------
+
+/** Share of the gap to the finish-implied prestige closed each season. */
+export const PRESTIGE_DRIFT_RATE = 0.15
+
+/** Prestige added by a trophy that season. */
+export const PRESTIGE_TROPHY_BONUS = 3
+
+/** Wealth follows prestige: share of the gap closed each season. */
+export const WEALTH_DRIFT_RATE = 0.2
+
+// ---------------------------------------------------------------------------
+// Abroad (abstract season for the foreign leagues).
+// ---------------------------------------------------------------------------
+
+/** Games credited to a manager for a season abroad (no match sim). */
+export const FOREIGN_GAMES_PER_SEASON = 34
+
+/** Noise (strength points) added when ranking a foreign league. */
+export const FOREIGN_SEASON_NOISE_SD = 6
+
+/** Foreign club strength drifts toward its league strength by this share per season. */
+export const FOREIGN_GRAVITY_RATE = 0.3
+
+/** Random strength shock per season for foreign clubs (sd). */
+export const FOREIGN_STRENGTH_SHOCK_SD = 2

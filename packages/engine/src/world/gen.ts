@@ -68,6 +68,8 @@ function makeClub(rng: Rng, id: number, tier: Tier, town: string): Club {
     shape: rng.pick(shapes),
     mentality: 'balanced',
     netSpendThisSeason: 0,
+    thisSeason: { cupFinals: 0, inBottomZone: false, academyPromoted: 0 },
+    pendingYouthGain: 0,
   }
 }
 
@@ -129,6 +131,10 @@ export function createWorld(seed: number): World {
     clubs: [],
     foreign: [],
     managers: [],
+    fixtures: [],
+    tables: [],
+    cups: [],
+    europeanEntrants: [],
     log: [],
   }
   const rng = rngFromState(world.rng)
@@ -146,5 +152,11 @@ export function createWorld(seed: number): World {
     foreignClubs: world.foreign.reduce((n, l) => n + l.clubs.length, 0),
   })
   createManagers(world, rng)
+  // Season one's European places go to the most prestigious tier-1 clubs.
+  world.europeanEntrants = world.clubs
+    .filter((c) => c.tier === 1)
+    .sort((a, b) => b.prestige - a.prestige || a.id - b.id)
+    .slice(0, T.EUROPEAN_LEAGUE_PLACES + 1)
+    .map((c) => c.id)
   return world
 }

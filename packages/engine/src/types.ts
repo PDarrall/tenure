@@ -81,6 +81,10 @@ export interface Club {
   mentality: Mentality
   /** £m, reset each summer. Ranked within the division for the big-spender tag. */
   netSpendThisSeason: number
+  /** Per-season counters, reset at season start. */
+  thisSeason: ClubSeasonTally
+  /** Strength banked from academy promotions, released next summer. */
+  pendingYouthGain: number
 }
 
 export type ForeignLeagueKind = 'big' | 'mid' | 'small'
@@ -122,6 +126,13 @@ export interface World {
   clubs: Club[]
   foreign: ForeignLeague[]
   managers: Manager[]
+  /** This season's fixtures, every competition. */
+  fixtures: Fixture[]
+  /** This season's league tables, one row per club. */
+  tables: TableRow[]
+  cups: CupState[]
+  /** Home clubs entering the European competition this season. */
+  europeanEntrants: ClubId[]
   log: Event[]
 }
 
@@ -216,6 +227,8 @@ export interface Manager {
   nationality: Nationality
   /** Whole years; incremented each summer. */
   age: number
+  /** Matches managed this season, reset each summer. */
+  seasonGames: number
   background: Background
   /** 0–100, employability. */
   reputation: number
@@ -231,4 +244,53 @@ export interface Manager {
   /** Season the manager entered the population; 0 for genesis. */
   cohortSeason: number
   isHuman: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Season (DESIGN.md "Season and match")
+// ---------------------------------------------------------------------------
+
+export interface Fixture {
+  /** Season week (0-based) the match is played in. */
+  week: number
+  competition: Competition
+  /** Cup round, 1-based; league round for the league. */
+  round: number
+  homeId: ClubId
+  awayId: ClubId
+  /** Tier for league fixtures. */
+  tier?: Tier
+  played: boolean
+  homeGoals?: number
+  awayGoals?: number
+}
+
+export interface TableRow {
+  clubId: ClubId
+  tier: Tier
+  played: number
+  won: number
+  drawn: number
+  lost: number
+  goalsFor: number
+  goalsAgainst: number
+  points: number
+}
+
+export interface CupState {
+  competition: 'nationalCup' | 'leagueCup' | 'european'
+  /** Season weeks of each round; last is the final. */
+  roundWeeks: number[]
+  /** Clubs still in. Foreign ids appear in the European competition. */
+  remaining: ClubId[]
+  /** Rounds already drawn and played. */
+  roundsPlayed: number
+  winnerId: ClubId | null
+  finalistIds: ClubId[]
+}
+
+export interface ClubSeasonTally {
+  cupFinals: number
+  inBottomZone: boolean
+  academyPromoted: number
 }
