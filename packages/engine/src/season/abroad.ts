@@ -8,6 +8,7 @@ import { emit } from '../events.js'
 import * as T from '../tunables.js'
 import { clamp, round1 } from '../world/gen.js'
 import { managerById } from '../lookup.js'
+import { awardTrophyPoints } from '../scoring/score.js'
 import type { ForeignClub, Manager, SeasonRecord, World } from '../types.js'
 
 export interface ForeignOutcome {
@@ -75,7 +76,11 @@ export function settleForeignLeagues(
 }
 
 function awardForeignTitle(world: World, club: ForeignClub, manager: Manager | undefined): void {
-  if (manager) manager.history.honours.push({ season: world.season, competition: 'foreignLeague', clubId: club.id, league: club.league })
+  if (manager) {
+    const honour = { season: world.season, competition: 'foreignLeague' as const, clubId: club.id, league: club.league }
+    manager.history.honours.push(honour)
+    awardTrophyPoints(world, manager, honour)
+  }
   emit(world, 'trophy', {
     clubId: club.id,
     managerId: manager ? manager.id : null,

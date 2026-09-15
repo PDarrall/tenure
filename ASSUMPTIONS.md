@@ -141,3 +141,15 @@ single branch, so they live here instead.
   earned (see TAG_RULES). "Loyal" counts declined approaches as a season.
 - The working population is topped up to 400 with new entrants each
   summer.
+
+## Scoring
+
+- Trophy points are banked the moment the trophy is won by the manager in
+  post, so a sacking later in the season does not cost them.
+- Promotion points go to the manager in post at season end; a champion
+  gets the title points, not the promotion points.
+- Bonuses are a share of the season's salary: 25% for a trophy, 50% for a
+  promotion. They count toward career earnings.
+- The Legacy weights are checked against two fixture careers (1,260 games,
+  £35m, 30 points versus 600 games, £45m, 900 points) rather than drawn
+  from the simulation.

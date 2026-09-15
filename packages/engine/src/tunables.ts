@@ -679,3 +679,34 @@ export const TAG_RULES = {
 
 /** Each summer the population of non-retired managers is topped up to POPULATION. */
 export const COHORT_TOP_UP = true
+
+// ---------------------------------------------------------------------------
+// The score (DESIGN.md "The score"). Serves: Legacy calibration — a 30-year
+// mid-table career and a 12-year trophy-laden career within ~20%.
+// ---------------------------------------------------------------------------
+
+/** Trophy points. DESIGN starting values. */
+export const TROPHY_POINTS = {
+  european: 120,
+  nationalCup: 50,
+  leagueCup: 25,
+  /** League titles by tier, index 0 = tier 1. */
+  leagueByTier: [100, 40, 25, 15, 10],
+  /** Promotion without the title, by the tier promoted from (tier 2 first). */
+  promotionFromTier: [20, 12, 8, 5],
+  foreign: { big: 80, mid: 40, small: 20 },
+} as const
+
+/** Legacy = games × a + earnings(£m) × b + trophy points × c. */
+export const LEGACY_WEIGHTS = { games: 0.2, earnings: 2, trophyPoints: 0.15 } as const
+
+/** Bonuses as a share of the season's salary: for a trophy, for a promotion. Serves: earnings mix. */
+export const TROPHY_BONUS_SHARE = 0.25
+export const PROMOTION_BONUS_SHARE = 0.5
+
+/** Reference careers the Legacy weights are checked against (DESIGN: within ~20%). */
+export const LEGACY_ARCHETYPES = {
+  midTableThirtyYears: { games: 1260, earnings: 35, trophyPoints: 30 },
+  trophyLadenTwelveYears: { games: 600, earnings: 45, trophyPoints: 900 },
+  tolerance: 0.2,
+} as const

@@ -4,6 +4,7 @@ import { clamp, round1 } from '../world/gen.js'
 import type { Club, ClubId, Tier, World } from '../types.js'
 import { tableFor } from './table.js'
 import { managerAt } from '../lookup.js'
+import { awardPromotionPoints, awardTrophyPoints } from '../scoring/score.js'
 
 export interface LeagueOutcome {
   /** Final position per home club, within the tier it played in. */
@@ -19,7 +20,10 @@ export function awardHonour(world: World, club: Club, competition: 'league' | 'n
   const honour = tier === undefined ? { season: world.season, competition, clubId: club.id } : { season: world.season, competition, clubId: club.id, tier }
   club.honours.push(honour)
   const manager = managerAt(world, club)
-  if (manager) manager.history.honours.push({ ...honour })
+  if (manager) {
+    manager.history.honours.push({ ...honour })
+    awardTrophyPoints(world, manager, honour)
+  }
   emit(world, 'trophy', {
     clubId: club.id,
     managerId: manager ? manager.id : null,
@@ -92,6 +96,10 @@ export function settleLeagues(world: World): LeagueOutcome {
     const from = club.tier
     club.tier = to
     if (to > from) club.lastRelegatedSeason = world.season
+    if (to < from) {
+      const manager = managerAt(world, club)
+      if (manager) awardPromotionPoints(world, manager, from, outcome.champions.get(from) === club.id)
+    }
     emit(world, to < from ? 'promotion' : 'relegation', {
       clubId: club.id,
       managerId: club.managerId,
