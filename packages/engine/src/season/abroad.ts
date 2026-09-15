@@ -7,17 +7,24 @@ import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import * as T from '../tunables.js'
 import { clamp, round1 } from '../world/gen.js'
+import { managerById } from '../lookup.js'
 import type { ForeignClub, Manager, SeasonRecord, World } from '../types.js'
 
 export interface ForeignOutcome {
   finish: Map<number, number>
 }
 
-export function settleForeignLeagues(world: World, rng: Rng): ForeignOutcome {
+export type ForeignExtrasFor = (managerId: number) => { expectation: number; fallouts: number; boardRows: number }
+
+export function settleForeignLeagues(
+  world: World,
+  rng: Rng,
+  extrasFor: ForeignExtrasFor = () => ({ expectation: 0, fallouts: 0, boardRows: 0 }),
+): ForeignOutcome {
   const finishAll = new Map<number, number>()
   for (const league of world.foreign) {
     const scored = league.clubs.map((club) => {
-      const manager = world.managers.find((m) => m.id === club.managerId)
+      const manager = club.managerId === null ? undefined : managerById(world, club.managerId)
       const tactical = manager ? manager.ability.tactical : T.CARETAKER_ABILITY
       const score = club.strength + (T.ABILITY_WEIGHT * (tactical - 50)) / 50 + rng.normal(0, T.FOREIGN_SEASON_NOISE_SD)
       return { club, manager, score }
@@ -36,7 +43,7 @@ export function settleForeignLeagues(world: World, rng: Rng): ForeignOutcome {
           tier: null,
           games: T.FOREIGN_GAMES_PER_SEASON,
           finish,
-          expectation: 0,
+          expectation: extrasFor(manager.id).expectation,
           promoted: false,
           relegated: false,
           trophies: finish === 1 ? 1 : 0,

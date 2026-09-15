@@ -1,18 +1,7 @@
 import type { Rng } from '../rng.js'
-import { emit } from '../events.js'
 import * as T from '../tunables.js'
 import { clamp } from '../world/gen.js'
-import type {
-  Ability,
-  Background,
-  ForeignLeagueKind,
-  Manager,
-  Nationality,
-  Post,
-  Shape,
-  Tier,
-  World,
-} from '../types.js'
+import type { Ability, Background, Manager, Nationality, Post, Shape, World } from '../types.js'
 import { ManagerNamer } from './names.js'
 
 function drawBackground(rng: Rng): Background {
@@ -94,12 +83,19 @@ export function makeEntrant(rng: Rng, namer: ManagerNamer, id: number, cohortSea
   )
 }
 
+export interface Assignment {
+  managerId: number
+  post: Post
+}
+
 /**
- * Populate the world at genesis: an incumbent at every home and foreign club,
- * then entrants up to POPULATION, all unemployed.
+ * Populate the world at genesis: an incumbent for every home and foreign
+ * club (returned as assignments for the tenure system to seat), then
+ * entrants up to POPULATION. Everyone starts unemployed here.
  */
-export function createManagers(world: World, rng: Rng): void {
+export function createManagers(world: World, rng: Rng): Assignment[] {
   const namer = new ManagerNamer(rng)
+  const assignments: Assignment[] = []
   let id = 1
 
   for (const club of world.clubs) {
@@ -117,7 +113,7 @@ export function createManagers(world: World, rng: Rng): void {
       },
       0,
     )
-    seat(world, manager, { kind: 'home', clubId: club.id })
+    assignments.push({ managerId: manager.id, post: { kind: 'home', clubId: club.id } })
     world.managers.push(manager)
   }
 
@@ -136,7 +132,7 @@ export function createManagers(world: World, rng: Rng): void {
         },
         0,
       )
-      seat(world, manager, { kind: 'abroad', league: league.kind, clubId: club.id })
+      assignments.push({ managerId: manager.id, post: { kind: 'abroad', league: league.kind, clubId: club.id } })
       world.managers.push(manager)
     }
   }
@@ -145,33 +141,5 @@ export function createManagers(world: World, rng: Rng): void {
     world.managers.push(makeEntrant(rng, namer, id++, 0))
   }
 
-  emit(world, 'managers.created', {
-    total: world.managers.length,
-    employed: world.managers.filter((m) => m.status.kind === 'employed').length,
-  })
-}
-
-/** Put a manager in a post and point the club back at them. */
-export function seat(world: World, manager: Manager, post: Post): void {
-  manager.status = { kind: 'employed', post }
-  if (post.kind === 'home') {
-    const club = world.clubs.find((c) => c.id === post.clubId)
-    if (!club) throw new Error(`seat: no home club ${post.clubId}`)
-    club.managerId = manager.id
-  } else {
-    const club = foreignClub(world, post.league, post.clubId)
-    club.managerId = manager.id
-  }
-}
-
-export function foreignClub(world: World, league: ForeignLeagueKind, clubId: number) {
-  const found = world.foreign.find((l) => l.kind === league)?.clubs.find((c) => c.id === clubId)
-  if (!found) throw new Error(`no foreign club ${clubId} in ${league}`)
-  return found
-}
-
-export function tierOf(post: Post, world: World): Tier | null {
-  if (post.kind !== 'home') return null
-  const club = world.clubs.find((c) => c.id === post.clubId)
-  return club ? club.tier : null
+  return assignments
 }

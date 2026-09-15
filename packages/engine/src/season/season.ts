@@ -1,13 +1,14 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import * as T from '../tunables.js'
-import type { Club, ClubId, CupState, Fixture, Manager, Result, SeasonRecord, Tier, World } from '../types.js'
+import type { Club, ClubId, CupState, Event, Fixture, Manager, Result, SeasonRecord, Tier, World } from '../types.js'
+import { homeClub, managerAt } from '../lookup.js'
 import { matchTemplateKey } from '../text/render.js'
 import { leagueFixtures } from './fixtures.js'
 import { applyResult, resetTables, tableFor } from './table.js'
 import { knockoutExpected, playMatch, type Participant } from './match.js'
 import { drawRound, isFinal, seedCups } from './cups.js'
-import { decayMorale, managerOf, runWindow, summerSquad, updateMorale } from './squad.js'
+import { decayMorale, runWindow, summerSquad, updateMorale, type WindowSummary } from './squad.js'
 import { awardHonour, settleLeagues } from './promotion.js'
 import { settleForeignLeagues } from './abroad.js'
 
@@ -23,13 +24,13 @@ export function startSeason(world: World, rng: Rng): void {
 }
 
 function clubById(world: World, id: ClubId): Club | undefined {
-  return world.clubs.find((c) => c.id === id)
+  return homeClub(world, id)
 }
 
 function participantFor(world: World, id: ClubId, opponentStrength: number): Participant {
   const club = clubById(world, id)
   if (club) {
-    const manager = managerOf(world, club)
+    const manager = managerAt(world, club)
     const tactical = manager ? manager.ability.tactical : T.CARETAKER_ABILITY
     const gap = club.squad.strength - opponentStrength
     club.mentality = gap >= T.AI_MENTALITY_GAP ? 'attack' : gap <= -T.AI_MENTALITY_GAP ? 'defend' : 'balanced'
@@ -76,7 +77,7 @@ function recordResult(world: World, club: Club | undefined, result: Result): voi
   if (!club) return
   club.form.push(result)
   if (club.form.length > T.FORM_WINDOW) club.form.splice(0, club.form.length - T.FORM_WINDOW)
-  const manager = managerOf(world, club)
+  const manager = managerAt(world, club)
   updateMorale(club, result, manager ? manager.ability.motivation : T.CARETAKER_ABILITY)
   if (manager) {
     manager.seasonGames++
@@ -94,6 +95,8 @@ export interface PlayedFixture {
   expAway: number
   homePoints: number
   awayPoints: number
+  /** The match.played event, so later systems can annotate it. */
+  event: Event
 }
 
 /** Play one fixture: sample the result, update form, morale, tables and the log. */
@@ -139,10 +142,10 @@ export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFix
   }
   const homePoints = homeResult === 'W' ? 3 : homeResult === 'D' ? 1 : 0
   const awayPoints = awayResult === 'W' ? 3 : awayResult === 'D' ? 1 : 0
-  const homeManager = homeClub ? managerOf(world, homeClub) : undefined
-  const awayManager = awayClub ? managerOf(world, awayClub) : undefined
+  const homeManager = homeClub ? managerAt(world, homeClub) : undefined
+  const awayManager = awayClub ? managerAt(world, awayClub) : undefined
 
-  emit(world, 'match.played', {
+  const event = emit(world, 'match.played', {
     competition: fixture.competition,
     round: fixture.round,
     tier: fixture.tier ?? null,
@@ -158,7 +161,7 @@ export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFix
     text: matchTemplateKey(outcome.homeGoals, outcome.awayGoals, outcome.shootoutWinnerId !== undefined),
   })
 
-  return { fixture, winnerId, loserId, homeManager, awayManager, expHome, expAway, homePoints, awayPoints }
+  return { fixture, winnerId, loserId, homeManager, awayManager, expHome, expAway, homePoints, awayPoints, event }
 }
 
 function tierOfClub(world: World, id: ClubId): Tier | null {
@@ -232,7 +235,19 @@ export interface SeasonEnd {
   playedTier: Map<ClubId, Tier>
   promoted: Set<ClubId>
   relegated: Set<ClubId>
+  /** Finish per foreign club. */
+  foreignFinish: Map<ClubId, number>
 }
+
+/** What the season needs from the tenure system to complete a season record. */
+export interface RecordExtras {
+  expectation: number
+  fallouts: number
+  boardRows: number
+}
+export type ExtrasFor = (managerId: number) => RecordExtras
+
+export const noExtras: ExtrasFor = () => ({ expectation: 0, fallouts: 0, boardRows: 0 })
 
 function netSpendRank(world: World, club: Club, tier: Tier): number {
   const division = world.clubs.filter((c) => c.tier === tier)
@@ -241,26 +256,27 @@ function netSpendRank(world: World, club: Club, tier: Tier): number {
 }
 
 /** Close the season: foreign leagues, home divisions, season records, ageing, drift. */
-export function endSeason(world: World, rng: Rng): SeasonEnd {
-  settleForeignLeagues(world, rng)
+export function endSeason(world: World, rng: Rng, extrasFor: ExtrasFor = noExtras): SeasonEnd {
+  const foreign = settleForeignLeagues(world, rng, extrasFor)
   // Net-spend ranks are taken against the tiers as played, before any swap.
   const spendRank = new Map<ClubId, number>()
   for (const club of world.clubs) spendRank.set(club.id, netSpendRank(world, club, club.tier))
   const outcome = settleLeagues(world)
 
   for (const club of world.clubs) {
-    const manager = managerOf(world, club)
+    const manager = managerAt(world, club)
     const tier = outcome.playedTier.get(club.id) as Tier
     const finish = outcome.finish.get(club.id) as number
     const size = T.TIER_SIZES[tier - 1] as number
     if (manager) {
+      const extras = extrasFor(manager.id)
       const record: SeasonRecord = {
         season: world.season,
         post: { kind: 'home', clubId: club.id },
         tier,
         games: manager.seasonGames,
         finish,
-        expectation: 0,
+        expectation: extras.expectation,
         promoted: outcome.promoted.has(club.id),
         relegated: outcome.relegated.has(club.id),
         trophies: club.honours.filter((h) => h.season === world.season).length,
@@ -268,8 +284,8 @@ export function endSeason(world: World, rng: Rng): SeasonEnd {
         netSpendRank: spendRank.get(club.id) as number,
         cupFinals: club.thisSeason.cupFinals,
         academyInXi: club.squad.academyInXi,
-        fallouts: 0,
-        boardRows: 0,
+        fallouts: extras.fallouts,
+        boardRows: extras.boardRows,
       }
       manager.history.seasons.push(record)
     }
@@ -288,15 +304,18 @@ export function endSeason(world: World, rng: Rng): SeasonEnd {
     promoted: [...outcome.promoted],
     relegated: [...outcome.relegated],
   })
-  return outcome
+  return { ...outcome, foreignFinish: foreign.finish }
 }
 
-export function summerWindow(world: World): void {
-  for (const club of world.clubs) runWindow(world, club, true, 1)
+export type BudgetMultiplierFor = (clubId: ClubId) => number
+const flatBudget: BudgetMultiplierFor = () => 1
+
+export function summerWindow(world: World, multiplierFor: BudgetMultiplierFor = flatBudget): WindowSummary[] {
+  return world.clubs.map((club) => runWindow(world, club, true, multiplierFor(club.id)))
 }
 
-export function winterWindow(world: World): void {
-  for (const club of world.clubs) runWindow(world, club, false, 1)
+export function winterWindow(world: World): WindowSummary[] {
+  return world.clubs.map((club) => runWindow(world, club, false, 1))
 }
 
 export { tableFor }

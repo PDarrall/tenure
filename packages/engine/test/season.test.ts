@@ -149,7 +149,9 @@ describe('a full season', () => {
   })
 
   it('writes a season record for every manager in a post, then ages everyone', () => {
-    for (const club of world.clubs) {
+    const staffed = world.clubs.filter((c) => c.managerId !== null)
+    expect(staffed.length).toBeGreaterThan(0)
+    for (const club of staffed) {
       const manager = world.managers.find((m) => m.id === club.managerId)!
       expect(manager.history.seasons).toHaveLength(1)
       const record = manager.history.seasons[0]!
@@ -161,6 +163,7 @@ describe('a full season', () => {
     }
     for (const league of world.foreign) {
       for (const club of league.clubs) {
+        if (club.managerId === null) continue
         const manager = world.managers.find((m) => m.id === club.managerId)!
         expect(manager.history.seasons[0]!.games).toBe(T.FOREIGN_GAMES_PER_SEASON)
       }

@@ -3,7 +3,7 @@ import * as T from '../tunables.js'
 import { clamp, round1 } from '../world/gen.js'
 import type { Club, ClubId, Tier, World } from '../types.js'
 import { tableFor } from './table.js'
-import { managerOf } from './squad.js'
+import { managerAt } from '../lookup.js'
 
 export interface LeagueOutcome {
   /** Final position per home club, within the tier it played in. */
@@ -18,7 +18,7 @@ export interface LeagueOutcome {
 export function awardHonour(world: World, club: Club, competition: 'league' | 'nationalCup' | 'leagueCup' | 'european', tier?: Tier): void {
   const honour = tier === undefined ? { season: world.season, competition } : { season: world.season, competition, tier }
   club.honours.push(honour)
-  const manager = managerOf(world, club)
+  const manager = managerAt(world, club)
   if (manager) manager.history.honours.push(honour)
   emit(world, 'trophy', {
     clubId: club.id,

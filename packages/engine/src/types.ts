@@ -133,6 +133,8 @@ export interface World {
   cups: CupState[]
   /** Home clubs entering the European competition this season. */
   europeanEntrants: ClubId[]
+  spells: Spell[]
+  nextSpellId: SpellId
   log: Event[]
 }
 
@@ -204,7 +206,7 @@ export type UnemployedActivity = 'wait' | 'punditry' | 'assistant' | 'abroad'
 export type RetirementReason = 'no-offers' | 'age' | 'scandal' | 'voluntary'
 
 export type ManagerStatus =
-  | { kind: 'employed'; post: Post }
+  | { kind: 'employed'; post: Post; spellId: SpellId }
   | { kind: 'unemployed'; sinceWeek: number; activity: UnemployedActivity; monthsSinceShortlisted: number }
   | { kind: 'retired'; week: number; reason: RetirementReason }
 
@@ -293,4 +295,73 @@ export interface ClubSeasonTally {
   cupFinals: number
   inBottomZone: boolean
   academyPromoted: number
+}
+
+// ---------------------------------------------------------------------------
+// Tenure (DESIGN.md "Tenure model")
+// ---------------------------------------------------------------------------
+
+export type Promise = 'top-half' | 'promotion' | 'stability'
+
+export type SpellEndReason = 'sacked' | 'mutual' | 'resigned' | 'poached' | 'expired' | 'retired'
+
+export interface Contract {
+  /** Global week the contract runs to (a season-end week). */
+  endWeek: number
+  /** £m per season. */
+  salary: number
+  yearsAtSigning: number
+  promise: Promise
+}
+
+export interface SpellSeasonTally {
+  games: number
+  points: number
+  /** Share of the first XI replaced in the last summer window. */
+  xiTurnover: number
+  fallouts: number
+  boardRows: number
+  /** £m earned in this season of the spell. */
+  earned: number
+}
+
+export interface Spell {
+  id: SpellId
+  managerId: ManagerId
+  post: Post
+  startWeek: number
+  endWeek: number | null
+  endReason: SpellEndReason | null
+  contract: Contract
+  /** Multiplier on the club's normal transfer budget (promise, crisis). */
+  budgetMultiplier: number
+  /** Board target finish. */
+  expectation: number
+  /** Finish the squad's strength rank implies. */
+  structuralTarget: number
+  /** 0–ceiling. The sacking variable. */
+  credit: number
+  ceiling: number
+  /** Board's sacking threshold; erratic owners re-roll monthly. */
+  threshold: number
+  seasonsCompleted: number
+  /** Share of the first XI the manager signed, 0–1. */
+  ownership: number
+  /** Consecutive weeks with credit below the threshold. */
+  weeksBelowThreshold: number
+  consecutiveDefeats: number
+  crisisHire: boolean
+  /** Extra seasons toward the loyal tag from declined approaches. */
+  loyaltyBonus: number
+  /** Set when a takeover has decided to replace the manager. */
+  takeover: { week: number; replaceWeek: number } | null
+  /** Set when a fallout has already been rolled for the current losing run. */
+  falloutRolled: boolean
+  season: SpellSeasonTally
+  /** £m paid on the way out. */
+  payout: number
+  /** Whether a sacking was deserved (below threshold for DESERVED_WEEKS). */
+  deserved: boolean | null
+  /** Last season's finish, waiting for the summer expectation reset. */
+  pendingReset: { finish: number; movedTier: boolean } | null
 }

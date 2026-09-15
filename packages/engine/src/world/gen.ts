@@ -13,6 +13,7 @@ import type {
 } from '../types.js'
 import { clubName, ForeignNamer, foreignLeagueName, TownNamer } from './names.js'
 import { createManagers } from '../managers/gen.js'
+import { seatIncumbents } from '../tenure/spell.js'
 
 export function clamp(x: number, lo: number, hi: number): number {
   return x < lo ? lo : x > hi ? hi : x
@@ -135,6 +136,8 @@ export function createWorld(seed: number): World {
     tables: [],
     cups: [],
     europeanEntrants: [],
+    spells: [],
+    nextSpellId: 1,
     log: [],
   }
   const rng = rngFromState(world.rng)
@@ -151,7 +154,12 @@ export function createWorld(seed: number): World {
     clubs: world.clubs.length,
     foreignClubs: world.foreign.reduce((n, l) => n + l.clubs.length, 0),
   })
-  createManagers(world, rng)
+  const assignments = createManagers(world, rng)
+  seatIncumbents(world, rng, assignments)
+  emit(world, 'managers.created', {
+    total: world.managers.length,
+    employed: world.managers.filter((m) => m.status.kind === 'employed').length,
+  })
   // Season one's European places go to the most prestigious tier-1 clubs.
   world.europeanEntrants = world.clubs
     .filter((c) => c.tier === 1)

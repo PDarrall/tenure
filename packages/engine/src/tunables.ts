@@ -378,3 +378,182 @@ export const FOREIGN_GRAVITY_RATE = 0.3
 
 /** Random strength shock per season for foreign clubs (sd). */
 export const FOREIGN_STRENGTH_SHOCK_SD = 2
+
+// ---------------------------------------------------------------------------
+// Expectation (DESIGN.md "Expectation"). Serves: median first spell ≈ 1.5
+// seasons and the 30% inside-a-season share, through the season-end delta.
+// ---------------------------------------------------------------------------
+
+/** Owner ambition lifts the target by up to this many places (ambition 1). */
+export const EXPECT_AMBITION_PLACES = 3
+
+/** After a missed target, the target eases one place toward the structural one. */
+export const EXPECT_EASE_PER_MISS = 1
+
+/** Interview promises. DESIGN: promotion +30% budget, +3 places; stability −10%, −2 places. */
+export const PROMISE_EFFECTS: Readonly<Record<'top-half' | 'promotion' | 'stability', { budget: number; places: number }>> = {
+  'top-half': { budget: 1, places: 0 },
+  promotion: { budget: 1.3, places: -3 },
+  stability: { budget: 0.9, places: 2 },
+}
+
+// ---------------------------------------------------------------------------
+// Credit (DESIGN.md "Credit"). Serves: median first spell, 30% inside a
+// season, 10% reach 20 seasons (ceiling and staleness).
+// ---------------------------------------------------------------------------
+
+export const CREDIT_ON_HIRE = 55
+/** Crisis hire: bottom zone, just relegated, or predecessor sacked mid-season. */
+export const CREDIT_CRISIS_BONUS = 15
+/** Hire at an elite (top-six-prestige) club. */
+export const CREDIT_ELITE_PENALTY = -10
+/** Per match: Δ = K × (points − expected points). */
+export const CREDIT_K = 2
+/** Losses weighted × this. Credit erodes unless you overachieve; watch in validation. */
+export const CREDIT_LOSS_WEIGHT = 1.5
+/** From this consecutive defeat on, an extra penalty each. */
+export const CREDIT_CONSEC_DEFEAT_FROM = 3
+export const CREDIT_CONSEC_DEFEAT = -2
+export const CREDIT_DERBY_DEFEAT = -4
+export const CREDIT_CUP_EXIT_LOWER = -6
+/** Beating a side in the top N of its division. */
+export const CREDIT_BEAT_TOP = 2
+export const CREDIT_TOP_SIDE_RANK = 3
+/** Monthly: position worse than expectation by this many places or more. */
+export const CREDIT_MONTH_GAP_PLACES = 4
+export const CREDIT_MONTH_GAP = -3
+/** Season end: (expectation − finish) × this, clamped ± the clamp. */
+export const CREDIT_SEASON_PER_PLACE = 3
+export const CREDIT_SEASON_CLAMP = 20
+export const CREDIT_PROMOTION = 20
+export const CREDIT_RELEGATION = -25
+export const CREDIT_TROPHY = 15
+/** Ceiling stays here for the first seasons, then falls per season (staleness). */
+export const CREDIT_CEILING = 100
+export const CEILING_FULL_SEASONS = 3
+export const CEILING_STALENESS_PER_SEASON = 10
+/** First-XI turnover in one summer that resets the ceiling. */
+export const CEILING_RESET_TURNOVER = 0.5
+/** Blame: for this many seasons, negative deltas × (base + share × ownership). */
+export const BLAME_SEASONS = 2
+export const BLAME_BASE = 0.5
+export const BLAME_OWNERSHIP_SHARE = 0.5
+
+// ---------------------------------------------------------------------------
+// Sacking (DESIGN.md "Sacking"). Serves: unjust sackings ≈ 20–30%, median
+// first spell.
+// ---------------------------------------------------------------------------
+
+export const SACK_THRESHOLD: Readonly<Record<'patient' | 'normal' | 'impatient', number>> = {
+  patient: 15,
+  normal: 25,
+  impatient: 35,
+}
+/** Erratic owners: uniform in this range, re-rolled monthly. */
+export const SACK_THRESHOLD_ERRATIC: readonly [number, number] = [10, 45]
+/** Weekly roll while below threshold: base × (1 − perYear × years remaining), floored. */
+export const SACK_ROLL_BASE = 0.1
+export const SACK_ROLL_PER_YEAR = 0.2
+export const SACK_ROLL_FLOOR = 0.03
+/** Credit at or below this: sacked at once. */
+export const CREDIT_INSTANT_SACK = 5
+/** A sacking is "deserved" after this many consecutive weeks below threshold. */
+export const DESERVED_WEEKS = 8
+export const REP_SACKED_DESERVED = -8
+export const REP_SACKED_UNJUST = -2
+
+// ---------------------------------------------------------------------------
+// Shocks (DESIGN.md "Shocks"). Serves: unjust sackings ≈ 20–30%.
+// ---------------------------------------------------------------------------
+
+/** Wealth below this counts as a low-wealth club. */
+export const LOW_WEALTH = 30
+export const TAKEOVER_P = 0.01
+export const TAKEOVER_LOW_WEALTH_MULT = 3
+/** New owner replaces the manager within this many months with this chance, whatever the results. */
+export const TAKEOVER_REPLACE_P = 0.35
+export const TAKEOVER_REPLACE_MONTHS = 6
+export const CRISIS_P = 0.005
+export const CRISIS_LOW_WEALTH_MULT = 3
+export const CRISIS_BUDGET_CUT = 0.4
+export const CRISIS_EXPECTATION_EASE = 3
+/** Forced star sale: only at low-wealth clubs. */
+export const STAR_SALE_P = 0.01
+export const STAR_SALE_STRENGTH = -5
+export const STAR_SALE_EXPECTATION_EASE = 1
+/** Dressing-room fallout rolls once per losing run of this length. */
+export const FALLOUT_TRIGGER_DEFEATS = 4
+export const FALLOUT_P = 0.25
+/** Back down: squad morale falls. Sell: ownership up, strength down, "difficult" progress. */
+export const FALLOUT_MORALE_LOSS = 10
+export const FALLOUT_STRENGTH_LOSS = 3
+export const FALLOUT_OWNERSHIP_GAIN = 1 / 11
+/** AI sells the player when its motivation ability is below this. */
+export const AI_FALLOUT_SELL_BELOW_MOTIVATION = 50
+/** Board rows: monthly roll while credit is within the margin above threshold. */
+export const BOARD_ROW_P = 0.05
+export const BOARD_ROW_MARGIN = 10
+export const BOARD_ROW_CREDIT = -3
+
+// ---------------------------------------------------------------------------
+// Ways out (DESIGN.md "Ways out"). Serves: careers across three or four clubs.
+// ---------------------------------------------------------------------------
+
+/** Mutual consent is offered while credit sits in this window. */
+export const MUTUAL_WINDOW: readonly [number, number] = [10, 25]
+export const MUTUAL_PAYOUT_SHARE = 0.5
+export const REP_MUTUAL = -4
+/** AI accepts a mutual-consent offer with this chance each month it is offered. */
+export const AI_MUTUAL_ACCEPT_P = 0.3
+/** Resigning: reputation hit depends on credit at the split. */
+export const RESIGN_CREDIT_SPLIT = 50
+export const REP_RESIGN_HIGH = -1
+export const REP_RESIGN_LOW = -5
+/** AI resigns with this monthly chance while below threshold (jumping before the push). */
+export const AI_RESIGN_P = 0.02
+/** Contract expiry: renewed above this credit, otherwise released. */
+export const EXPIRY_RENEW_CREDIT = 40
+export const REP_RELEASED = -3
+/** Years on a renewal. */
+export const RENEW_YEARS = 2
+
+// ---------------------------------------------------------------------------
+// Reputation moves at season end (DESIGN.md "Reputation moves"). Serves:
+// 40–50% never get a second job; median career 6–8 seasons.
+// ---------------------------------------------------------------------------
+
+export const REP_SEASON_PER_PLACE = 2
+export const REP_SEASON_CLAMP = 8
+export const REP_TROPHY = 6
+/** Tier weights on the trophy reputation gain. */
+export const REP_TROPHY_WEIGHT: Readonly<Record<string, number>> = {
+  'league-1': 1,
+  'league-2': 0.6,
+  'league-3': 0.4,
+  'league-4': 0.3,
+  'league-5': 0.2,
+  nationalCup: 0.8,
+  leagueCup: 0.5,
+  european: 1.2,
+  'foreign-big': 0.9,
+  'foreign-mid': 0.5,
+  'foreign-small': 0.3,
+}
+export const REP_PROMOTION = 5
+export const REP_RELEGATION = -6
+
+// ---------------------------------------------------------------------------
+// Contracts and pay (DESIGN.md "Job market": salary by tier × reputation).
+// Serves: earnings scale in Legacy.
+// ---------------------------------------------------------------------------
+
+/** £m per season at reputation 50, index 0 = tier 1. */
+export const SALARY_BASE_BY_TIER: readonly number[] = [3, 1, 0.4, 0.2, 0.08]
+export const SALARY_BASE_ABROAD: Readonly<Record<'big' | 'mid' | 'small', number>> = { big: 3, mid: 1, small: 0.3 }
+/** Salary = base × (SALARY_REP_FLOOR + reputation / 100). */
+export const SALARY_REP_FLOOR = 0.5
+/** Genesis incumbents: contract years left and seasons already served, uniform. */
+export const GENESIS_CONTRACT_YEARS: readonly [number, number] = [1, 3]
+export const GENESIS_TENURE_SEASONS: readonly [number, number] = [0, 4]
+/** Ownership a genesis incumbent has built per season served. */
+export const GENESIS_OWNERSHIP_PER_SEASON = 0.35

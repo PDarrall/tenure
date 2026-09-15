@@ -2,11 +2,11 @@ import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import * as T from '../tunables.js'
 import { clamp, gravityTarget, round1 } from '../world/gen.js'
+import { managerAt } from '../lookup.js'
 import type { Club, Manager, Result, World } from '../types.js'
 
 export function managerOf(world: World, club: Club): Manager | undefined {
-  if (club.managerId === null) return undefined
-  return world.managers.find((m) => m.id === club.managerId)
+  return managerAt(world, club)
 }
 
 /** The transfer budget a club normally has for a summer, £m. */

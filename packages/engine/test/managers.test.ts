@@ -16,13 +16,13 @@ describe('manager population', () => {
     for (const club of world.clubs) {
       const manager = world.managers.find((m) => m.id === club.managerId)
       expect(manager).toBeDefined()
-      expect(manager!.status).toEqual({ kind: 'employed', post: { kind: 'home', clubId: club.id } })
+      expect(manager!.status).toMatchObject({ kind: 'employed', post: { kind: 'home', clubId: club.id } })
     }
     for (const league of world.foreign) {
       for (const club of league.clubs) {
         const manager = world.managers.find((m) => m.id === club.managerId)
         expect(manager).toBeDefined()
-        expect(manager!.status).toEqual({
+        expect(manager!.status).toMatchObject({
           kind: 'employed',
           post: { kind: 'abroad', league: league.kind, clubId: club.id },
         })
@@ -41,6 +41,7 @@ describe('manager population', () => {
       expect(m.age).toBeLessThanOrEqual(T.START_AGE_RANGE[1])
       expect(m.history.spellIds).toEqual([])
       expect(m.history.games).toBe(0)
+      expect(m.status.kind).toBe('unemployed')
       expect(m.tags).toEqual([])
       // Entry reputation plus the widest background offset stays inside the bottom two bands.
       expect(m.reputation).toBeLessThan(40)

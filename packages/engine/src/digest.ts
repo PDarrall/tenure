@@ -27,6 +27,7 @@ export function digestWorld(world: World) {
         `${m.id} ${m.name} (${m.nationality}, ${m.age}, ${m.background}) rep=${m.reputation} ` +
         `${m.status.kind}${m.status.kind === 'employed' ? '@' + m.status.post.clubId : ''}`,
     ),
+    spells: world.spells.length,
     events: world.log.length,
   }
 }
