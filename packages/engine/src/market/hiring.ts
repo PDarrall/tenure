@@ -1,6 +1,6 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { clamp } from '../world/gen.js'
 import { clubById, foreignClubById, managerById, spellOf } from '../lookup.js'
 import { structuralTarget } from '../tenure/expectation.js'

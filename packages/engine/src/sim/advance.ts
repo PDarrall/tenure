@@ -1,5 +1,5 @@
 import { rngFromState } from '../rng.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import type { World } from '../types.js'
 import { isMonthly, seasonOf, seasonWeek } from '../season/calendar.js'
 import { endSeason, playWeek, startSeason, summerWindow, winterWindow } from '../season/season.js'

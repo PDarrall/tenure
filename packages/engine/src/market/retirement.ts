@@ -1,6 +1,6 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { spellOf } from '../lookup.js'
 import { endSpell } from '../tenure/spell.js'
 import type { Manager, RetirementReason, World } from '../types.js'

@@ -9,7 +9,7 @@ import { rollProbability, sack, weeklySackingCheck } from '../src/tenure/sacking
 import { checkExpiry, leaveByMutualConsent, resign } from '../src/tenure/exits.js'
 import { clubById, managerById, spellOf } from '../src/lookup.js'
 import { digestWorld } from '../src/digest.js'
-import * as T from '../src/tunables.js'
+import { T } from '../src/tunables.js'
 import type { Spell, World } from '../src/types.js'
 
 function freshSpell(world: World, clubId = 1): Spell {

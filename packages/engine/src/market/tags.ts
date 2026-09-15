@@ -1,5 +1,5 @@
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { spellOf } from '../lookup.js'
 import type { Manager, Tag, World } from '../types.js'
 

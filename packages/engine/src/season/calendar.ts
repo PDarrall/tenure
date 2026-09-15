@@ -1,4 +1,4 @@
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 
 /** Week within the season, 0-based. */
 export function seasonWeek(week: number): number {

@@ -1,5 +1,5 @@
 import type { Rng } from '../rng.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { clamp } from '../world/gen.js'
 import type { Ability, Background, Manager, Nationality, Post, Shape, World } from '../types.js'
 import { ManagerNamer } from './names.js'

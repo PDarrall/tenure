@@ -8,7 +8,7 @@ import { tableFor } from '../src/season/table.js'
 import { advanceWeek, runSeasons, runWeeks } from '../src/sim/advance.js'
 import { digestWorld } from '../src/digest.js'
 import { renderMatch } from '../src/text/render.js'
-import * as T from '../src/tunables.js'
+import { T } from '../src/tunables.js'
 
 function side(overrides: Partial<Participant> = {}): Participant {
   return { id: 1, strength: 50, tactical: 50, form: [], morale: 50, shape: 'A', mentality: 'balanced', ...overrides }

@@ -7,7 +7,7 @@
  */
 import { beforeAll, describe, expect, it } from 'vitest'
 import { runCareers } from '../src/sim/run.js'
-import * as T from '../src/tunables.js'
+import { T } from '../src/tunables.js'
 import type { PopulationStats, StatLine } from '../src/stats/population.js'
 
 const CAREERS = 500

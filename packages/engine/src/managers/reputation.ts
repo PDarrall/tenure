@@ -1,4 +1,4 @@
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import type { Club, ForeignLeagueKind, Tier, World } from '../types.js'
 
 /** Index into REPUTATION_BANDS for a reputation value. */

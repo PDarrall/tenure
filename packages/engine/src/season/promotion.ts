@@ -1,5 +1,5 @@
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { clamp, round1 } from '../world/gen.js'
 import type { Club, ClubId, Tier, World } from '../types.js'
 import { tableFor } from './table.js'

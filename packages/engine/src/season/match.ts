@@ -5,7 +5,7 @@
  * points, so credit is judged against the odds the model itself produced.
  */
 import type { Rng } from '../rng.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import type { Mentality, Result, Shape } from '../types.js'
 
 export interface Participant {

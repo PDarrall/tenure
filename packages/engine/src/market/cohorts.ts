@@ -1,6 +1,6 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { makeEntrant } from '../managers/gen.js'
 import { ManagerNamer } from '../managers/names.js'
 import type { World } from '../types.js'

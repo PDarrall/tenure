@@ -4,7 +4,7 @@
  */
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { round1 } from '../world/gen.js'
 import { homeClub, managerById, spellOf } from '../lookup.js'
 import { positionOf } from '../season/table.js'

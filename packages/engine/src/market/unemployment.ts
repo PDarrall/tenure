@@ -1,6 +1,6 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { bandIndex, foreignBandIndex } from '../managers/reputation.js'
 import { bumpReputation } from '../tenure/exits.js'
 import type { Manager, UnemployedActivity, World } from '../types.js'

@@ -5,7 +5,7 @@
  */
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { clamp, round1 } from '../world/gen.js'
 import { managerById } from '../lookup.js'
 import { awardTrophyPoints } from '../scoring/score.js'

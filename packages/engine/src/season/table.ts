@@ -1,4 +1,4 @@
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import type { ClubId, Fixture, TableRow, Tier, World } from '../types.js'
 
 export function resetTables(world: World): void {

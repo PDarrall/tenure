@@ -3,7 +3,7 @@ import { createWorld } from '../src/world/gen.js'
 import { runSeasons } from '../src/sim/advance.js'
 import { careerScore, legacy, promotionPointsFrom, trophyPointsFor } from '../src/scoring/score.js'
 import { managerById } from '../src/lookup.js'
-import * as T from '../src/tunables.js'
+import { T } from '../src/tunables.js'
 
 describe('trophy points', () => {
   it('matches the DESIGN table', () => {

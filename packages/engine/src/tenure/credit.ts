@@ -1,4 +1,4 @@
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { clamp, round1 } from '../world/gen.js'
 import type { Spell } from '../types.js'
 

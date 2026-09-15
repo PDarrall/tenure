@@ -1,5 +1,5 @@
 import type { Rng } from '../rng.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import type { ClubId, CupState, World } from '../types.js'
 
 /** Matches in a knockout round of n clubs: pare down to a power of two, then halve. */

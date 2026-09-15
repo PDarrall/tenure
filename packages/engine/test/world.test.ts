@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createWorld } from '../src/world/gen.js'
 import { digestWorld } from '../src/digest.js'
-import * as T from '../src/tunables.js'
+import { T } from '../src/tunables.js'
 
 describe('world generation', () => {
   it('seed 1 always produces the same world', () => {

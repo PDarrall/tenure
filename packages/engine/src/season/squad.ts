@@ -1,6 +1,6 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { clamp, gravityTarget, round1 } from '../world/gen.js'
 import { managerAt } from '../lookup.js'
 import type { Club, Manager, Result, World } from '../types.js'

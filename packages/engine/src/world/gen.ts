@@ -1,6 +1,6 @@
 import { rngFromState, seedState, type Rng } from '../rng.js'
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import type {
   Club,
   ForeignClub,

@@ -1,4 +1,4 @@
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import type { ManagerId, World } from '../types.js'
 import { createWorld } from '../world/gen.js'
 import { seasonWeek } from '../season/calendar.js'

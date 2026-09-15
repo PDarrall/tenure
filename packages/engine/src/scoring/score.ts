@@ -4,7 +4,7 @@
  * cup final keeps them. Nothing is ever deducted.
  */
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { round1 } from '../world/gen.js'
 import { spellOf } from '../lookup.js'
 import type { Honour, Manager, Tier, World } from '../types.js'

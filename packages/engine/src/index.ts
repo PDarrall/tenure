@@ -1,6 +1,7 @@
 export type { Rng, RngState } from './rng.js'
 export { createRng, rngFromState, seedState } from './rng.js'
-export * as tunables from './tunables.js'
+export { T as tunables, applyOverrides } from './tunables.js'
+export type { Tunables } from './tunables.js'
 export type * from './types.js'
 export { emit } from './events.js'
 export { createWorld, gravityTarget } from './world/gen.js'

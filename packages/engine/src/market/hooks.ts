@@ -1,6 +1,6 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import type { World } from '../types.js'
 import { openNewVacancies, openVacancies, vacancyPrestige } from './vacancies.js'
 import { drawShortlist } from './shortlist.js'

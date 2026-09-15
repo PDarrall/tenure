@@ -14,7 +14,7 @@ import { assignTag, reviewTags } from '../src/market/tags.js'
 import { joinCohort } from '../src/market/cohorts.js'
 import { bandIndex } from '../src/managers/reputation.js'
 import { digestWorld } from '../src/digest.js'
-import * as T from '../src/tunables.js'
+import { T } from '../src/tunables.js'
 import type { Manager, SeasonRecord, World } from '../src/types.js'
 
 function vacate(world: World, clubId: number) {

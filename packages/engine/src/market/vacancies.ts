@@ -1,6 +1,6 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { clubById, foreignClubById } from '../lookup.js'
 import { isElite } from '../managers/reputation.js'
 import { positionOf } from '../season/table.js'

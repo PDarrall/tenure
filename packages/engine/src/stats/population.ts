@@ -3,7 +3,7 @@
  * "Validation targets"). A career is tracked from a manager's first hire
  * after genesis to the end of their career.
  */
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import { spellById } from '../lookup.js'
 import type { Manager, ManagerId, Spell, World } from '../types.js'
 

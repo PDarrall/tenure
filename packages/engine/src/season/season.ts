@@ -1,6 +1,6 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
-import * as T from '../tunables.js'
+import { T } from '../tunables.js'
 import type { Club, ClubId, CupState, Event, Fixture, Manager, Result, SeasonRecord, Tier, World } from '../types.js'
 import { homeClub, managerAt } from '../lookup.js'
 import { matchTemplateKey } from '../text/render.js'

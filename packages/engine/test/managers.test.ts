@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createWorld } from '../src/world/gen.js'
 import { bandIndex, clubBandIndex, foreignBandIndex, isElite, tiersForReputation } from '../src/managers/reputation.js'
-import * as T from '../src/tunables.js'
+import { T } from '../src/tunables.js'
 
 describe('manager population', () => {
   const world = createWorld(1)
