@@ -1,0 +1,22 @@
+{
+  "name": "tenure",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:core": "vitest run --exclude \"**/population.test.ts\"",
+    "test:validation": "vitest run --passWithNoTests packages/engine/test/population.test.ts",
+    "typecheck": "pnpm -r typecheck",
+    "sim": "tsx packages/cli/src/sim.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}
