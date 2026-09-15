@@ -1,0 +1,147 @@
+import { rngFromState, seedState, type Rng } from '../rng.js'
+import { emit } from '../events.js'
+import * as T from '../tunables.js'
+import type {
+  Club,
+  ForeignClub,
+  ForeignLeague,
+  ForeignLeagueKind,
+  OwnerType,
+  Shape,
+  Tier,
+  World,
+} from '../types.js'
+import { clubName, ForeignNamer, foreignLeagueName, TownNamer } from './names.js'
+
+export function clamp(x: number, lo: number, hi: number): number {
+  return x < lo ? lo : x > hi ? hi : x
+}
+
+export function round1(x: number): number {
+  return Math.round(x * 10) / 10
+}
+
+/** Strength a squad drifts toward, set by wealth. */
+export function gravityTarget(wealth: number): number {
+  return clamp(T.GRAVITY_INTERCEPT + T.GRAVITY_SLOPE * wealth, 0, 100)
+}
+
+function drawOwnerType(rng: Rng): OwnerType {
+  const types = Object.keys(T.OWNER_TYPE_WEIGHTS) as OwnerType[]
+  return rng.weighted(types, types.map((t) => T.OWNER_TYPE_WEIGHTS[t]))
+}
+
+function makeClub(rng: Rng, id: number, tier: Tier, town: string): Club {
+  const prestigeRange = T.PRESTIGE_BY_TIER[tier - 1]
+  if (!prestigeRange) throw new Error(`no prestige range for tier ${tier}`)
+  const prestige = rng.int(prestigeRange[0], prestigeRange[1])
+  const wealth = Math.round(clamp(prestige + rng.normal(0, T.WEALTH_NOISE_SD), 0, 100))
+  const strength = round1(clamp(gravityTarget(wealth) + rng.normal(0, T.STRENGTH_INITIAL_NOISE_SD), 1, 100))
+  const shapes: Shape[] = ['A', 'B', 'C']
+  return {
+    id,
+    name: clubName(rng, town, T.CLUB_PLAIN_NAME_SHARE),
+    city: town,
+    region: rng.int(0, T.REGIONS - 1),
+    tier,
+    prestige,
+    wealth,
+    cash: 0,
+    owner: {
+      type: drawOwnerType(rng),
+      ambition: round1(rng.float() * (T.AMBITION_RANGE[1] - T.AMBITION_RANGE[0]) + T.AMBITION_RANGE[0]),
+    },
+    fanPatience: rng.int(T.FAN_PATIENCE_RANGE[0], T.FAN_PATIENCE_RANGE[1]),
+    squad: {
+      strength,
+      avgAge: rng.int(T.SQUAD_AGE_INITIAL_RANGE[0], T.SQUAD_AGE_INITIAL_RANGE[1]),
+      size: rng.int(T.SQUAD_SIZE_RANGE[0], T.SQUAD_SIZE_RANGE[1]),
+      morale: T.MORALE_INITIAL,
+      academyInXi: 0,
+    },
+    wageBudget: round1(T.WAGE_BUDGET_PER_WEALTH_SQ * wealth * wealth),
+    honours: [],
+    rivals: [],
+    managerId: null,
+    form: [],
+    shape: rng.pick(shapes),
+    mentality: 'balanced',
+    netSpendThisSeason: 0,
+  }
+}
+
+/** Pair clubs with rivals inside their region, nearest tier first, symmetric. */
+function assignRivals(rng: Rng, clubs: Club[]): void {
+  const byRegion = new Map<number, Club[]>()
+  for (const club of clubs) {
+    const list = byRegion.get(club.region) ?? []
+    list.push(club)
+    byRegion.set(club.region, list)
+  }
+  for (const club of clubs) {
+    if (club.rivals.length >= T.RIVALS_PER_CLUB) continue
+    const candidates = (byRegion.get(club.region) ?? [])
+      .filter((c) => c.id !== club.id && !club.rivals.includes(c.id) && c.rivals.length < T.RIVALS_PER_CLUB)
+      .sort((a, b) => Math.abs(a.tier - club.tier) - Math.abs(b.tier - club.tier) || a.id - b.id)
+    // Take the closest-tier candidates, breaking ties by seed order.
+    const wanted = T.RIVALS_PER_CLUB - club.rivals.length
+    const pool = candidates.slice(0, wanted + 2)
+    rng.shuffle(pool)
+    for (const rival of pool.slice(0, wanted)) {
+      club.rivals.push(rival.id)
+      rival.rivals.push(club.id)
+    }
+  }
+  for (const club of clubs) club.rivals.sort((a, b) => a - b)
+}
+
+function makeForeign(rng: Rng, namer: ForeignNamer, nextId: { value: number }): ForeignLeague[] {
+  return T.FOREIGN_LEAGUES.map((spec) => {
+    const clubs: ForeignClub[] = []
+    for (let i = 0; i < spec.clubs; i++) {
+      clubs.push({
+        id: nextId.value++,
+        name: namer.next(spec.kind as ForeignLeagueKind, T.FOREIGN_PREFIX_SHARE),
+        league: spec.kind,
+        prestige: Math.round(clamp(spec.prestige + rng.normal(0, T.FOREIGN_CLUB_NOISE_SD), 0, 100)),
+        strength: round1(clamp(spec.strength + rng.normal(0, T.FOREIGN_CLUB_NOISE_SD), 1, 100)),
+        managerId: null,
+      })
+    }
+    return {
+      kind: spec.kind,
+      name: foreignLeagueName(spec.kind),
+      prestige: spec.prestige,
+      strength: spec.strength,
+      clubs,
+    }
+  })
+}
+
+/** Build a fresh world from a seed. Same seed, same world. */
+export function createWorld(seed: number): World {
+  const world: World = {
+    seed,
+    rng: seedState(seed),
+    week: 0,
+    season: 1,
+    clubs: [],
+    foreign: [],
+    log: [],
+  }
+  const rng = rngFromState(world.rng)
+  const towns = new TownNamer(rng)
+  let id = 1
+  T.TIER_SIZES.forEach((count, index) => {
+    const tier = (index + 1) as Tier
+    for (let i = 0; i < count; i++) world.clubs.push(makeClub(rng, id++, tier, towns.next()))
+  })
+  assignRivals(rng, world.clubs)
+  world.foreign = makeForeign(rng, new ForeignNamer(rng), { value: T.FOREIGN_CLUB_ID_BASE })
+  emit(world, 'world.created', {
+    seed,
+    clubs: world.clubs.length,
+    foreignClubs: world.foreign.reduce((n, l) => n + l.clubs.length, 0),
+  })
+  return world
+}
