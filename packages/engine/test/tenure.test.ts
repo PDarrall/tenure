@@ -323,3 +323,138 @@ describe('tenure over seasons', () => {
     expect(digestWorld(restored).hash).toBe(digestWorld(live).hash)
   })
 })
+
+/** An Rng whose every roll goes one way, for forcing rare events. */
+function forcedRng(succeed: boolean): import('../src/rng.js').Rng {
+  const real = createRng(1)
+  return {
+    float: () => (succeed ? 0 : 0.999999),
+    int: (min, max) => (succeed ? max : min),
+    chance: () => succeed,
+    pick: (items) => real.pick(items),
+    weighted: (items) => items[0] as never,
+    shuffle: (items) => items,
+    normal: (mean) => mean,
+    state: real.state,
+  }
+}
+
+describe('shocks and rare exits (forced rolls)', () => {
+  it('counts the weeks below threshold through the roll path and calls the eighth deserved', async () => {
+    const { weeklySackingCheck } = await import('../src/tenure/sacking.js')
+    const world = createWorld(6)
+    const spell = freshSpell(world, 12)
+    spell.credit = spell.threshold - 1
+    for (let i = 0; i < T.DESERVED_WEEKS - 1; i++) expect(weeklySackingCheck(world, forcedRng(false), spell)).toBe(false)
+    expect(spell.weeksBelowThreshold).toBe(T.DESERVED_WEEKS - 1)
+    expect(weeklySackingCheck(world, forcedRng(true), spell)).toBe(true)
+    expect(spell.deserved).toBe(true)
+  })
+
+  it('takeover, crisis, star sale and board row all land when every roll succeeds', async () => {
+    const { monthlyShocks } = await import('../src/tenure/shocks.js')
+    const world = createWorld(6)
+    const poor = [...world.clubs].sort((a, b) => a.wealth - b.wealth)[0]!
+    const spell = freshSpell(world, poor.id)
+    // Low enough to sit within the board-row margin whatever threshold the new owner brings.
+    spell.credit = Math.min(...Object.values(T.SACK_THRESHOLD), T.SACK_THRESHOLD_ERRATIC[0]) + T.BOARD_ROW_MARGIN - 1
+    const strength = poor.squad.strength
+    const expectation = spell.expectation
+    monthlyShocks(world, forcedRng(true), spell)
+    const types = world.log.slice(-8).map((e) => e.type)
+    expect(types).toContain('shock.takeover')
+    expect(types).toContain('shock.crisis')
+    expect(types).toContain('shock.starSale')
+    expect(types).toContain('shock.boardRow')
+    expect(spell.takeover).not.toBeNull()
+    expect(spell.budgetMultiplier).toBeCloseTo(1 - T.CRISIS_BUDGET_CUT, 2)
+    expect(poor.squad.strength).toBe(Math.max(1, strength + T.STAR_SALE_STRENGTH))
+    expect(spell.expectation).toBe(Math.min(24, expectation + T.CRISIS_EXPECTATION_EASE + T.STAR_SALE_EXPECTATION_EASE))
+    expect(spell.season.boardRows).toBe(1)
+    // A later takeover whose owner keeps the manager clears the pending replacement.
+    const keep = forcedRng(true)
+    keep.chance = (() => {
+      let calls = 0
+      return () => ++calls !== 2
+    })()
+    monthlyShocks(world, keep, spell)
+    expect(spell.takeover).toBeNull()
+  })
+
+  it('a takeover replacement sacks unjustly on its week', async () => {
+    const { weeklySackingCheck } = await import('../src/tenure/sacking.js')
+    const world = createWorld(6)
+    const spell = freshSpell(world, 14)
+    spell.takeover = { week: world.week, replaceWeek: world.week }
+    expect(weeklySackingCheck(world, forcedRng(false), spell)).toBe(true)
+    expect(spell.deserved).toBe(false)
+    expect(world.log.at(-1)!.payload['cause']).toBe('takeover')
+  })
+
+  it('a fallout after four straight defeats is resolved by the AI', async () => {
+    const { maybeFallout } = await import('../src/tenure/shocks.js')
+    const world = createWorld(6)
+    const spell = freshSpell(world, 15)
+    const club = clubById(world, 15)
+    const manager = managerById(world, spell.managerId)
+    spell.consecutiveDefeats = T.FALLOUT_TRIGGER_DEFEATS
+    const morale = club.squad.morale
+    const strength = club.squad.strength
+    maybeFallout(world, forcedRng(true), spell)
+    expect(spell.season.fallouts).toBe(1)
+    expect(spell.falloutRolled).toBe(true)
+    const resolved = world.log.at(-1)!
+    expect(resolved.type).toBe('shock.falloutResolved')
+    if (manager.ability.motivation < T.AI_FALLOUT_SELL_BELOW_MOTIVATION) {
+      expect(resolved.payload['choice']).toBe('sell')
+      expect(club.squad.strength).toBe(strength - T.FALLOUT_STRENGTH_LOSS)
+      expect(spell.ownership).toBeCloseTo(T.FALLOUT_OWNERSHIP_GAIN, 2)
+    } else {
+      expect(resolved.payload['choice']).toBe('back-down')
+      expect(club.squad.morale).toBe(morale - T.FALLOUT_MORALE_LOSS)
+    }
+    maybeFallout(world, forcedRng(true), spell)
+    expect(spell.season.fallouts).toBe(1) // once per losing run
+  })
+
+  it('offers mutual consent in the window and the AI can take it; the AI can also resign below threshold', async () => {
+    const { monthlyMutualConsent, monthlyResignation } = await import('../src/tenure/exits.js')
+    const world = createWorld(6)
+    const a = freshSpell(world, 16)
+    a.credit = T.MUTUAL_WINDOW[0]
+    expect(monthlyMutualConsent(world, forcedRng(false), a)).toBe(false)
+    expect(world.log.at(-1)!.type).toBe('manager.mutualOffered')
+    expect(monthlyMutualConsent(world, forcedRng(true), a)).toBe(true)
+    expect(a.endReason).toBe('mutual')
+    const b = freshSpell(world, 17)
+    b.credit = b.threshold - 1
+    expect(monthlyResignation(world, forcedRng(true), b)).toBe(true)
+    expect(b.endReason).toBe('resigned')
+    const c = freshSpell(world, 18)
+    c.credit = c.threshold + 5
+    expect(monthlyResignation(world, forcedRng(true), c)).toBe(false)
+  })
+
+  it('a big summer turnover resets the ceiling', async () => {
+    const { resetCeilingForTurnover } = await import('../src/tenure/credit.js')
+    const world = createWorld(6)
+    const spell = freshSpell(world, 19)
+    spell.ceiling = 70
+    expect(resetCeilingForTurnover(spell, T.CEILING_RESET_TURNOVER - 0.01)).toBe(false)
+    expect(spell.ceiling).toBe(70)
+    expect(resetCeilingForTurnover(spell, T.CEILING_RESET_TURNOVER)).toBe(true)
+    expect(spell.ceiling).toBe(T.CREDIT_CEILING)
+  })
+
+  it('pays the top-three bonus only against a side in the top three at kick-off', () => {
+    const world = createWorld(6)
+    runWeeks(world, 12)
+    const matches = world.log.filter((e) => e.type === 'match.played' && e.payload['competition'] === 'league')
+    expect(matches.length).toBeGreaterThan(100)
+    // Reputation and season-end moves are logged as reputation.changed once a season has ended.
+    runWeeks(world, T.SEASON_WEEKS)
+    const reps = world.log.filter((e) => e.type === 'reputation.changed' && e.payload['reason'] === 'season vs expectation')
+    expect(reps.length).toBeGreaterThan(50)
+    for (const e of reps) expect(Math.abs(e.payload['delta'] as number)).toBeLessThanOrEqual(T.REP_SEASON_CLAMP)
+  })
+})

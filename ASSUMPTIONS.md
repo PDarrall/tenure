@@ -85,8 +85,7 @@ single branch, so they live here instead.
 - The ceiling is 100 for seasons one to three and 90 for season four; the
   credit clamp to a lowered ceiling is applied after the summer window, so
   a big turnover that resets the ceiling keeps the credit.
-- "Beat a top-three side" reads the opponent's position after the week's
-  results. Monthly rolls (shocks, gap check, mutual consent) happen every
+- "Beat a top-three side" reads the opponent's position at kick-off. Monthly rolls (shocks, gap check, mutual consent) happen every
   four match weeks and not in the summer.
 - Trophies count for credit and reputation only for the spell they were
   won in (honours record the club).

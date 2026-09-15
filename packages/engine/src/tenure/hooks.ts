@@ -18,10 +18,6 @@ import { maybeFallout, monthlyShocks } from './shocks.js'
 import { bumpReputation, checkExpiry, monthlyMutualConsent, monthlyResignation } from './exits.js'
 import { activeSpells } from './spell.js'
 
-function isTopSide(world: World, clubId: number): boolean {
-  return homeClub(world, clubId) !== undefined && positionOf(world, clubId) <= T.CREDIT_TOP_SIDE_RANK
-}
-
 function creditForSide(world: World, rng: Rng, played: PlayedFixture, home: boolean): number | null {
   const manager = home ? played.homeManager : played.awayManager
   if (!manager) return null
@@ -32,13 +28,14 @@ function creditForSide(world: World, rng: Rng, played: PlayedFixture, home: bool
   const club = homeClub(world, ownId)
   const opponent = homeClub(world, opponentId)
   const points = home ? played.homePoints : played.awayPoints
+  const opponentPosition = home ? played.awayPosition : played.homePosition
   const knockout = played.fixture.competition !== 'league'
   const delta = matchCreditDelta(spell, {
     points: knockout ? (points === 3 ? 3 : 0) : points,
     expected: home ? played.expHome : played.expAway,
     derby: club !== undefined && club.rivals.includes(opponentId),
     cupExitToLowerTier: knockout && points < 3 && opponent !== undefined && club !== undefined && opponent.tier > club.tier,
-    beatTopSide: isTopSide(world, opponentId),
+    beatTopSide: opponentPosition !== null && opponentPosition <= T.CREDIT_TOP_SIDE_RANK,
   })
   const applied = addCredit(spell, delta)
   maybeFallout(world, rng, spell)

@@ -5,7 +5,7 @@ import type { Club, ClubId, CupState, Event, Fixture, Manager, Result, SeasonRec
 import { homeClub, managerAt } from '../lookup.js'
 import { matchTemplateKey } from '../text/render.js'
 import { leagueFixtures } from './fixtures.js'
-import { applyResult, resetTables, tableFor } from './table.js'
+import { applyResult, positionOf, resetTables, tableFor } from './table.js'
 import { knockoutExpected, playMatch, type Participant } from './match.js'
 import { drawRound, isFinal, seedCups } from './cups.js'
 import { decayMorale, runWindow, summerSquad, updateMorale, type WindowSummary } from './squad.js'
@@ -95,6 +95,9 @@ export interface PlayedFixture {
   expAway: number
   homePoints: number
   awayPoints: number
+  /** League positions at kick-off (home clubs only), for the "top-three side" rule. */
+  homePosition: number | null
+  awayPosition: number | null
   /** The match.played event, so later systems can annotate it. */
   event: Event
 }
@@ -104,6 +107,8 @@ export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFix
   const knockout = fixture.competition !== 'league'
   const home = participantFor(world, fixture.homeId, strengthOf(world, fixture.awayId))
   const away = participantFor(world, fixture.awayId, strengthOf(world, fixture.homeId))
+  const homePosition = clubById(world, fixture.homeId) ? positionOf(world, fixture.homeId) : null
+  const awayPosition = clubById(world, fixture.awayId) ? positionOf(world, fixture.awayId) : null
   const outcome = playMatch(rng, home, away, knockout)
   fixture.played = true
   fixture.homeGoals = outcome.homeGoals
@@ -161,7 +166,7 @@ export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFix
     text: matchTemplateKey(outcome.homeGoals, outcome.awayGoals, outcome.shootoutWinnerId !== undefined),
   })
 
-  return { fixture, winnerId, loserId, homeManager, awayManager, expHome, expAway, homePoints, awayPoints, event }
+  return { fixture, winnerId, loserId, homeManager, awayManager, expHome, expAway, homePoints, awayPoints, homePosition, awayPosition, event }
 }
 
 function tierOfClub(world: World, id: ClubId): Tier | null {
