@@ -83,6 +83,8 @@ export interface Club {
   netSpendThisSeason: number
   /** Per-season counters, reset at season start. */
   thisSeason: ClubSeasonTally
+  /** Season the club was last relegated in, for crisis hires. */
+  lastRelegatedSeason: number | null
   /** Strength banked from academy promotions, released next summer. */
   pendingYouthGain: number
 }
@@ -135,6 +137,9 @@ export interface World {
   europeanEntrants: ClubId[]
   spells: Spell[]
   nextSpellId: SpellId
+  vacancies: Vacancy[]
+  nextVacancyId: VacancyId
+  nextManagerId: ManagerId
   log: Event[]
 }
 
@@ -364,4 +369,32 @@ export interface Spell {
   deserved: boolean | null
   /** Last season's finish, waiting for the summer expectation reset. */
   pendingReset: { finish: number; movedTier: boolean } | null
+}
+
+// ---------------------------------------------------------------------------
+// Market (DESIGN.md "Job market", "Career model")
+// ---------------------------------------------------------------------------
+
+export type VacancyReason = SpellEndReason | 'unknown'
+
+export interface Vacancy {
+  id: VacancyId
+  post: Post
+  openedWeek: number
+  reason: VacancyReason
+  ownerType: OwnerType
+  expectation: number
+  /** £m normal summer budget. */
+  budget: number
+  contract: { years: number; salary: number }
+  wantTags: Tag[]
+  /** Managers who put themselves forward (the human, and AI by band). */
+  applicants: ManagerId[]
+  shortlist: ManagerId[]
+  /** Bands the search has widened by while unfilled. */
+  widened: number
+  /** True if the hire counts as a crisis appointment. */
+  crisis: boolean
+  filledWeek: number | null
+  hiredManagerId: ManagerId | null
 }

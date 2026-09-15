@@ -14,6 +14,7 @@ import type {
 import { clubName, ForeignNamer, foreignLeagueName, TownNamer } from './names.js'
 import { createManagers } from '../managers/gen.js'
 import { seatIncumbents } from '../tenure/spell.js'
+import { resetTables } from '../season/table.js'
 
 export function clamp(x: number, lo: number, hi: number): number {
   return x < lo ? lo : x > hi ? hi : x
@@ -70,6 +71,7 @@ function makeClub(rng: Rng, id: number, tier: Tier, town: string): Club {
     mentality: 'balanced',
     netSpendThisSeason: 0,
     thisSeason: { cupFinals: 0, inBottomZone: false, academyPromoted: 0 },
+    lastRelegatedSeason: null,
     pendingYouthGain: 0,
   }
 }
@@ -138,6 +140,9 @@ export function createWorld(seed: number): World {
     europeanEntrants: [],
     spells: [],
     nextSpellId: 1,
+    vacancies: [],
+    nextVacancyId: 1,
+    nextManagerId: 1,
     log: [],
   }
   const rng = rngFromState(world.rng)
@@ -148,6 +153,7 @@ export function createWorld(seed: number): World {
     for (let i = 0; i < count; i++) world.clubs.push(makeClub(rng, id++, tier, towns.next()))
   })
   assignRivals(rng, world.clubs)
+  resetTables(world)
   world.foreign = makeForeign(rng, new ForeignNamer(rng), { value: T.FOREIGN_CLUB_ID_BASE })
   emit(world, 'world.created', {
     seed,
@@ -155,6 +161,7 @@ export function createWorld(seed: number): World {
     foreignClubs: world.foreign.reduce((n, l) => n + l.clubs.length, 0),
   })
   const assignments = createManagers(world, rng)
+  world.nextManagerId = world.managers.length + 1
   seatIncumbents(world, rng, assignments)
   emit(world, 'managers.created', {
     total: world.managers.length,

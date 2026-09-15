@@ -557,3 +557,111 @@ export const GENESIS_CONTRACT_YEARS: readonly [number, number] = [1, 3]
 export const GENESIS_TENURE_SEASONS: readonly [number, number] = [0, 4]
 /** Ownership a genesis incumbent has built per season served. */
 export const GENESIS_OWNERSHIP_PER_SEASON = 0.35
+
+// ---------------------------------------------------------------------------
+// Job market (DESIGN.md "Job market"). Serves: 40–50% never get a second
+// job, median career 6–8 seasons across three or four clubs.
+// ---------------------------------------------------------------------------
+
+/** Weeks after a vacancy opens before the shortlist is drawn, then before the hire. */
+export const VACANCY_SHORTLIST_DELAY_WEEKS = 1
+export const VACANCY_HIRE_DELAY_WEEKS = 2
+/** After this many weeks unfilled, the search widens by one band a week. */
+export const VACANCY_WIDEN_AFTER_WEEKS = 3
+/** Shortlist size, uniform. DESIGN: three to five. */
+export const SHORTLIST_SIZE: readonly [number, number] = [3, 5]
+/** Shortlist score weights: reputation, tag fit, agent quality, randomness. */
+export const SHORTLIST_WEIGHTS = { reputation: 1, tagFit: 0.6, agent: 0.4, random: 0.5 } as const
+/** Shortlist weight multipliers by age. Serves: careers end by 72, a handful past 1,000 games. */
+export const AGE_PENALTY: readonly { from: number; mult: number }[] = [
+  { from: 60, mult: 0.5 },
+  { from: 67, mult: 0.2 },
+]
+/** A manager one band below the club's band qualifies with a wanted tag. */
+export const TAG_BAND_BELOW = 1
+/** AI applies to clubs at most this many bands below its own band ... */
+export const AI_APPLY_BANDS_BELOW = 1
+/** ... until this many months unemployed, after which it applies anywhere it qualifies. */
+export const AI_APPLY_ANY_AFTER_MONTHS = 12
+/** Most tags on a vacancy's want-list. */
+export const WANT_TAGS_MAX = 2
+/** Contract years offered, weights for 1, 2, 3, 4 years. DESIGN: one to four. */
+export const CONTRACT_YEARS_WEIGHTS: readonly number[] = [0.15, 0.4, 0.3, 0.15]
+/** Salary × (1 − factor × (years − 2)): longer contracts pay less per year. */
+export const SALARY_PER_YEAR_FACTOR = 0.08
+/** AI promises promotion when the structural target is this high or better (tiers 2–5). */
+export const AI_PROMISE_PROMOTION_RANK = 4
+/** Employed managers are approached only by clubs at least this much more prestigious. */
+export const POACH_PRESTIGE_GAP = 10
+/** Share of vacancies where the club calls one employed manager (the best fit) rather than only the unemployed. */
+export const POACH_ATTEMPT_P = 0.25
+export const AI_ACCEPT_APPROACH_P = 0.7
+/** Declining an approach. DESIGN: credit +3, loyalty progress. */
+export const DECLINE_APPROACH_CREDIT = 3
+export const LOYALTY_PER_DECLINE = 1
+export const REP_POACHED = 2
+/** The new club pays the buy-out if it is under this share of its wage budget; otherwise the manager must walk out. */
+export const BUYOUT_AFFORD_SHARE = 0.5
+/** AI walks out (no buy-out) only for a club this much more prestigious, with this chance. */
+export const WALKOUT_MIN_PRESTIGE_GAP = 20
+export const AI_WALKOUT_P = 0.5
+export const REP_WALKOUT = -3
+
+// ---------------------------------------------------------------------------
+// Unemployment and permadeath (DESIGN.md "Job market", "Permadeath").
+// Serves: 40–50% never get a second job; careers end.
+// ---------------------------------------------------------------------------
+
+export const UNEMPLOYED_DECAY_AFTER_MONTHS = 3
+export const UNEMPLOYED_DECAY = -1
+/** Punditry halves the decay. */
+export const PUNDITRY_DECAY_SHARE = 0.5
+/** Stepping down to an assistant role: once, then decay stops. */
+export const REP_STEP_DOWN = -5
+/** £m per month. */
+export const PUNDITRY_INCOME_PER_MONTH = 0.01
+export const ASSISTANT_INCOME_PER_MONTH = 0.03
+/** AI activity choices by months out of work and reputation. */
+export const AI_PUNDITRY_AFTER_MONTHS = 6
+export const AI_PUNDITRY_MIN_REP = 40
+export const AI_ASSISTANT_AFTER_MONTHS = 12
+export const AI_ASSISTANT_MAX_REP = 40
+export const AI_ABROAD_AFTER_MONTHS = 9
+export const AI_ABROAD_P = 0.3
+/** Career ends after this many months without a shortlist. DESIGN: 24. */
+export const NO_SHORTLIST_MONTHS = 24
+/** Career ends at this age. DESIGN: 72. */
+export const RETIRE_AGE = 72
+/** Monthly chance of a career-ending scandal. */
+export const SCANDAL_P = 0.0005
+/** AI voluntary retirement from this age: base + per-year × (age − from), doubled when unemployed. */
+export const AI_RETIRE_FROM = 60
+export const AI_RETIRE_BASE_P = 0.05
+export const AI_RETIRE_PER_YEAR = 0.03
+export const AI_RETIRE_UNEMPLOYED_MULT = 2
+
+// ---------------------------------------------------------------------------
+// Tags (DESIGN.md "Tags"). Windows are seasons; expiry is seasons after the
+// last qualifying season. Serves: typecasting, second-job rate.
+// ---------------------------------------------------------------------------
+
+export const TAG_RULES = {
+  'promotion specialist': { count: 2, window: 5, expiry: 5 },
+  'survival specialist': { count: 2, window: 5, expiry: 5 },
+  'youth developer': { academyInXi: 4, expiry: 3 },
+  'big spender': { rank: 3, seasons: 2, expiry: 2 },
+  overachiever: { seasons: 3, places: 5, window: 6, expiry: 3 },
+  'cup manager': { finals: 2, window: 4, expiry: 4 },
+  loyal: { seasons: 6, expiry: 2 },
+  'in demand': { expiry: 2 },
+  mercenary: { walkouts: 2, expiry: 5 },
+  difficult: { count: 2, window: 3, expiry: 3 },
+  abroad: { expiry: 4 },
+} as const
+
+// ---------------------------------------------------------------------------
+// Cohorts (DESIGN.md "~400 managers"). Serves: a steady flow of first-timers.
+// ---------------------------------------------------------------------------
+
+/** Each summer the population of non-retired managers is topped up to POPULATION. */
+export const COHORT_TOP_UP = true

@@ -5,6 +5,7 @@ import { isMonthly, seasonOf, seasonWeek } from '../season/calendar.js'
 import { endSeason, playWeek, startSeason, summerWindow, winterWindow } from '../season/season.js'
 import { managerById, spellOf } from '../lookup.js'
 import * as tenure from '../tenure/hooks.js'
+import * as market from '../market/hooks.js'
 
 function extrasFor(world: World) {
   return (managerId: number) => {
@@ -24,11 +25,18 @@ export function advanceWeek(world: World): void {
     const played = playWeek(world, rng, sw)
     tenure.afterMatches(world, rng, played)
   }
-  if (isMonthly(sw)) tenure.monthly(world, rng)
+  if (isMonthly(sw)) {
+    tenure.monthly(world, rng)
+    market.monthly(world, rng)
+  }
   if (sw === T.WINTER_WINDOW_WEEK) tenure.afterWinterWindow(world, winterWindow(world))
-  if (sw === T.MATCH_WEEKS) tenure.seasonEnd(world, endSeason(world, rng, extrasFor(world)))
+  if (sw === T.MATCH_WEEKS) {
+    tenure.seasonEnd(world, endSeason(world, rng, extrasFor(world)))
+    market.seasonEnd(world, rng)
+  }
   if (sw === T.SUMMER_WINDOW_WEEK) tenure.afterSummerWindow(world, summerWindow(world, (clubId) => tenure.budgetMultiplierFor(world, clubId)))
   tenure.weekly(world, rng)
+  market.weekly(world, rng)
   world.week++
   world.season = seasonOf(world.week)
 }

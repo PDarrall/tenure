@@ -28,6 +28,7 @@ export function digestWorld(world: World) {
         `${m.status.kind}${m.status.kind === 'employed' ? '@' + m.status.post.clubId : ''}`,
     ),
     spells: world.spells.length,
+    vacancies: world.vacancies.length,
     events: world.log.length,
   }
 }

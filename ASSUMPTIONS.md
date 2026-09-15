@@ -99,3 +99,37 @@ single branch, so they live here instead.
   and see no shocks.
 - Abroad, "ambition" is 0.5 for the expectation formula.
 - Salary accrues weekly as a raw float; only displayed figures are rounded.
+
+## Market
+
+- A vacancy opens the week a post empties, the shortlist is drawn a week
+  later, and the hire is attempted the week after. Unfilled searches widen
+  by one reputation band a week from the third week.
+- "Band covers its tier" is read as: the manager's band is at or above the
+  club's band. AI managers apply no lower than one band below their own
+  until a year out of work; foreign posts are open to that league's
+  nationals and to managers who chose "abroad".
+- "A bigger club calls" is an event: a quarter of vacancies approach the
+  single best-fitting employed manager at a club at least 10 prestige
+  points smaller; the AI accepts 70% of calls. If the hiring club cannot
+  pay the buy-out (over half its wage budget) the manager must walk out,
+  which the AI only does for a much bigger club.
+- Salary is tier × reputation, scaled down 8% per contract year beyond
+  two (and up for one-year deals). The AI takes the years offered and
+  promises promotion when the squad ranks top four in tiers 2–5,
+  stability when it ranks in the bottom four, top-half otherwise.
+- The AI's unemployed activity: wait; punditry after six months if
+  reputation ≥ 40; assistant after twelve months if reputation < 40;
+  abroad after nine months with a 30% monthly chance if its band covers a
+  foreign league.
+- Punditry pays £10k a month, an assistant role £30k; both count toward
+  career earnings. Waiting scores zero.
+- Careers end after 24 months without a shortlist (also for entrants who
+  never had a job, who are excluded from validation), at 72, on a scandal
+  (0.05% a month), or when an AI manager over 60 chooses to retire
+  (5% + 3% a year over 60, doubled when unemployed).
+- Tags are reviewed at season end from season records with the windows
+  in DESIGN.md; each expires a fixed number of seasons after it was last
+  earned (see TAG_RULES). "Loyal" counts declined approaches as a season.
+- The working population is topped up to 400 with new entrants each
+  summer.

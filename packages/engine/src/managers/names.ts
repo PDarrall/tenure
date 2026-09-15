@@ -60,8 +60,13 @@ const POOLS: Record<Nationality, { first: string[]; last: string[] }> = {
 }
 
 export class ManagerNamer {
-  private readonly used = new Set<string>()
-  constructor(private readonly rng: Rng) {}
+  private readonly used: Set<string>
+  constructor(
+    private readonly rng: Rng,
+    alreadyUsed: Iterable<string> = [],
+  ) {
+    this.used = new Set(alreadyUsed)
+  }
 
   next(nationality: Nationality): string {
     const pool = POOLS[nationality]

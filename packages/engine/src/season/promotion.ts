@@ -91,6 +91,7 @@ export function settleLeagues(world: World): LeagueOutcome {
   for (const { club, to } of moves) {
     const from = club.tier
     club.tier = to
+    if (to > from) club.lastRelegatedSeason = world.season
     emit(world, to < from ? 'promotion' : 'relegation', {
       clubId: club.id,
       managerId: club.managerId,

@@ -153,9 +153,13 @@ describe('a full season', () => {
     expect(staffed.length).toBeGreaterThan(0)
     for (const club of staffed) {
       const manager = world.managers.find((m) => m.id === club.managerId)!
+      const spell = world.spells.find((s) => s.id === manager.history.spellIds.at(-1))!
+      if (spell.startWeek >= T.MATCH_WEEKS) continue // hired this summer: no record yet
       expect(manager.history.seasons).toHaveLength(1)
       const record = manager.history.seasons[0]!
-      expect(record.games).toBeGreaterThanOrEqual(T.LEAGUE_ROUNDS_BY_TIER[record.tier! - 1] as number)
+      // Genesis managers played the whole season; later hires carry games from wherever they were.
+      if (spell.startWeek <= 0) expect(record.games).toBeGreaterThanOrEqual(T.LEAGUE_ROUNDS_BY_TIER[record.tier! - 1] as number)
+      expect(record.games).toBeGreaterThanOrEqual(0)
       expect(record.finish).toBeGreaterThanOrEqual(1)
       expect(record.netSpendRank).toBeGreaterThanOrEqual(1)
       expect(manager.history.games).toBe(record.games)
