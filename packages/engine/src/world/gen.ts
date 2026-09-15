@@ -12,6 +12,7 @@ import type {
   World,
 } from '../types.js'
 import { clubName, ForeignNamer, foreignLeagueName, TownNamer } from './names.js'
+import { createManagers } from '../managers/gen.js'
 
 export function clamp(x: number, lo: number, hi: number): number {
   return x < lo ? lo : x > hi ? hi : x
@@ -127,6 +128,7 @@ export function createWorld(seed: number): World {
     season: 1,
     clubs: [],
     foreign: [],
+    managers: [],
     log: [],
   }
   const rng = rngFromState(world.rng)
@@ -143,5 +145,6 @@ export function createWorld(seed: number): World {
     clubs: world.clubs.length,
     foreignClubs: world.foreign.reduce((n, l) => n + l.clubs.length, 0),
   })
+  createManagers(world, rng)
   return world
 }

@@ -121,5 +121,114 @@ export interface World {
   season: number
   clubs: Club[]
   foreign: ForeignLeague[]
+  managers: Manager[]
   log: Event[]
+}
+
+// ---------------------------------------------------------------------------
+// Managers (DESIGN.md "Managers", "Career model")
+// ---------------------------------------------------------------------------
+
+export type Background = 'ex-pro' | 'coach' | 'analyst'
+
+/** Where a manager is native to: the home pyramid or one of the foreign leagues. */
+export type Nationality = 'home' | ForeignLeagueKind
+
+export type Tag =
+  | 'promotion specialist'
+  | 'survival specialist'
+  | 'youth developer'
+  | 'big spender'
+  | 'overachiever'
+  | 'cup manager'
+  | 'loyal'
+  | 'in demand'
+  | 'mercenary'
+  | 'difficult'
+  | 'abroad'
+
+export interface ManagerTag {
+  tag: Tag
+  /** Season after which the tag lapses unless renewed. */
+  expiresSeason: number
+}
+
+/** 0–100 each. Hidden for AI; earned through play for the human. */
+export interface Ability {
+  tactical: number
+  motivation: number
+  development: number
+  dealing: number
+}
+
+/** A job: a home club or an abstract foreign club. */
+export type Post =
+  | { kind: 'home'; clubId: ClubId }
+  | { kind: 'abroad'; league: ForeignLeagueKind; clubId: ClubId }
+
+/** One row per season managed. Tags and validation stats read these. */
+export interface SeasonRecord {
+  season: number
+  post: Post
+  /** Tier for home posts, null abroad. */
+  tier: Tier | null
+  games: number
+  finish: number
+  expectation: number
+  promoted: boolean
+  relegated: boolean
+  trophies: number
+  /** Sat in the bottom zone at a monthly check and finished outside it. */
+  bottomFourEscape: boolean
+  /** 1 = highest net spend in the division; null abroad. */
+  netSpendRank: number | null
+  cupFinals: number
+  academyInXi: number
+  fallouts: number
+  boardRows: number
+}
+
+export type UnemployedActivity = 'wait' | 'punditry' | 'assistant' | 'abroad'
+
+export type RetirementReason = 'no-offers' | 'age' | 'scandal' | 'voluntary'
+
+export type ManagerStatus =
+  | { kind: 'employed'; post: Post }
+  | { kind: 'unemployed'; sinceWeek: number; activity: UnemployedActivity; monthsSinceShortlisted: number }
+  | { kind: 'retired'; week: number; reason: RetirementReason }
+
+export interface ManagerHistory {
+  spellIds: SpellId[]
+  honours: Honour[]
+  /** £m: salary, bonuses, payouts and unemployment income. */
+  earnings: number
+  games: number
+  trophyPoints: number
+  walkouts: number
+  /** The −5 for stepping down to an assistant role is charged once per career. */
+  steppedDown: boolean
+  seasons: SeasonRecord[]
+}
+
+export interface Manager {
+  id: ManagerId
+  name: string
+  nationality: Nationality
+  /** Whole years; incremented each summer. */
+  age: number
+  background: Background
+  /** 0–100, employability. */
+  reputation: number
+  /** 0–100, weight in shortlisting. */
+  agent: number
+  tags: ManagerTag[]
+  ability: Ability
+  /** 0–100 each. */
+  trust: { players: number; board: number }
+  preferredShape: Shape
+  history: ManagerHistory
+  status: ManagerStatus
+  /** Season the manager entered the population; 0 for genesis. */
+  cohortSeason: number
+  isHuman: boolean
 }

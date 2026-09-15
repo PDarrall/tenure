@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createWorld } from '../src/world/gen.js'
+import { digestWorld } from '../src/digest.js'
 import * as T from '../src/tunables.js'
 
 describe('world generation', () => {
   it('seed 1 always produces the same world', () => {
     const world = createWorld(1)
-    expect(world).toMatchSnapshot()
+    expect(digestWorld(world)).toMatchSnapshot()
   })
 
   it('is deterministic across two builds and a JSON round-trip', () => {
@@ -44,7 +45,6 @@ describe('world generation', () => {
       expect(club.owner.ambition).toBeGreaterThanOrEqual(T.AMBITION_RANGE[0])
       expect(club.owner.ambition).toBeLessThanOrEqual(T.AMBITION_RANGE[1])
       expect(['patient', 'normal', 'impatient', 'erratic']).toContain(club.owner.type)
-      expect(club.managerId).toBeNull()
       expect(club.honours).toEqual([])
     }
   })

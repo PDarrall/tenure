@@ -92,3 +92,103 @@ export const FOREIGN_CLUB_NOISE_SD = 8
 
 /** Id offset for foreign clubs so ids never collide with home clubs. */
 export const FOREIGN_CLUB_ID_BASE = 1000
+
+// ---------------------------------------------------------------------------
+// Managers (DESIGN.md "Managers", "Reputation → employability band")
+// ---------------------------------------------------------------------------
+
+/** Population size, topped up each summer. Serves: every career target. */
+export const POPULATION = 400
+
+/** Starting age for new entrants, inclusive. DESIGN: 33–38. */
+export const START_AGE_RANGE: readonly [number, number] = [33, 38]
+
+/** Age range of genesis incumbents, who have been around a while. */
+export const INCUMBENT_AGE_RANGE: readonly [number, number] = [36, 60]
+
+/**
+ * Reputation of new entrants (genesis unemployed and later cohorts), uniform.
+ * Sits in the non-league and tier-4 bands so first jobs are small.
+ * Serves: median first spell ≈ 1.5 seasons; 40–50% never get a second job.
+ */
+export const ENTRY_REPUTATION_RANGE: readonly [number, number] = [8, 32]
+
+/** Genesis incumbents' reputation by tier, index 0 = tier 1. Matches the bands. */
+export const INCUMBENT_REPUTATION_BY_TIER: readonly (readonly [number, number])[] = [
+  [72, 92],
+  [58, 78],
+  [40, 62],
+  [22, 44],
+  [6, 26],
+]
+
+/** Genesis incumbents abroad, reputation by league kind. */
+export const INCUMBENT_REPUTATION_ABROAD: Readonly<Record<'big' | 'mid' | 'small', readonly [number, number]>> = {
+  big: [72, 92],
+  mid: [50, 72],
+  small: [10, 40],
+}
+
+/** Base ability range, uniform per component (0–100). */
+export const ABILITY_RANGE: readonly [number, number] = [30, 70]
+
+/** Incumbents at higher tiers are a little better: + (5 − tier) × this. */
+export const INCUMBENT_ABILITY_PER_TIER = 3
+
+/** Agent quality (0–100), uniform. Serves: shortlist randomness. */
+export const AGENT_RANGE: readonly [number, number] = [20, 90]
+
+/** Trust in the manager at genesis (0–100) before background offsets. */
+export const TRUST_BASE = 50
+
+/**
+ * Background offsets. DESIGN: ex-pro = high player trust, low board trust;
+ * coach = tactically strong, no name; analyst = dealing/development, no
+ * player trust. "No name" is a reputation offset.
+ */
+export const BACKGROUND_OFFSETS: Readonly<
+  Record<
+    'ex-pro' | 'coach' | 'analyst',
+    { reputation: number; playersTrust: number; boardTrust: number; tactical: number; development: number; dealing: number }
+  >
+> = {
+  'ex-pro': { reputation: 6, playersTrust: 25, boardTrust: -15, tactical: 0, development: 0, dealing: 0 },
+  coach: { reputation: -6, playersTrust: 0, boardTrust: 0, tactical: 15, development: 0, dealing: 0 },
+  analyst: { reputation: 0, playersTrust: -20, boardTrust: 5, tactical: 0, development: 15, dealing: 15 },
+}
+
+/** Background mix for new entrants. */
+export const BACKGROUND_WEIGHTS: Readonly<Record<'ex-pro' | 'coach' | 'analyst', number>> = {
+  'ex-pro': 0.5,
+  coach: 0.35,
+  analyst: 0.15,
+}
+
+/** Share of managers in the home pyramid (and its unemployed pool) who are home nationals. */
+export const HOME_NATIONAL_SHARE = 0.85
+
+/** Share of managers at a foreign club who are nationals of that league. */
+export const FOREIGN_NATIONAL_SHARE = 0.8
+
+/**
+ * Reputation → employability bands. DESIGN: 0–20 non-league / minor abroad ·
+ * 20–40 tier 4 · 40–60 tier 3 · 60–75 tier 2 · 75–90 tier 1 · 90+ elite.
+ * `tiers` are the home tiers the band covers; `foreign` the leagues abroad.
+ * Serves: 40–50% never get a second job (typecasting by band).
+ */
+export const REPUTATION_BANDS: readonly {
+  min: number
+  tiers: readonly (1 | 2 | 3 | 4 | 5)[]
+  foreign: readonly ('big' | 'mid' | 'small')[]
+  elite: boolean
+}[] = [
+  { min: 0, tiers: [5], foreign: ['small'], elite: false },
+  { min: 20, tiers: [4], foreign: [], elite: false },
+  { min: 40, tiers: [3], foreign: [], elite: false },
+  { min: 60, tiers: [2], foreign: ['mid'], elite: false },
+  { min: 75, tiers: [1], foreign: [], elite: false },
+  { min: 90, tiers: [1], foreign: ['big'], elite: true },
+]
+
+/** Tier-1 clubs ranked in the top N by prestige are "elite" (90+ band, −10 credit on hire). */
+export const ELITE_PRESTIGE_RANK = 6
