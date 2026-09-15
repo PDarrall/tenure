@@ -169,11 +169,17 @@ describe('a full season', () => {
       for (const club of league.clubs) {
         if (club.managerId === null) continue
         const manager = world.managers.find((m) => m.id === club.managerId)!
+        const spell = world.spells.find((s) => s.id === manager.history.spellIds.at(-1))!
+        if (spell.startWeek > 0) continue // hired during the season or summer: not a full season abroad
         expect(manager.history.seasons[0]!.games).toBe(T.FOREIGN_GAMES_PER_SEASON)
       }
     }
     const fresh = createWorld(1)
-    for (const m of world.managers) expect(m.age).toBe(fresh.managers.find((f) => f.id === m.id)!.age + 1)
+    for (const m of world.managers) {
+      const was = fresh.managers.find((f) => f.id === m.id)
+      if (!was || m.status.kind === 'retired') continue // cohort entrants and the retired do not age here
+      expect(m.age).toBe(was.age + 1)
+    }
   })
 
   it('keeps squads in range and moves them through ageing, gravity and windows', () => {
