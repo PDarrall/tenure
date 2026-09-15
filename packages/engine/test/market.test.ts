@@ -230,13 +230,15 @@ describe('unemployment and permadeath', () => {
     expect(m.status).toMatchObject({ kind: 'retired', reason: 'no-offers' })
     const old = managerById(world, clubById(world, 1).managerId!)
     old.age = T.RETIRE_AGE
+    for (const other of world.managers) if (other.id !== old.id && other.age >= T.AI_RETIRE_FROM) other.age = T.AI_RETIRE_FROM - 1
     seasonRetirements(world, createRng(1))
     expect(old.status).toMatchObject({ kind: 'retired', reason: 'age' })
     expect(clubById(world, 1).managerId).toBeNull()
     expect(spellOf(world, old)).toBeUndefined()
-    expect(world.log.filter((e) => e.type === 'career.ended')).toHaveLength(2)
+    const ended = () => world.log.filter((e) => e.type === 'career.ended' && (e.payload['managerId'] === old.id || e.payload['managerId'] === m.id))
+    expect(ended()).toHaveLength(2)
     endCareer(world, old, 'scandal')
-    expect(world.log.filter((e) => e.type === 'career.ended')).toHaveLength(2)
+    expect(ended()).toHaveLength(2)
   })
 })
 

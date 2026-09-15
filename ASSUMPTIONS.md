@@ -180,3 +180,38 @@ single branch, so they live here instead.
 - Top-tier long tenures are counted at every season end from season nine,
   at the clubs then in tier 1, and the reported figure is the mean.
 - "A handful" past 1,000 games is read as 2 to 15 of 500.
+
+## Tuning (phase 1)
+
+Values were chosen by sweeping seeds 1 to 3 and confirmed on seeds 1 to 5
+with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
+
+- Credit no longer drifts: the loss weighting is 1.0 (DESIGN started at
+  1.5). With any drift every top-tier manager eroded to the threshold in
+  about three seasons and no five-year tenure existed. Variance still
+  ends spells; k is 2.5.
+- A collapse to the instant-sack line (now credit 8) counts as deserved.
+- Blame protection lasts one season at 0.85 + 0.15 × ownership. At the
+  DESIGN's two seasons of 0.5 + 0.5 × ownership first spells were the
+  longest spells in the game.
+- Mutual consent is accepted by the AI 5% of the months it is offered.
+  At 30% it removed most long-suffering managers before eight weeks
+  below the threshold, so nearly every remaining sacking read as unjust.
+- Erratic owners are 5% of clubs and patient ones 30%; takeover
+  replacements happen 25% of the time and 1.5× as often at poor clubs.
+- The squad model's equilibrium is about 8 points above the wealth
+  level (gravity 0.5, slope 0.85, spend gain 6). Before, summer spending
+  outran gravity and every rich club sat at the 100 cap, which made
+  titles a lottery.
+- Manager ability moves strength by ±8 (was ±4), so good managers last
+  and bad ones fail.
+- Hiring: a quarter of vacancies became a tenth calling an employed
+  manager, who accepts half the time; shortlist randomness is 0.4; AI
+  managers rest nine months after losing a job and never apply below
+  one band under their own; AI managers start considering retirement
+  at 55.
+- Not reached: "median career across three or four clubs". With 40–50%
+  of managers never getting a second job, a median of three clubs would
+  need almost nobody to stop at exactly two, which no reading of the
+  rules produced. The median is two clubs on every seed. The
+  20-season share sits at the top of its band (12–14% by seed).

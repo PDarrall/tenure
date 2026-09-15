@@ -110,29 +110,31 @@ describe('credit', () => {
 
   it('moves by k × (points − expected), weights losses, and adds the extras', () => {
     const base = { derby: false, cupExitToLowerTier: false, beatTopSide: false }
-    expect(matchCreditDelta(spell, { points: 3, expected: 1.5, ...base })).toBeCloseTo(3)
-    expect(matchCreditDelta(spell, { points: 0, expected: 1.5, ...base })).toBeCloseTo(-4.5)
-    expect(matchCreditDelta(spell, { points: 0, expected: 1.5, ...base, derby: true })).toBeCloseTo(-8.5)
+    const K = T.CREDIT_K
+    const L = T.CREDIT_LOSS_WEIGHT
+    expect(matchCreditDelta(spell, { points: 3, expected: 1.5, ...base })).toBeCloseTo(K * 1.5)
+    expect(matchCreditDelta(spell, { points: 0, expected: 1.5, ...base })).toBeCloseTo(-K * 1.5 * L)
+    expect(matchCreditDelta(spell, { points: 0, expected: 1.5, ...base, derby: true })).toBeCloseTo(-K * 1.5 * L + T.CREDIT_DERBY_DEFEAT)
     // Third consecutive defeat.
-    expect(matchCreditDelta(spell, { points: 0, expected: 1, ...base })).toBeCloseTo(-3 - 2)
+    expect(matchCreditDelta(spell, { points: 0, expected: 1, ...base })).toBeCloseTo(-K * 1 * L + T.CREDIT_CONSEC_DEFEAT)
     expect(spell.consecutiveDefeats).toBe(3)
-    expect(matchCreditDelta(spell, { points: 3, expected: 2, ...base, beatTopSide: true })).toBeCloseTo(2 + 2)
+    expect(matchCreditDelta(spell, { points: 3, expected: 2, ...base, beatTopSide: true })).toBeCloseTo(K * 1 + T.CREDIT_BEAT_TOP)
     expect(spell.consecutiveDefeats).toBe(0)
-    expect(matchCreditDelta(spell, { points: 0, expected: 2.5, ...base, cupExitToLowerTier: true })).toBeCloseTo(-7.5 - 6)
+    expect(matchCreditDelta(spell, { points: 0, expected: 2.5, ...base, cupExitToLowerTier: true })).toBeCloseTo(-K * 2.5 * L + T.CREDIT_CUP_EXIT_LOWER)
   })
 
-  it('scales negative deltas by blame in the first two seasons', () => {
+  it('scales negative deltas by blame in the first seasons', () => {
     spell.seasonsCompleted = 0
     spell.ownership = 0
-    expect(blameScale(spell)).toBe(0.5)
+    expect(blameScale(spell)).toBe(T.BLAME_BASE)
     spell.ownership = 1
-    expect(blameScale(spell)).toBe(1)
-    spell.seasonsCompleted = 2
+    expect(blameScale(spell)).toBeCloseTo(T.BLAME_BASE + T.BLAME_OWNERSHIP_SHARE)
+    spell.seasonsCompleted = T.BLAME_SEASONS
     spell.ownership = 0
     expect(blameScale(spell)).toBe(1)
     spell.seasonsCompleted = 0
     spell.credit = 50
-    expect(addCredit(spell, -10)).toBe(-5)
+    expect(addCredit(spell, -10)).toBeCloseTo(-10 * T.BLAME_BASE, 5)
     expect(addCredit(spell, 10)).toBe(10)
   })
 
@@ -175,17 +177,17 @@ describe('sacking', () => {
     const world = createWorld(4)
     const spell = freshSpell(world, 4)
     spell.contract.endWeek = contractEndWeek(world, 4)
-    expect(rollProbability(world, spell)).toBeCloseTo(T.SACK_ROLL_FLOOR)
+    expect(rollProbability(world, spell)).toBeCloseTo(Math.max(T.SACK_ROLL_FLOOR, T.SACK_ROLL_BASE * (1 - T.SACK_ROLL_PER_YEAR * 4)))
     spell.contract.endWeek = contractEndWeek(world, 1)
-    expect(rollProbability(world, spell)).toBeCloseTo(0.08)
+    expect(rollProbability(world, spell)).toBeCloseTo(Math.max(T.SACK_ROLL_FLOOR, T.SACK_ROLL_BASE * (1 - T.SACK_ROLL_PER_YEAR)))
   })
 
-  it('sacks at once at credit 5, pays out the contract and counts the collapse as deserved', () => {
+  it('sacks at once at the instant line, pays out the contract and counts the collapse as deserved', () => {
     const world = createWorld(4)
     const spell = freshSpell(world, 4)
     const manager = managerById(world, spell.managerId)
     const repBefore = manager.reputation
-    spell.credit = 5
+    spell.credit = T.CREDIT_INSTANT_SACK
     const owed = remainingValue(world, spell)
     expect(weeklySackingCheck(world, createRng(1), spell)).toBe(true)
     expect(spell.endReason).toBe('sacked')

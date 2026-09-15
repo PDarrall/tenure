@@ -38,10 +38,10 @@ export const T = {
 
   /** Owner type mix. Serves: unjust sackings ≈ 20–30% (impatient and erratic owners sack unjustly). */
   OWNER_TYPE_WEIGHTS: {
-    patient: 0.25,
+    patient: 0.3,
     normal: 0.45,
     impatient: 0.2,
-    erratic: 0.1,
+    erratic: 0.05,
   } as Readonly<Record<'patient' | 'normal' | 'impatient' | 'erratic', number>>,
 
   /** Owner ambition drawn uniformly in this range (0–1). Serves: expectation spread. */
@@ -50,9 +50,9 @@ export const T = {
   /** Fan patience drawn uniformly (0–100). Held on the club for later phases. */
   FAN_PATIENCE_RANGE: [30, 80] as readonly [number, number],
 
-  /** Squad strength target set by wealth: target = intercept + slope × wealth ("gravity"). */
-  GRAVITY_INTERCEPT: 5,
-  GRAVITY_SLOPE: 0.9,
+  /** Squad strength target set by wealth: target = intercept + slope × wealth ("gravity"). With the summer spend the equilibrium sits about 8 above it, so the top of tier 1 spreads out instead of piling at 100. Serves: 2–4 long top-tier tenures. */
+  GRAVITY_INTERCEPT: 0,
+  GRAVITY_SLOPE: 0.85,
 
   /** Initial strength = gravity target + normal(0, sd). Serves: season-one surprises. */
   STRENGTH_INITIAL_NOISE_SD: 6,
@@ -271,8 +271,8 @@ export const T = {
   /** Strength swing from form: ±this at all wins / all losses over the window. */
   FORM_WEIGHT: 3,
 
-  /** Strength swing from the manager's tactical ability: ±this at 100 / 0. */
-  ABILITY_WEIGHT: 4,
+  /** Strength swing from the manager's tactical ability: ±this at 100 / 0. Serves: good managers last, bad ones fail (first spell, top-tier tenures). */
+  ABILITY_WEIGHT: 8,
 
   /** Strength swing from squad morale: ±this at 100 / 0. */
   MORALE_WEIGHT: 3,
@@ -336,14 +336,14 @@ export const T = {
   /** Mean age of promoted academy players. */
   ACADEMY_AGE: 19,
 
-  /** Share of the gap to the gravity target closed each summer. */
-  GRAVITY_RATE: 0.3,
+  /** Share of the gap to the gravity target closed each summer. Serves: 2–4 long top-tier tenures (a flat top produced none). */
+  GRAVITY_RATE: 0.5,
 
   /** Transfer budget in £m per season = coefficient × wealth². Serves: earnings, big-spender ranks. */
   TRANSFER_BUDGET_PER_WEALTH_SQ: 0.012,
 
   /** Spend returns: gain = SPEND_GAIN_MAX × r / (r + 1), r = spend / normal budget. Diminishing. */
-  SPEND_GAIN_MAX: 9,
+  SPEND_GAIN_MAX: 6,
 
   /** Dealing ability multiplies spend gain: 1 + this × (dealing − 50) / 50. */
   DEALING_EFFECT: 0.3,
@@ -407,7 +407,7 @@ export const T = {
    * Serves: careers abroad carry the same hazard as at home.
    */
   ABROAD_MONTHLY_CREDIT_MEAN: -1.5,
-  ABROAD_MONTHLY_CREDIT_SD: 6,
+  ABROAD_MONTHLY_CREDIT_SD: 4,
 
   // ---------------------------------------------------------------------------
   // Expectation (DESIGN.md "Expectation"). Serves: median first spell ≈ 1.5
@@ -440,9 +440,9 @@ export const T = {
   /** Hire at an elite (top-six-prestige) club. */
   CREDIT_ELITE_PENALTY: -10,
   /** Per match: Δ = K × (points − expected points). */
-  CREDIT_K: 2,
-  /** Losses weighted × this. Credit erodes unless you overachieve; watch in validation. */
-  CREDIT_LOSS_WEIGHT: 1.5,
+  CREDIT_K: 2.5,
+  /** Losses weighted × this. DESIGN started at 1.5 so credit erodes unless you overachieve; validation showed that erosion killed every long top-tier tenure, so it sits at 1 (no drift, variance only). */
+  CREDIT_LOSS_WEIGHT: 1.0,
   /** From this consecutive defeat on, an extra penalty each. */
   CREDIT_CONSEC_DEFEAT_FROM: 3,
   CREDIT_CONSEC_DEFEAT: -2,
@@ -466,10 +466,10 @@ export const T = {
   CEILING_STALENESS_PER_SEASON: 10,
   /** First-XI turnover in one summer that resets the ceiling. */
   CEILING_RESET_TURNOVER: 0.5,
-  /** Blame: for this many seasons, negative deltas × (base + share × ownership). */
-  BLAME_SEASONS: 2,
-  BLAME_BASE: 0.5,
-  BLAME_OWNERSHIP_SHARE: 0.5,
+  /** Blame: for this many seasons, negative deltas × (base + share × ownership). DESIGN started at two seasons of 0.5 + 0.5 × ownership; that made first spells the longest of all, so it is one season of 0.85 + 0.15 × ownership. Serves: median first spell ≈ 1.5, 30% inside a season. */
+  BLAME_SEASONS: 1,
+  BLAME_BASE: 0.85,
+  BLAME_OWNERSHIP_SHARE: 0.15,
 
   // ---------------------------------------------------------------------------
   // Sacking (DESIGN.md "Sacking"). Serves: unjust sackings ≈ 20–30%, median
@@ -483,12 +483,12 @@ export const T = {
   } as Readonly<Record<'patient' | 'normal' | 'impatient', number>>,
   /** Erratic owners: uniform in this range, re-rolled monthly. */
   SACK_THRESHOLD_ERRATIC: [10, 45] as readonly [number, number],
-  /** Weekly roll while below threshold: base × (1 − perYear × years remaining), floored. */
-  SACK_ROLL_BASE: 0.1,
+  /** Weekly roll while below threshold: base × (1 − perYear × years remaining), floored. DESIGN started at 10%; 4% lets eight weeks pass more often. Serves: unjust ≈ 20–30%. */
+  SACK_ROLL_BASE: 0.04,
   SACK_ROLL_PER_YEAR: 0.2,
   SACK_ROLL_FLOOR: 0.03,
-  /** Credit at or below this: sacked at once. */
-  CREDIT_INSTANT_SACK: 5,
+  /** Credit at or below this: sacked at once, and counted as deserved. DESIGN started at 5. */
+  CREDIT_INSTANT_SACK: 8,
   /** A sacking is "deserved" after this many consecutive weeks below threshold. */
   DESERVED_WEEKS: 8,
   REP_SACKED_DESERVED: -8,
@@ -501,9 +501,9 @@ export const T = {
   /** Wealth below this counts as a low-wealth club. */
   LOW_WEALTH: 30,
   TAKEOVER_P: 0.01,
-  TAKEOVER_LOW_WEALTH_MULT: 3,
+  TAKEOVER_LOW_WEALTH_MULT: 1.5,
   /** New owner replaces the manager within this many months with this chance, whatever the results. */
-  TAKEOVER_REPLACE_P: 0.35,
+  TAKEOVER_REPLACE_P: 0.25,
   TAKEOVER_REPLACE_MONTHS: 6,
   CRISIS_P: 0.005,
   CRISIS_LOW_WEALTH_MULT: 3,
@@ -535,8 +535,8 @@ export const T = {
   MUTUAL_WINDOW: [10, 25] as readonly [number, number],
   MUTUAL_PAYOUT_SHARE: 0.5,
   REP_MUTUAL: -4,
-  /** AI accepts a mutual-consent offer with this chance each month it is offered. */
-  AI_MUTUAL_ACCEPT_P: 0.3,
+  /** AI accepts a mutual-consent offer with this chance each month it is offered. At 0.3 consent removed most long-suffering managers before eight weeks. Serves: unjust ≈ 20–30%. */
+  AI_MUTUAL_ACCEPT_P: 0.05,
   /** Resigning: reputation hit depends on credit at the split. */
   RESIGN_CREDIT_SPLIT: 50,
   REP_RESIGN_HIGH: -1,
@@ -603,7 +603,7 @@ export const T = {
   /** Shortlist size, uniform. DESIGN: three to five. */
   SHORTLIST_SIZE: [3, 5] as readonly [number, number],
   /** Shortlist score weights: reputation, tag fit, agent quality, randomness. */
-  SHORTLIST_WEIGHTS: { reputation: 1, tagFit: 0.6, agent: 0.4, random: 0.5 } as const,
+  SHORTLIST_WEIGHTS: { reputation: 1, tagFit: 0.6, agent: 0.4, random: 0.4 } as const,
   /** Shortlist weight multipliers by age. Serves: careers end by 72, a handful past 1,000 games. */
   AGE_PENALTY: [
     { from: 60, mult: 0.5 },
@@ -614,9 +614,9 @@ export const T = {
   /** AI applies to clubs at most this many bands below its own band ... */
   AI_APPLY_BANDS_BELOW: 1,
   /** ... until this many months unemployed, after which it applies anywhere it qualifies. */
-  AI_APPLY_ANY_AFTER_MONTHS: 12,
-  /** After losing a job an AI manager takes this many months before applying again. Serves: a handful past 1,000 games. */
-  AI_REST_MONTHS_AFTER_EXIT: 3,
+  AI_APPLY_ANY_AFTER_MONTHS: 24,
+  /** After losing a job an AI manager takes this many months before applying again. Serves: a handful past 1,000 games (immediate rehiring made 10% of careers continuous for 20 years). */
+  AI_REST_MONTHS_AFTER_EXIT: 9,
   /** Most tags on a vacancy's want-list. */
   WANT_TAGS_MAX: 2,
   /** Contract years offered, weights for 1, 2, 3, 4 years. DESIGN: one to four. */
@@ -630,10 +630,10 @@ export const T = {
   /** Employed managers are approached only by clubs at least this much more prestigious. */
   POACH_PRESTIGE_GAP: 10,
   /** Share of vacancies where the club calls one employed manager (the best fit) rather than only the unemployed. */
-  POACH_ATTEMPT_P: 0.25,
+  POACH_ATTEMPT_P: 0.1,
   /** A manager must have been in post this many weeks before a bigger club calls. Serves: a handful past 1,000 games. */
   POACH_MIN_WEEKS: 46,
-  AI_ACCEPT_APPROACH_P: 0.7,
+  AI_ACCEPT_APPROACH_P: 0.5,
   /** Declining an approach. DESIGN: credit +3, loyalty progress. */
   DECLINE_APPROACH_CREDIT: 3,
   LOYALTY_PER_DECLINE: 1,
@@ -672,8 +672,8 @@ export const T = {
   RETIRE_AGE: 72,
   /** Monthly chance of a career-ending scandal. */
   SCANDAL_P: 0.0005,
-  /** AI voluntary retirement from this age: base + per-year × (age − from), doubled when unemployed. */
-  AI_RETIRE_FROM: 60,
+  /** AI voluntary retirement from this age: base + per-year × (age − from), doubled when unemployed. Serves: ~10% reach 20 seasons, a handful past 1,000 games. */
+  AI_RETIRE_FROM: 55,
   AI_RETIRE_BASE_P: 0.05,
   AI_RETIRE_PER_YEAR: 0.03,
   AI_RETIRE_UNEMPLOYED_MULT: 2,
