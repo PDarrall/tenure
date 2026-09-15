@@ -74,10 +74,17 @@ export function approach(world: World, rng: Rng, manager: Manager, vacancy: Vaca
   return true
 }
 
+/** Contract length for this manager: the vacancy's offer, or a shorter first-job deal for the unproven. */
+export function contractYearsFor(rng: Rng, manager: Manager, vacancy: Vacancy): number {
+  if (manager.history.spellIds.length > 0) return vacancy.contract.years
+  const years = T.FIRST_JOB_CONTRACT_YEARS_WEIGHTS.map((_, i) => i + 1)
+  return rng.weighted(years, T.FIRST_JOB_CONTRACT_YEARS_WEIGHTS)
+}
+
 /** Seat the manager on the vacancy's terms. */
 export function hire(world: World, rng: Rng, manager: Manager, vacancy: Vacancy): Spell {
   const promise = manager.isHuman ? 'top-half' : aiPromise(world, vacancy)
-  const years = vacancy.contract.years
+  const years = contractYearsFor(rng, manager, vacancy)
   const salary = salaryForYears(salaryFor(world, vacancy.post, manager.reputation), years)
   const spell = startSpell(world, rng, manager, vacancy.post, { years, promise, crisis: vacancy.crisis, salary })
   vacancy.filledWeek = world.week
@@ -102,6 +109,8 @@ export function tryToFill(world: World, rng: Rng, vacancy: Vacancy): boolean {
     if (manager.status.kind === 'retired') continue
     if (manager.isHuman) continue
     if (manager.status.kind === 'employed') {
+      // Only the chosen target is called; anyone hired elsewhere since the draw is simply gone.
+      if (manager.id !== vacancy.poachTargetId) continue
       if (!approach(world, rng, manager, vacancy)) continue
     }
     if (manager.status.kind !== 'unemployed') continue

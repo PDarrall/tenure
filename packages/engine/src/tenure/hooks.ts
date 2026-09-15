@@ -68,6 +68,8 @@ export function weekly(world: World, rng: Rng): void {
 export function monthly(world: World, rng: Rng): void {
   for (const spell of activeSpells(world)) {
     if (spell.post.kind !== 'home') {
+      const drift = addCredit(spell, rng.normal(T.ABROAD_MONTHLY_CREDIT_MEAN, T.ABROAD_MONTHLY_CREDIT_SD))
+      emit(world, 'credit.monthly', { spellId: spell.id, managerId: spell.managerId, abroad: true, delta: drift, credit: spell.credit })
       if (monthlyMutualConsent(world, rng, spell)) continue
       monthlyResignation(world, rng, spell)
       continue
@@ -103,8 +105,13 @@ function spellHonours(world: World, manager: Manager, spell: Spell): Honour[] {
   return manager.history.honours.filter((h) => h.season === world.season && h.clubId === spell.post.clubId)
 }
 
+/**
+ * The market judges a season against the structural expectation (the
+ * squad's strength rank), not the board's target, so reputation is
+ * zero-sum across a division rather than draining as boards ratchet.
+ */
 function seasonReputation(world: World, manager: Manager, spell: Spell, finish: number, promoted: boolean, relegated: boolean): void {
-  const places = Math.max(-T.REP_SEASON_CLAMP, Math.min(T.REP_SEASON_CLAMP, (spell.expectation - finish) * T.REP_SEASON_PER_PLACE))
+  const places = Math.max(-T.REP_SEASON_CLAMP, Math.min(T.REP_SEASON_CLAMP, (spell.structuralTarget - finish) * T.REP_SEASON_PER_PLACE))
   if (places !== 0) bumpReputation(world, manager.id, places, 'season vs expectation')
   for (const h of spellHonours(world, manager, spell)) {
     bumpReputation(world, manager.id, round1(T.REP_TROPHY * trophyWeight(h)), `trophy ${h.competition}`)
@@ -138,6 +145,7 @@ export function seasonEnd(world: World, outcome: SeasonEnd): void {
       managerId: spell.managerId,
       finish,
       expectation: spell.expectation,
+      structural: spell.structuralTarget,
       delta: applied,
       credit: spell.credit,
       ceiling: spell.ceiling,

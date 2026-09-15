@@ -106,6 +106,14 @@ describe('shortlisting', () => {
     star.reputation = 80
     expect(bandIndex(star.reputation)).toBe(4)
     expect(wouldApply(world, star, vacancy)).toBe(false)
+    // A sacked manager rests before applying anywhere.
+    const rested = world.managers.find((m) => m.status.kind === 'unemployed' && m.id !== star.id)!
+    rested.history.spellIds.push(1)
+    rested.reputation = 30
+    expect(wouldApply(world, rested, vacancy)).toBe(false)
+    if (rested.status.kind === 'unemployed') rested.status.sinceWeek = -T.AI_REST_MONTHS_AFTER_EXIT * T.MONTH_WEEKS
+    expect(wouldApply(world, rested, vacancy)).toBe(true)
+    rested.history.spellIds.pop()
     if (star.status.kind === 'unemployed') star.status.sinceWeek = -T.AI_APPLY_ANY_AFTER_MONTHS * T.MONTH_WEEKS
     expect(wouldApply(world, star, vacancy)).toBe(true)
   })
@@ -142,7 +150,9 @@ describe('hiring', () => {
     const vacancy = vacate(world, tierTwo.id)
     const candidate = world.managers.find((m) => m.status.kind === 'unemployed')!
     candidate.reputation = 65
+    candidate.history.spellIds.push(1) // an established manager takes the offered length
     const spell = hire(world, createRng(1), candidate, vacancy)
+    candidate.history.spellIds.shift()
     expect(spell.contract.yearsAtSigning).toBe(vacancy.contract.years)
     expect(spell.contract.promise).toBe(aiPromise(world, vacancy))
     expect(vacancy.filledWeek).toBe(world.week)

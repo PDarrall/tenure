@@ -28,10 +28,14 @@ export function qualifies(world: World, manager: Manager, vacancy: Vacancy): boo
   return have >= need - T.TAG_BAND_BELOW && hasWantedTag(manager, vacancy)
 }
 
-/** Would an AI manager put itself forward? Unemployed managers aim no lower than one band below their own. */
+/**
+ * Would an AI manager put itself forward? Unemployed managers aim no lower
+ * than one band below their own, and take a short break after losing a job.
+ */
 export function wouldApply(world: World, manager: Manager, vacancy: Vacancy): boolean {
   if (manager.status.kind === 'retired') return false
   if (manager.status.kind === 'employed') return false
+  if (manager.history.spellIds.length > 0 && monthsUnemployed(world, manager) < T.AI_REST_MONTHS_AFTER_EXIT) return false
   if (vacancy.post.kind === 'abroad') {
     const native = manager.nationality === vacancy.post.league
     if (!native && manager.status.activity !== 'abroad') return false
@@ -45,6 +49,7 @@ export function poachable(world: World, manager: Manager, vacancy: Vacancy): boo
   if (manager.status.kind !== 'employed') return false
   const spell = spellOf(world, manager)
   if (!spell) return false
+  if (world.week - spell.startWeek < T.POACH_MIN_WEEKS) return false
   const current =
     spell.post.kind === 'home' ? clubById(world, spell.post.clubId).prestige : (foreignClubById(world, spell.post.clubId)?.prestige ?? 0)
   return vacancyPrestige(world, vacancy) >= current + T.POACH_PRESTIGE_GAP
@@ -75,7 +80,8 @@ export function drawShortlist(world: World, rng: Rng, vacancy: Vacancy): Manager
   scored.sort((a, b) => b.score - a.score || a.m.id - b.m.id)
   const size = rng.int(T.SHORTLIST_SIZE[0], T.SHORTLIST_SIZE[1])
   const picked = scored.slice(0, size).map((s) => s.m)
-  if (rng.chance(T.POACH_ATTEMPT_P)) {
+  // One call to an employed manager per vacancy, decided on the first draw.
+  if (vacancy.shortlist.length === 0 && vacancy.widened === 0 && rng.chance(T.POACH_ATTEMPT_P)) {
     const targets = world.managers
       .filter((m) => !m.isHuman && qualifies(world, m, vacancy) && poachable(world, m, vacancy))
       .map((m) => ({ m, score: shortlistScore(rng, m, vacancy) }))
@@ -83,6 +89,7 @@ export function drawShortlist(world: World, rng: Rng, vacancy: Vacancy): Manager
     const best = targets[0]
     if (best) {
       picked.unshift(best.m)
+      vacancy.poachTargetId = best.m.id
       if (picked.length > T.SHORTLIST_SIZE[1]) picked.pop()
     }
   }

@@ -95,7 +95,13 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
   const firstSpellLengths = firstSpells.filter((s) => s.endWeek !== null).map((s) => spellSeasons(s, now))
   const insideSeason = firstSpells.filter((s) => s.endWeek !== null && s.endWeek - s.startWeek < T.SEASON_WEEKS).length
 
-  const careerSeasons = ended.map((m) => m.history.spellIds.reduce((sum, id) => sum + spellSeasons(spellById(world, id), now), 0))
+  // Career length is the calendar span from first hire to the end of the career.
+  const careerSeasons = ended.map((m) => {
+    const first = firstCareerSpell(world, m) as Spell
+    const endWeek = m.status.kind === 'retired' ? m.status.week : now
+    return (endWeek - first.startWeek) / T.SEASON_WEEKS
+  })
+  const employedSeasons = ended.map((m) => m.history.spellIds.reduce((sum, id) => sum + spellSeasons(spellById(world, id), now), 0))
   const careerClubs = ended.map((m) => m.history.spellIds.length)
   const neverSecond = ended.filter((m) => m.history.spellIds.length === 1).length
   const twentySeasons = careerSeasons.filter((s) => s >= T.LONG_CAREER_SEASONS).length
@@ -113,7 +119,7 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     line('firstSpellMedianSeasons', 'Median first-spell length (seasons)', median(firstSpellLengths), 'seasons'),
     line('firstSpellInsideSeasonShare', 'First spells ending inside a season', firstSpells.length ? insideSeason / firstSpells.length : 0, 'share'),
     line('neverSecondJobShare', 'First-time managers who never get a second job', ended.length ? neverSecond / ended.length : 0, 'share'),
-    line('careerMedianSeasons', 'Median career length (seasons managed)', median(careerSeasons), 'seasons'),
+    line('careerMedianSeasons', 'Median career length (seasons, first job to the end)', median(careerSeasons), 'seasons'),
     line('careerMedianClubs', 'Median clubs per career', median(careerClubs), 'number'),
     line('twentySeasonShare', 'Careers reaching 20 seasons', ended.length ? twentySeasons / ended.length : 0, 'share'),
     line('thousandGameCount', 'Careers past 1,000 games', thousandGames, 'count'),
@@ -156,6 +162,14 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     'career p25 (seasons)': quantile(careerSeasons, 0.25),
     'career p75 (seasons)': quantile(careerSeasons, 0.75),
     'career p90 (seasons)': quantile(careerSeasons, 0.9),
+    'median seasons employed': median(employedSeasons),
+    'p90 seasons employed': quantile(employedSeasons, 0.9),
+    'games abroad share (1,000+)': (() => {
+      const long = ended.filter((m) => m.history.games >= T.LONG_CAREER_GAMES)
+      const abroad = long.reduce((s, m) => s + m.history.seasons.filter((r) => r.post.kind === 'abroad').reduce((g, r) => g + r.games, 0), 0)
+      const total = long.reduce((s, m) => s + m.history.games, 0)
+      return total ? abroad / total : 0
+    })(),
     'max games (tracked)': ended.length ? Math.max(...ended.map((m) => m.history.games)) : 0,
     'median earnings £m (ended)': median(ended.map((m) => Math.round(m.history.earnings * 10) / 10)),
     'median trophy points (ended)': median(ended.map((m) => m.history.trophyPoints)),

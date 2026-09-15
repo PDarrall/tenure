@@ -74,8 +74,10 @@ single branch, so they live here instead.
 - A contract signed mid-season counts that season as its first year; one
   signed in the summer starts with the season about to begin. Contracts end
   on the season-end week. Payout is salary × weeks left / season weeks.
-- "Deserved" means eight or more consecutive weeks below the threshold at
-  the moment of sacking. Takeover replacements are always unjust.
+- "Deserved" means the manager has spent eight or more weeks of the spell
+  below the threshold, counted cumulatively rather than consecutively, at
+  the moment of sacking, or has collapsed to the instant-sack line (credit
+  5). Takeover replacements are always unjust.
 - The board rolls every week, including summer weeks.
 - Expectation: beating or meeting the target sets next target = finish;
   missing it eases the target one place, but never past the structural
@@ -89,6 +91,11 @@ single branch, so they live here instead.
   four match weeks and not in the summer.
 - Trophies count for credit and reputation only for the spell they were
   won in (honours record the club).
+- The season-end reputation move (±2 per place, clamped ±8) is measured
+  against the structural expectation, the squad's strength rank, rather
+  than the board's ratcheting target. Credit uses the board's target.
+  Measured against the board's target the whole population's reputation
+  drained by about two places a season.
 - Blame applies while fewer than two seasons of the spell are complete.
 - Cup ties: points are 3 for the winner (shoot-outs included) and 0 for
   the loser; expected points fold the shoot-out into the win chance.
@@ -118,7 +125,8 @@ single branch, so they live here instead.
   nationals and to managers who chose "abroad".
 - "A bigger club calls" is an event: a quarter of vacancies approach the
   single best-fitting employed manager at a club at least 10 prestige
-  points smaller; the AI accepts 70% of calls. If the hiring club cannot
+  points smaller who has been in post at least a season; the AI accepts
+  70% of calls. If the hiring club cannot
   pay the buy-out (over half its wage budget) the manager must walk out,
   which the AI only does for a much bigger club.
 - Salary is tier × reputation, scaled down 8% per contract year beyond
@@ -158,11 +166,16 @@ single branch, so they live here instead.
 - A tracked career belongs to a manager whose first spell began after
   genesis. `sim --careers N` follows the first N such managers to the end
   of their careers (bounded by the age limit), so no career is censored.
-- Career length is seasons employed (sum of spell lengths), not calendar
-  years; "clubs" is the number of spells.
+- Career length is the calendar span from first hire to the end of the
+  career, unemployment included, which is what makes "10% reach 20
+  seasons" and "a handful pass 1,000 games" consistent. Seasons employed
+  is reported alongside. "Clubs" is the number of spells.
+- Spells abroad get a monthly credit move drawn from normal(−1.5, 6) in
+  place of match-by-match credit, so a job abroad carries a similar
+  hazard to one at home.
 - "Inside a season" means the first spell lasted fewer than 46 weeks.
-- "Unjust" means credit was below the threshold for fewer than eight
-  consecutive weeks at the sacking, or the sacking followed a takeover;
+- "Unjust" means credit had been below the threshold for fewer than eight
+  weeks of the spell at the sacking, or the sacking followed a takeover;
   the share is over every sacking in the run, not only tracked careers.
 - Top-tier long tenures are counted at every season end from season nine,
   at the clubs then in tier 1, and the reported figure is the mean.

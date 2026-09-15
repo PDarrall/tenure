@@ -92,6 +92,7 @@ function openVacancy(world: World, rng: Rng, post: Post): Vacancy {
     wantTags: wantTags(world, post),
     applicants: [],
     shortlist: [],
+    poachTargetId: null,
     widened: 0,
     crisis: isCrisis(world, post, reason, world.week),
     filledWeek: null,

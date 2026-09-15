@@ -13,10 +13,14 @@ export function rollProbability(world: World, spell: Spell): number {
 
 export type SackCause = 'credit' | 'takeover'
 
-/** Sack: full payout, reputation hit by whether it was deserved. */
+/**
+ * Sack: full payout, reputation hit by whether it was deserved. Deserved
+ * means eight weeks of the spell spent below the threshold, or a collapse
+ * to the instant-sack line; a takeover replacement never is.
+ */
 export function sack(world: World, spell: Spell, cause: SackCause): void {
   const manager = managerById(world, spell.managerId)
-  const deserved = cause === 'credit' && spell.weeksBelowThreshold >= T.DESERVED_WEEKS
+  const deserved = cause === 'credit' && (spell.weeksBelowThreshold >= T.DESERVED_WEEKS || spell.credit <= T.CREDIT_INSTANT_SACK)
   spell.deserved = deserved
   const repDelta = bumpReputation(world, manager.id, deserved ? T.REP_SACKED_DESERVED : T.REP_SACKED_UNJUST, deserved ? 'sacked (deserved)' : 'sacked (unjust)')
   endSpell(world, spell, 'sacked', 1)
@@ -56,8 +60,6 @@ export function weeklySackingCheck(world: World, rng: Rng, spell: Spell): boolea
       sack(world, spell, 'credit')
       return true
     }
-  } else {
-    spell.weeksBelowThreshold = 0
   }
   return false
 }

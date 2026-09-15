@@ -180,7 +180,7 @@ describe('sacking', () => {
     expect(rollProbability(world, spell)).toBeCloseTo(0.08)
   })
 
-  it('sacks at once at credit 5, pays out the contract and marks it unjust', () => {
+  it('sacks at once at credit 5, pays out the contract and counts the collapse as deserved', () => {
     const world = createWorld(4)
     const spell = freshSpell(world, 4)
     const manager = managerById(world, spell.managerId)
@@ -189,10 +189,10 @@ describe('sacking', () => {
     const owed = remainingValue(world, spell)
     expect(weeklySackingCheck(world, createRng(1), spell)).toBe(true)
     expect(spell.endReason).toBe('sacked')
-    expect(spell.deserved).toBe(false)
+    expect(spell.deserved).toBe(true)
     expect(spell.payout).toBe(owed)
     expect(manager.history.earnings).toBeGreaterThanOrEqual(owed)
-    expect(manager.reputation).toBe(repBefore + T.REP_SACKED_UNJUST)
+    expect(manager.reputation).toBe(repBefore + T.REP_SACKED_DESERVED)
     expect(manager.status.kind).toBe('unemployed')
     expect(clubById(world, 4).managerId).toBeNull()
     expect(world.log.at(-1)!.type).toBe('manager.sacked')

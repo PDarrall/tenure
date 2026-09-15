@@ -401,6 +401,14 @@ export const T = {
   /** Random strength shock per season for foreign clubs (sd). */
   FOREIGN_STRENGTH_SHOCK_SD: 2,
 
+  /**
+   * Abroad there is no match-by-match credit, so each month credit moves by
+   * normal(mean, sd): the same slow erosion and noise a home spell sees.
+   * Serves: careers abroad carry the same hazard as at home.
+   */
+  ABROAD_MONTHLY_CREDIT_MEAN: -1.5,
+  ABROAD_MONTHLY_CREDIT_SD: 6,
+
   // ---------------------------------------------------------------------------
   // Expectation (DESIGN.md "Expectation"). Serves: median first spell ≈ 1.5
   // seasons and the 30% inside-a-season share, through the season-end delta.
@@ -607,10 +615,14 @@ export const T = {
   AI_APPLY_BANDS_BELOW: 1,
   /** ... until this many months unemployed, after which it applies anywhere it qualifies. */
   AI_APPLY_ANY_AFTER_MONTHS: 12,
+  /** After losing a job an AI manager takes this many months before applying again. Serves: a handful past 1,000 games. */
+  AI_REST_MONTHS_AFTER_EXIT: 3,
   /** Most tags on a vacancy's want-list. */
   WANT_TAGS_MAX: 2,
   /** Contract years offered, weights for 1, 2, 3, 4 years. DESIGN: one to four. */
   CONTRACT_YEARS_WEIGHTS: [0.15, 0.4, 0.3, 0.15] as readonly number[],
+  /** Contract years offered to a manager with no previous job. Serves: ~30% of first spells end inside a season. */
+  FIRST_JOB_CONTRACT_YEARS_WEIGHTS: [0.45, 0.4, 0.15, 0] as readonly number[],
   /** Salary × (1 − factor × (years − 2)): longer contracts pay less per year. */
   SALARY_PER_YEAR_FACTOR: 0.08,
   /** AI promises promotion when the structural target is this high or better (tiers 2–5). */
@@ -619,6 +631,8 @@ export const T = {
   POACH_PRESTIGE_GAP: 10,
   /** Share of vacancies where the club calls one employed manager (the best fit) rather than only the unemployed. */
   POACH_ATTEMPT_P: 0.25,
+  /** A manager must have been in post this many weeks before a bigger club calls. Serves: a handful past 1,000 games. */
+  POACH_MIN_WEEKS: 46,
   AI_ACCEPT_APPROACH_P: 0.7,
   /** Declining an approach. DESIGN: credit +3, loyalty progress. */
   DECLINE_APPROACH_CREDIT: 3,

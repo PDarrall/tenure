@@ -354,7 +354,7 @@ export interface Spell {
   seasonsCompleted: number
   /** Share of the first XI the manager signed, 0–1. */
   ownership: number
-  /** Consecutive weeks with credit below the threshold. */
+  /** Weeks with credit below the threshold over the whole spell; eight make a sacking deserved. */
   weeksBelowThreshold: number
   consecutiveDefeats: number
   crisisHire: boolean
@@ -393,6 +393,8 @@ export interface Vacancy {
   /** Managers who put themselves forward (the human, and AI by band). */
   applicants: ManagerId[]
   shortlist: ManagerId[]
+  /** The one employed manager the club chose to call, if any. */
+  poachTargetId: ManagerId | null
   /** Bands the search has widened by while unfilled. */
   widened: number
   /** True if the hire counts as a crisis appointment. */
