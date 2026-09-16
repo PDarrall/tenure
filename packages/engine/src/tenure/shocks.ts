@@ -7,6 +7,7 @@ import type { OwnerType, Spell, World } from '../types.js'
 import { addCredit } from './credit.js'
 import { easeExpectation } from './expectation.js'
 import { thresholdFor } from './spell.js'
+import { queueFallout } from '../play/decisions.js'
 
 function drawOwnerType(rng: Rng): OwnerType {
   const types = Object.keys(T.OWNER_TYPE_WEIGHTS) as OwnerType[]
@@ -76,7 +77,7 @@ export function monthlyShocks(world: World, rng: Rng, spell: Spell): void {
   }
 }
 
-/** Dressing-room fallout after a losing run. AI backs down or sells by its motivation ability. */
+/** Dressing-room fallout after a losing run. AI backs down or sells by its motivation ability; the human is asked. */
 export function maybeFallout(world: World, rng: Rng, spell: Spell): void {
   if (spell.post.kind !== 'home') return
   if (spell.consecutiveDefeats < T.FALLOUT_TRIGGER_DEFEATS || spell.falloutRolled) return
@@ -85,8 +86,19 @@ export function maybeFallout(world: World, rng: Rng, spell: Spell): void {
   const club = clubById(world, spell.post.clubId)
   const manager = managerById(world, spell.managerId)
   spell.season.fallouts++
-  const sell = manager.ability.motivation < T.AI_FALLOUT_SELL_BELOW_MOTIVATION
   emit(world, 'shock.fallout', { clubId: club.id, managerId: manager.id, spellId: spell.id, season: world.season })
+  if (manager.isHuman) {
+    queueFallout(world, spell)
+    return
+  }
+  resolveFallout(world, spell, manager.ability.motivation < T.AI_FALLOUT_SELL_BELOW_MOTIVATION)
+}
+
+/** Settle a fallout: sell the player (ownership up, strength down) or back down (morale down). */
+export function resolveFallout(world: World, spell: Spell, sell: boolean): void {
+  if (spell.post.kind !== 'home') return
+  const club = clubById(world, spell.post.clubId)
+  const manager = managerById(world, spell.managerId)
   if (sell) {
     spell.ownership = round1(clamp(spell.ownership + T.FALLOUT_OWNERSHIP_GAIN, 0, 1) * 100) / 100
     club.squad.strength = round1(clamp(club.squad.strength - T.FALLOUT_STRENGTH_LOSS, 1, 100))

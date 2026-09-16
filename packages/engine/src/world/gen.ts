@@ -143,6 +143,8 @@ export function createWorld(seed: number): World {
     vacancies: [],
     nextVacancyId: 1,
     nextManagerId: 1,
+    human: null,
+    logPolicy: 'full',
     log: [],
   }
   const rng = rngFromState(world.rng)

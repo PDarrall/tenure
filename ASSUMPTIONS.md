@@ -215,3 +215,38 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   need almost nobody to stop at exactly two, which no reading of the
   rules produced. The median is two clubs on every seed. The
   20-season share sits at the top of its band (12–14% by seed).
+
+## Play (phase 2)
+
+- The human enters as an ordinary entrant: unemployed, entry reputation,
+  chosen name and background. They are one of the 400 and the AI treats
+  them like any other manager except where a decision is theirs.
+- Decisions are queued by the engine with options and a default, and
+  answered from the next turn's inputs. Unanswered decisions take their
+  default after one week. Blocking decisions (offers, approaches, mutual
+  consent, renewals, fallouts, window plans) hold the club for a week;
+  press and board questions and the monthly activity choice do not.
+- Applying is an active act: a qualifying application by the human makes
+  the shortlist with a 30% chance, and a shortlisted human interviews
+  first. Scored like the AI, a novice ranked around 100th of 180
+  applicants for every non-league vacancy and never got a first job.
+- At interview the human picks a promise and a contract length; salary
+  moves 8% per year away from a two-year deal. Declining marks the
+  vacancy and the club moves on.
+- An employed human may apply elsewhere; if the club calls, the usual
+  approach rules apply (buy-out or walk-out).
+- A human offered renewal may decline and leave when the contract ends,
+  with nothing owed and no mark on the record.
+- Window plans are presets: spend, rebuild, youth first, sell a senior
+  player, hold. Selling raises cash worth 40% of the normal budget per
+  player and costs 3 strength.
+- Press responses: confident +2 morale, measured nothing, defiant −2
+  morale and +1 credit. Board responses when uneasy: accept nothing,
+  push back a coin flip of ±3 credit, promise +3 credit and a target one
+  place harder. DESIGN names these controls without effects; these are
+  the smallest ones that matter.
+- The board's mood is shown in words derived from credit against the
+  threshold; the number itself is never shown.
+- In a career the log keeps only events that concern the human plus the
+  news (hires, sackings, trophies, promotions, vacancies), so saves stay
+  small. Every state change is still emitted.

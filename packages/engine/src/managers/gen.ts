@@ -25,10 +25,13 @@ interface Draft {
   age: number
   reputation: number
   abilityBonus: number
+  /** Fixed by the player rather than drawn. */
+  name?: string
+  background?: Background
 }
 
 function makeManager(rng: Rng, namer: ManagerNamer, id: number, draft: Draft, cohortSeason: number): Manager {
-  const background = drawBackground(rng)
+  const background = draft.background ?? drawBackground(rng)
   const offsets = T.BACKGROUND_OFFSETS[background]
   const ability = drawAbility(rng, draft.abilityBonus)
   ability.tactical = clamp(ability.tactical + offsets.tactical, 0, 100)
@@ -37,7 +40,7 @@ function makeManager(rng: Rng, namer: ManagerNamer, id: number, draft: Draft, co
   const shapes: Shape[] = ['A', 'B', 'C']
   return {
     id,
-    name: namer.next(draft.nationality),
+    name: draft.name ?? namer.next(draft.nationality),
     nationality: draft.nationality,
     age: draft.age,
     seasonGames: 0,
@@ -68,19 +71,22 @@ function makeManager(rng: Rng, namer: ManagerNamer, id: number, draft: Draft, co
 }
 
 /** A brand-new entrant: no record, small reputation, starting age. */
-export function makeEntrant(rng: Rng, namer: ManagerNamer, id: number, cohortSeason: number): Manager {
-  return makeManager(
-    rng,
-    namer,
-    id,
-    {
-      nationality: drawNationality(rng, 'home', T.HOME_NATIONAL_SHARE),
-      age: rng.int(T.START_AGE_RANGE[0], T.START_AGE_RANGE[1]),
-      reputation: rng.int(T.ENTRY_REPUTATION_RANGE[0], T.ENTRY_REPUTATION_RANGE[1]),
-      abilityBonus: 0,
-    },
-    cohortSeason,
-  )
+export function makeEntrant(
+  rng: Rng,
+  namer: ManagerNamer,
+  id: number,
+  cohortSeason: number,
+  fixed: { name?: string; background?: Background; nationality?: Nationality } = {},
+): Manager {
+  const draft: Draft = {
+    nationality: fixed.nationality ?? drawNationality(rng, 'home', T.HOME_NATIONAL_SHARE),
+    age: rng.int(T.START_AGE_RANGE[0], T.START_AGE_RANGE[1]),
+    reputation: rng.int(T.ENTRY_REPUTATION_RANGE[0], T.ENTRY_REPUTATION_RANGE[1]),
+    abilityBonus: 0,
+  }
+  if (fixed.name !== undefined) draft.name = fixed.name
+  if (fixed.background !== undefined) draft.background = fixed.background
+  return makeManager(rng, namer, id, draft, cohortSeason)
 }
 
 export interface Assignment {

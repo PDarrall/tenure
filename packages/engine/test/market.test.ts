@@ -174,7 +174,7 @@ describe('hiring', () => {
     for (let seed = 1; seed < 50 && !accepted; seed++) {
       const rng = createRng(seed)
       if (!rng.chance(T.AI_ACCEPT_APPROACH_P)) continue
-      accepted = approach(world, createRng(seed), manager, vacancy)
+      accepted = approach(world, createRng(seed), manager, vacancy) === 'accepted'
     }
     expect(accepted).toBe(true)
     expect(oldSpell.endReason).toBe('poached')
@@ -189,7 +189,7 @@ describe('hiring', () => {
     for (let seed = 1; seed < 50 && !declined; seed++) {
       const rng = createRng(seed)
       if (rng.chance(T.AI_ACCEPT_APPROACH_P)) continue
-      declined = !approach(world, createRng(seed), m2, vacancy)
+      declined = approach(world, createRng(seed), m2, vacancy) === 'declined'
     }
     expect(declined).toBe(true)
     expect(s2.credit).toBe(Math.min(s2.ceiling, credit + T.DECLINE_APPROACH_CREDIT))

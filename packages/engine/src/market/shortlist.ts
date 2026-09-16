@@ -80,6 +80,14 @@ export function drawShortlist(world: World, rng: Rng, vacancy: Vacancy): Manager
   scored.sort((a, b) => b.score - a.score || a.m.id - b.m.id)
   const size = rng.int(T.SHORTLIST_SIZE[0], T.SHORTLIST_SIZE[1])
   const picked = scored.slice(0, size).map((s) => s.m)
+  // A human who applied and qualifies has a chance of the list, and interviews first.
+  if (world.human && vacancy.applicants.includes(world.human.managerId) && !world.human.declinedVacancies.includes(vacancy.id)) {
+    const player = world.managers[world.human.managerId - 1] as Manager
+    if (player.status.kind === 'unemployed' && qualifies(world, player, vacancy) && rng.chance(T.HUMAN_SHORTLIST_P)) {
+      picked.unshift(player)
+      if (picked.length > T.SHORTLIST_SIZE[1]) picked.pop()
+    }
+  }
   // One call to an employed manager per vacancy, decided on the first draw.
   if (vacancy.shortlist.length === 0 && vacancy.widened === 0 && rng.chance(T.POACH_ATTEMPT_P)) {
     const targets = world.managers
@@ -90,6 +98,15 @@ export function drawShortlist(world: World, rng: Rng, vacancy: Vacancy): Manager
     if (best) {
       picked.unshift(best.m)
       vacancy.poachTargetId = best.m.id
+      if (picked.length > T.SHORTLIST_SIZE[1]) picked.pop()
+    }
+  }
+  // An employed human who applied is called like any poach target, once in post a season.
+  if (world.human && vacancy.poachTargetId === null && vacancy.applicants.includes(world.human.managerId)) {
+    const player = world.managers[world.human.managerId - 1] as Manager
+    if (player.status.kind === 'employed' && qualifies(world, player, vacancy) && poachable(world, player, vacancy)) {
+      picked.unshift(player)
+      vacancy.poachTargetId = player.id
       if (picked.length > T.SHORTLIST_SIZE[1]) picked.pop()
     }
   }

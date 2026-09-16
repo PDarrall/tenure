@@ -142,6 +142,10 @@ export interface World {
   vacancies: Vacancy[]
   nextVacancyId: VacancyId
   nextManagerId: ManagerId
+  /** The human player, if this world is a career rather than a simulation. */
+  human: HumanState | null
+  /** 'career' keeps only events that concern the human plus season-level news. */
+  logPolicy: LogPolicy
   log: Event[]
 }
 
@@ -402,3 +406,82 @@ export interface Vacancy {
   filledWeek: number | null
   hiredManagerId: ManagerId | null
 }
+
+// ---------------------------------------------------------------------------
+// Play (DESIGN.md "Turn structure", phase 2): one human manager, one week per
+// turn, decisions queued by the engine and answered from outside.
+// ---------------------------------------------------------------------------
+
+export type DecisionKind =
+  | 'offer'
+  | 'approach'
+  | 'mutualConsent'
+  | 'renewal'
+  | 'fallout'
+  | 'summerWindow'
+  | 'winterWindow'
+  | 'press'
+  | 'board'
+  | 'activity'
+
+export interface DecisionOption {
+  key: string
+  label: string
+  detail?: string
+}
+
+export interface Decision {
+  id: number
+  kind: DecisionKind
+  /** Week it was raised. */
+  week: number
+  /** Week from which the default applies if unanswered. */
+  deadlineWeek: number
+  /** Who is asking: board, agent, press, staff. */
+  from: 'board' | 'agent' | 'press' | 'staff'
+  title: string
+  body: string
+  options: DecisionOption[]
+  defaultKey: string
+  /** The turn cannot sensibly proceed without an answer. */
+  blocking: boolean
+  payload: Record<string, unknown>
+}
+
+/** Summer or winter window plan for the human's club. */
+export interface WindowChoice {
+  /** Share of the pot to spend, 0–1. */
+  spend: number
+  /** Academy players to promote (summer only). */
+  youth: number
+  /** Senior players sold for cash. */
+  sell: number
+}
+
+export interface HumanState {
+  managerId: ManagerId
+  pending: Decision[]
+  nextDecisionId: number
+  /** Sticky per-match choices. */
+  shape: Shape
+  mentality: Mentality
+  /** Vacancies the human turned down; the club moves on. */
+  declinedVacancies: VacancyId[]
+  /** Plan for the next window, set by a decision. */
+  windowChoice: WindowChoice | null
+}
+
+export interface HumanInputs {
+  shape?: Shape
+  mentality?: Mentality
+  /** Vacancies to put the human's name forward for. */
+  apply?: VacancyId[]
+  withdraw?: VacancyId[]
+  /** Decision id → chosen option key. */
+  answers?: Record<number, string>
+  activity?: UnemployedActivity
+  resign?: boolean
+  retire?: boolean
+}
+
+export type LogPolicy = 'full' | 'career'

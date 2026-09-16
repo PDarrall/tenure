@@ -705,6 +705,40 @@ export const T = {
   COHORT_TOP_UP: true,
 
   // ---------------------------------------------------------------------------
+  // Play (DESIGN.md "Turn structure", "What the player controls in v1").
+  // ---------------------------------------------------------------------------
+
+  /** Weeks a human decision waits before its default applies. */
+  HUMAN_DECISION_DEADLINE_WEEKS: 1,
+  /**
+   * Chance a qualifying application by the human makes the shortlist, where
+   * AI names merely wait to be picked. Serves: a first interview within a
+   * few weeks of applying widely; "waiting is a bet" still holds for the job itself.
+   */
+  HUMAN_SHORTLIST_P: 0.3,
+  /** Contract lengths the human may ask for at interview. DESIGN: one to four. */
+  HUMAN_CONTRACT_YEARS_OPTIONS: [1, 2, 3, 4] as readonly number[],
+  /** Chance a match week brings a press question. Serves: most weeks zero or one decision. */
+  PRESS_QUESTION_P: 0.3,
+  /** Press responses: confident lifts morale, defiant buys a little credit at morale's expense. */
+  PRESS_RESPONSE_EFFECTS: {
+    confident: { morale: 2, credit: 0 },
+    measured: { morale: 0, credit: 0 },
+    defiant: { morale: -2, credit: 1 },
+  } as const,
+  /** The board writes when credit is within this of the threshold. */
+  BOARD_WARN_MARGIN: 10,
+  /** Board responses: push back is a coin flip on credit; a promise buys credit and tightens the target. */
+  BOARD_RESPONSE_EFFECTS: {
+    pushBackSwing: 3,
+    promiseCredit: 3,
+    promisePlaces: 1,
+  } as const,
+  /** Selling a senior player: strength lost and £m raised (scaled by the club's normal budget). */
+  SELL_STRENGTH_PER_PLAYER: 3,
+  SELL_CASH_SHARE_OF_BUDGET: 0.4,
+
+  // ---------------------------------------------------------------------------
   // The score (DESIGN.md "The score"). Serves: Legacy calibration — a 30-year
   // mid-table career and a 12-year trophy-laden career within ~20%.
   // ---------------------------------------------------------------------------

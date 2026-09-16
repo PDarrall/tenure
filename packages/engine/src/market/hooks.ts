@@ -21,7 +21,8 @@ export function weekly(world: World, rng: Rng): void {
       continue
     }
     if (age < T.VACANCY_HIRE_DELAY_WEEKS) continue
-    if (tryToFill(world, rng, vacancy)) continue
+    const outcome = tryToFill(world, rng, vacancy)
+    if (outcome !== 'failed') continue
     // Still empty: widen the net and try again next week.
     if (age >= T.VACANCY_WIDEN_AFTER_WEEKS) {
       vacancy.widened++

@@ -10,6 +10,7 @@ import { addCredit } from '../tenure/credit.js'
 import type { Manager, Promise, Spell, Vacancy, World } from '../types.js'
 import { salaryForYears } from './vacancies.js'
 import { assignTag } from './tags.js'
+import { hasPending, queueApproach, queueOffer } from '../play/decisions.js'
 
 /** The AI's interview promise: promotion when the squad is a contender, stability when it is a struggler. */
 export function aiPromise(world: World, vacancy: Vacancy): Promise {
@@ -36,29 +37,20 @@ function vacancyPrestigeOf(world: World, vacancy: Vacancy): number {
   return vacancy.post.kind === 'home' ? clubById(world, vacancy.post.clubId).prestige : (foreignClubById(world, vacancy.post.clubId)?.prestige ?? 0)
 }
 
-/**
- * A bigger club calls an employed manager. The AI accepts most of the time;
- * if the new club cannot pay the buy-out it must walk out, which it does only
- * for a much bigger club. Returns true if the manager is coming.
- */
-export function approach(world: World, rng: Rng, manager: Manager, vacancy: Vacancy): boolean {
+export type ApproachOutcome = 'accepted' | 'declined' | 'pending'
+
+/** Turn an approach down: credit and loyalty at the current club. */
+export function declineApproach(world: World, spell: Spell, vacancy: Vacancy): void {
+  const applied = addCredit(spell, T.DECLINE_APPROACH_CREDIT)
+  spell.loyaltyBonus += T.LOYALTY_PER_DECLINE
+  emit(world, 'approach.declined', { managerId: spell.managerId, spellId: spell.id, vacancyId: vacancy.id, creditDelta: applied, credit: spell.credit, season: world.season })
+}
+
+/** Leave for the calling club: poached with a buy-out, or a walk-out without one; then take the job. */
+export function acceptApproach(world: World, rng: Rng, manager: Manager, vacancy: Vacancy, paid: boolean): Spell | null {
   const spell = spellOf(world, manager)
-  if (!spell) return false
+  if (!spell) return null
   const buyout = remainingValue(world, spell)
-  const paid = buyoutAffordable(world, vacancy, buyout)
-  emit(world, 'approach.made', { managerId: manager.id, spellId: spell.id, vacancyId: vacancy.id, from: spell.post, to: vacancy.post, buyout, buyoutPaid: paid, season: world.season })
-  if (manager.isHuman) return false
-  let accept = rng.chance(T.AI_ACCEPT_APPROACH_P)
-  if (accept && !paid) {
-    const gap = vacancyPrestigeOf(world, vacancy) - prestigeOf(world, spell)
-    accept = gap >= T.WALKOUT_MIN_PRESTIGE_GAP && rng.chance(T.AI_WALKOUT_P)
-  }
-  if (!accept) {
-    const applied = addCredit(spell, T.DECLINE_APPROACH_CREDIT)
-    spell.loyaltyBonus += T.LOYALTY_PER_DECLINE
-    emit(world, 'approach.declined', { managerId: manager.id, spellId: spell.id, vacancyId: vacancy.id, creditDelta: applied, credit: spell.credit, season: world.season })
-    return false
-  }
   if (paid) {
     endSpell(world, spell, 'poached', 0)
     if (spell.post.kind === 'home') clubById(world, spell.post.clubId).cash += buyout
@@ -71,7 +63,38 @@ export function approach(world: World, rng: Rng, manager: Manager, vacancy: Vaca
     bumpReputation(world, manager.id, T.REP_WALKOUT, 'walked out')
     emit(world, 'manager.walkedOut', { managerId: manager.id, spellId: spell.id, from: spell.post, to: vacancy.post, walkouts: manager.history.walkouts, season: world.season })
   }
-  return true
+  return hire(world, rng, manager, vacancy)
+}
+
+/**
+ * A bigger club calls an employed manager. The AI accepts most of the time;
+ * if the new club cannot pay the buy-out it must walk out, which it does only
+ * for a much bigger club. The human is asked and the vacancy waits.
+ */
+export function approach(world: World, rng: Rng, manager: Manager, vacancy: Vacancy): ApproachOutcome {
+  const spell = spellOf(world, manager)
+  if (!spell) return 'declined'
+  const buyout = remainingValue(world, spell)
+  const paid = buyoutAffordable(world, vacancy, buyout)
+  if (manager.isHuman) {
+    if (!hasPending(world, 'approach', (d) => d.payload['vacancyId'] === vacancy.id)) {
+      emit(world, 'approach.made', { managerId: manager.id, spellId: spell.id, vacancyId: vacancy.id, from: spell.post, to: vacancy.post, buyout, buyoutPaid: paid, season: world.season })
+      queueApproach(world, vacancy, buyout, paid)
+    }
+    return 'pending'
+  }
+  emit(world, 'approach.made', { managerId: manager.id, spellId: spell.id, vacancyId: vacancy.id, from: spell.post, to: vacancy.post, buyout, buyoutPaid: paid, season: world.season })
+  let accept = rng.chance(T.AI_ACCEPT_APPROACH_P)
+  if (accept && !paid) {
+    const gap = vacancyPrestigeOf(world, vacancy) - prestigeOf(world, spell)
+    accept = gap >= T.WALKOUT_MIN_PRESTIGE_GAP && rng.chance(T.AI_WALKOUT_P)
+  }
+  if (!accept) {
+    declineApproach(world, spell, vacancy)
+    return 'declined'
+  }
+  acceptApproach(world, rng, manager, vacancy, paid)
+  return 'accepted'
 }
 
 /** Contract length for this manager: the vacancy's offer, or a shorter first-job deal for the unproven. */
@@ -81,10 +104,15 @@ export function contractYearsFor(rng: Rng, manager: Manager, vacancy: Vacancy): 
   return rng.weighted(years, T.FIRST_JOB_CONTRACT_YEARS_WEIGHTS)
 }
 
-/** Seat the manager on the vacancy's terms. */
-export function hire(world: World, rng: Rng, manager: Manager, vacancy: Vacancy): Spell {
-  const promise = manager.isHuman ? 'top-half' : aiPromise(world, vacancy)
-  const years = contractYearsFor(rng, manager, vacancy)
+export interface HireTermsChoice {
+  promise: Promise
+  years: number
+}
+
+/** Seat the manager on the vacancy's terms, or on the terms the human negotiated. */
+export function hire(world: World, rng: Rng, manager: Manager, vacancy: Vacancy, chosen?: HireTermsChoice): Spell {
+  const promise = chosen ? chosen.promise : aiPromise(world, vacancy)
+  const years = chosen ? chosen.years : contractYearsFor(rng, manager, vacancy)
   const salary = salaryForYears(salaryFor(world, vacancy.post, manager.reputation), years)
   const spell = startSpell(world, rng, manager, vacancy.post, { years, promise, crisis: vacancy.crisis, salary })
   vacancy.filledWeek = world.week
@@ -102,22 +130,35 @@ export function hire(world: World, rng: Rng, manager: Manager, vacancy: Vacancy)
   return spell
 }
 
-/** Work down the shortlist; the first taker gets the job. */
-export function tryToFill(world: World, rng: Rng, vacancy: Vacancy): boolean {
+export type FillOutcome = 'filled' | 'waiting' | 'failed'
+
+/** Work down the shortlist; the first taker gets the job. A human on the list is asked, and the club waits a week. */
+export function tryToFill(world: World, rng: Rng, vacancy: Vacancy): FillOutcome {
   for (const id of vacancy.shortlist) {
     const manager = managerById(world, id)
     if (manager.status.kind === 'retired') continue
-    if (manager.isHuman) continue
+    if (manager.isHuman && world.human) {
+      if (world.human.declinedVacancies.includes(vacancy.id)) continue
+      if (manager.status.kind === 'employed') {
+        if (manager.id !== vacancy.poachTargetId) continue
+        if (approach(world, rng, manager, vacancy) === 'pending') return 'waiting'
+        continue
+      }
+      if (manager.status.kind !== 'unemployed') continue
+      if (!hasPending(world, 'offer', (d) => d.payload['vacancyId'] === vacancy.id)) queueOffer(world, vacancy)
+      return 'waiting'
+    }
     if (manager.status.kind === 'employed') {
       // Only the chosen target is called; anyone hired elsewhere since the draw is simply gone.
       if (manager.id !== vacancy.poachTargetId) continue
-      if (!approach(world, rng, manager, vacancy)) continue
+      if (approach(world, rng, manager, vacancy) !== 'accepted') continue
+      return 'filled'
     }
     if (manager.status.kind !== 'unemployed') continue
     hire(world, rng, manager, vacancy)
-    return true
+    return 'filled'
   }
-  return false
+  return 'failed'
 }
 
 export { clamp }

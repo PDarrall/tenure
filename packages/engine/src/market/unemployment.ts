@@ -6,6 +6,7 @@ import { bumpReputation } from '../tenure/exits.js'
 import type { Manager, UnemployedActivity, World } from '../types.js'
 import { monthsUnemployed } from './shortlist.js'
 import { endCareer } from './retirement.js'
+import { hasPending, queueActivity } from '../play/decisions.js'
 
 function canWorkAbroad(manager: Manager): boolean {
   const band = bandIndex(manager.reputation)
@@ -25,20 +26,27 @@ export function chooseActivity(world: World, rng: Rng, manager: Manager): Unempl
   return current === 'punditry' ? 'punditry' : 'wait'
 }
 
+/** Change what an unemployed manager does with their months; stepping down costs reputation once. */
+export function setActivity(world: World, manager: Manager, next: UnemployedActivity): void {
+  if (manager.status.kind !== 'unemployed') return
+  const status = manager.status
+  if (next === status.activity) return
+  status.activity = next
+  emit(world, 'unemployed.activity', { managerId: manager.id, activity: next, months: monthsUnemployed(world, manager), season: world.season })
+  if (next === 'assistant' && !manager.history.steppedDown) {
+    manager.history.steppedDown = true
+    bumpReputation(world, manager.id, T.REP_STEP_DOWN, 'stepped down to assistant')
+  }
+}
+
 /** Monthly bookkeeping for one unemployed manager: activity, income, decay, the 24-month clock. */
 export function monthlyUnemployed(world: World, rng: Rng, manager: Manager): void {
   if (manager.status.kind !== 'unemployed') return
   const status = manager.status
-  if (!manager.isHuman) {
-    const next = chooseActivity(world, rng, manager)
-    if (next !== status.activity) {
-      status.activity = next
-      emit(world, 'unemployed.activity', { managerId: manager.id, activity: next, months: monthsUnemployed(world, manager), season: world.season })
-      if (next === 'assistant' && !manager.history.steppedDown) {
-        manager.history.steppedDown = true
-        bumpReputation(world, manager.id, T.REP_STEP_DOWN, 'stepped down to assistant')
-      }
-    }
+  if (manager.isHuman) {
+    if (!hasPending(world, 'activity')) queueActivity(world)
+  } else {
+    setActivity(world, manager, chooseActivity(world, rng, manager))
   }
   const income = status.activity === 'punditry' ? T.PUNDITRY_INCOME_PER_MONTH : status.activity === 'assistant' ? T.ASSISTANT_INCOME_PER_MONTH : 0
   if (income > 0) {

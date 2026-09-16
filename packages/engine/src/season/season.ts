@@ -8,7 +8,7 @@ import { leagueFixtures } from './fixtures.js'
 import { applyResult, positionOf, resetTables, tableFor } from './table.js'
 import { knockoutExpected, playMatch, type Participant } from './match.js'
 import { drawRound, isFinal, seedCups } from './cups.js'
-import { decayMorale, runWindow, summerSquad, updateMorale, type WindowSummary } from './squad.js'
+import { decayMorale, runHumanWindow, runWindow, summerSquad, updateMorale, type WindowSummary } from './squad.js'
 import { awardHonour, settleLeagues } from './promotion.js'
 import { settleForeignLeagues } from './abroad.js'
 
@@ -33,8 +33,14 @@ function participantFor(world: World, id: ClubId, opponentStrength: number): Par
     const manager = managerAt(world, club)
     const tactical = manager ? manager.ability.tactical : T.CARETAKER_ABILITY
     const gap = club.squad.strength - opponentStrength
-    club.mentality = gap >= T.AI_MENTALITY_GAP ? 'attack' : gap <= -T.AI_MENTALITY_GAP ? 'defend' : 'balanced'
-    if (manager) club.shape = manager.preferredShape
+    if (manager && manager.isHuman && world.human) {
+      // The player picks a shape and a mentality per match; they stick until changed.
+      club.shape = world.human.shape
+      club.mentality = world.human.mentality
+    } else {
+      club.mentality = gap >= T.AI_MENTALITY_GAP ? 'attack' : gap <= -T.AI_MENTALITY_GAP ? 'defend' : 'balanced'
+      if (manager) club.shape = manager.preferredShape
+    }
     return {
       id,
       strength: club.squad.strength,
@@ -321,12 +327,23 @@ export function endSeason(world: World, rng: Rng, extrasFor: ExtrasFor = noExtra
 export type BudgetMultiplierFor = (clubId: ClubId) => number
 const flatBudget: BudgetMultiplierFor = () => 1
 
+/** The human's club follows the player's plan when one is set; every other club is AI-run. */
+function windowFor(world: World, club: Club, summer: boolean, multiplier: number): WindowSummary {
+  const state = world.human
+  if (state && club.managerId === state.managerId && state.windowChoice) {
+    const summary = runHumanWindow(world, club, summer, multiplier, state.windowChoice)
+    state.windowChoice = null
+    return summary
+  }
+  return runWindow(world, club, summer, multiplier)
+}
+
 export function summerWindow(world: World, multiplierFor: BudgetMultiplierFor = flatBudget): WindowSummary[] {
-  return world.clubs.map((club) => runWindow(world, club, true, multiplierFor(club.id)))
+  return world.clubs.map((club) => windowFor(world, club, true, multiplierFor(club.id)))
 }
 
 export function winterWindow(world: World): WindowSummary[] {
-  return world.clubs.map((club) => runWindow(world, club, false, 1))
+  return world.clubs.map((club) => windowFor(world, club, false, 1))
 }
 
 export { tableFor }

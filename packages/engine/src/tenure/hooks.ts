@@ -17,6 +17,9 @@ import { weeklySackingCheck } from './sacking.js'
 import { maybeFallout, monthlyShocks } from './shocks.js'
 import { bumpReputation, checkExpiry, monthlyMutualConsent, monthlyResignation } from './exits.js'
 import { activeSpells } from './spell.js'
+import { hasPending, queueBoard, queuePress, queueWindow } from '../play/decisions.js'
+import { normalBudget } from '../season/squad.js'
+import { matchTemplateKey } from '../text/render.js'
 
 function creditForSide(world: World, rng: Rng, played: PlayedFixture, home: boolean): number | null {
   const manager = home ? played.homeManager : played.awayManager
@@ -42,13 +45,28 @@ function creditForSide(world: World, rng: Rng, played: PlayedFixture, home: bool
   return applied
 }
 
-/** Credit for every match of the week, written onto the match events. */
+/** Credit for every match of the week, written onto the match events; the press may want a word with the human. */
 export function afterMatches(world: World, rng: Rng, played: PlayedFixture[]): void {
   for (const p of played) {
     const homeDelta = creditForSide(world, rng, p, true)
     const awayDelta = creditForSide(world, rng, p, false)
     p.event.payload['homeCredit'] = homeDelta
     p.event.payload['awayCredit'] = awayDelta
+  }
+  const state = world.human
+  if (!state) return
+  const player = managerById(world, state.managerId)
+  const spell = spellOf(world, player)
+  if (!spell || spell.post.kind !== 'home') return
+  const own = played.filter((p) => p.fixture.homeId === spell.post.clubId || p.fixture.awayId === spell.post.clubId)
+  const last = own[own.length - 1]
+  if (!last || hasPending(world, 'press')) return
+  if (rng.chance(T.PRESS_QUESTION_P)) {
+    const home = last.fixture.homeId === spell.post.clubId
+    const points = home ? last.homePoints : last.awayPoints
+    const result = points >= T.POINTS_WIN ? 'win' : points >= T.POINTS_DRAW ? 'draw' : 'loss'
+    const streak = spell.consecutiveDefeats >= T.CREDIT_CONSEC_DEFEAT_FROM ? 'streak' : result
+    queuePress(world, spell, `${streak}:${matchTemplateKey(last.fixture.homeGoals ?? 0, last.fixture.awayGoals ?? 0, false)}`)
   }
 }
 
@@ -91,8 +109,38 @@ export function monthly(world: World, rng: Rng): void {
     monthlyShocks(world, rng, spell)
     if (spell.endWeek !== null) continue
     if (monthlyMutualConsent(world, rng, spell)) continue
-    monthlyResignation(world, rng, spell)
+    if (monthlyResignation(world, rng, spell)) continue
+    if (world.human && spell.managerId === world.human.managerId) {
+      const mood = boardMood(spell)
+      emit(world, 'board.note', { spellId: spell.id, managerId: spell.managerId, mood, position, expectation: spell.expectation, season: world.season })
+      if (spell.credit < spell.threshold + T.BOARD_WARN_MARGIN && !hasPending(world, 'board')) queueBoard(world, spell)
+    }
   }
+}
+
+/** How the board feel, in words the player can see instead of the credit number. */
+export function boardMood(spell: Spell): 'secure' | 'settled' | 'uneasy' | 'under review' | 'on the brink' {
+  const gap = spell.credit - spell.threshold
+  if (spell.credit <= T.CREDIT_INSTANT_SACK + 2) return 'on the brink'
+  if (gap < 0) return 'under review'
+  if (gap < T.BOARD_WARN_MARGIN) return 'uneasy'
+  if (gap < 3 * T.BOARD_WARN_MARGIN) return 'settled'
+  return 'secure'
+}
+
+/** Ask the human for a window plan the week before the window runs. */
+export function queueWindowDecision(world: World, summer: boolean): void {
+  const state = world.human
+  if (!state) return
+  const player = managerById(world, state.managerId)
+  const spell = spellOf(world, player)
+  if (!spell || spell.post.kind !== 'home') return
+  const club = homeClub(world, spell.post.clubId)
+  if (!club) return
+  const kind = summer ? 'summerWindow' : 'winterWindow'
+  if (hasPending(world, kind)) return
+  const pot = summer ? round1(normalBudget(club) * spell.budgetMultiplier) : round1(normalBudget(club) * T.WINTER_BUDGET_SHARE)
+  queueWindow(world, summer, pot)
 }
 
 function trophyWeight(h: Honour): number {
