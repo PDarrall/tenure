@@ -269,3 +269,47 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
 - In a career the log keeps only events that concern the human plus the
   news (hires, sackings, trophies, promotions, vacancies), so saves stay
   small. Every state change is still emitted.
+
+## Match layer (phase 3a)
+
+- A turn plays the human club's next fixture. A match week is a run of
+  slots played together: the earliest unplayed league round of every
+  tier, then any cup round due, in the order national cup, league cup,
+  European. AI clubs in the human's division play their round in the
+  same slot as the human's.
+- After the week's football the week closes (morale settles, monthly
+  rolls, windows, salaries, the board's roll, the market, next week's
+  cup draws) and, when the human's club plays next week and nothing is
+  waiting for an answer, the turn runs straight on into that fixture. A
+  pending decision of any kind stops the turn before the fixture (the
+  pre-match step); so do a change in the human's employment, the start
+  of the summer, and a week with no fixture for the human, which passes
+  as one step with its own inbox (the previous match week's close is
+  shown with it).
+- Summer weeks are one step each. The new season's fixtures are drawn at
+  the end of the last summer week, so the opening fixture is on the card
+  before it is played.
+- In a career, cup rounds are drawn at the close of the week before they
+  are played, so the tie is on the card and the draw is in the inbox.
+  The population simulation draws at kick-off, which keeps its random
+  sequence identical (`simpath.test.ts` hashes its state).
+- A career consumes the random sequence per slot rather than per week,
+  so a career and a no-human simulation of the same seed diverge; each
+  is deterministic on its own, and a save taken between two turns of
+  one week continues identically. `advanceWeek` on a career plays and
+  closes the whole week through the same loop.
+- "Date" on the fixture card is the season week; the calendar has weeks,
+  not dates, until something needs them.
+- Home advantage in the one-shot model is 0.35 extra expected goals for
+  the home side against an equal opponent (phase 1's 1.5 / 1.15 split,
+  restated as one tunable). The model reads about 3.1 goals a game and
+  47 / 19 / 34 home / draw / away over a season; DESIGN's 2.7 and
+  45 / 26 / 29 (to verify) are phase 3(c)'s calibration targets.
+- The round-robin's venues were keyed on round plus pair index, which
+  sat every rotating club at one ground for half a season; venues now
+  alternate, at most two rounds running at one ground. This shifts the
+  simulation's random sequence, so the validation readings moved within
+  seed noise; the turn loop itself moved nothing.
+- A season in post at tier 5 is about 55 turns: 47 matches and 8
+  non-match steps (six summer weeks and a couple of pre-match stops),
+  measured on seeds 1 to 3.
