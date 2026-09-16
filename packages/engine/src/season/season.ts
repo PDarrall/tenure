@@ -179,10 +179,20 @@ function tierOfClub(world: World, id: ClubId): Tier | null {
   return clubById(world, id)?.tier ?? null
 }
 
-function playCupRound(world: World, rng: Rng, cup: CupState, seasonWk: number): PlayedFixture[] {
+/** The ties of a cup's next round that are drawn but not yet played. */
+export function drawnCupFixtures(world: World, cup: CupState): Fixture[] {
+  const round = cup.roundsPlayed + 1
+  return world.fixtures.filter((f) => f.competition === cup.competition && f.round === round && !f.played)
+}
+
+/**
+ * Draw a cup round: the ties that play in `seasonWk`, everyone else has a bye.
+ * The fixtures exist unplayed from here, so a career can show the tie before
+ * it is played; one `cup.tie` event per tie and one `cup.bye` per bye.
+ */
+export function drawCupRound(world: World, rng: Rng, cup: CupState, seasonWk: number): Fixture[] {
   const final = isFinal(cup)
   const pairs = drawRound(rng, cup)
-  const played: PlayedFixture[] = []
   const round = cup.roundsPlayed + 1
   if (final) {
     cup.finalistIds = [...cup.remaining]
@@ -192,10 +202,31 @@ function playCupRound(world: World, rng: Rng, cup: CupState, seasonWk: number): 
       emit(world, 'cup.final', { competition: cup.competition, clubId: id, managerId: club?.managerId ?? null, season: world.season })
     }
   }
-  const out = new Set<ClubId>()
+  const drawn: Fixture[] = []
+  const playing = new Set<ClubId>()
   for (const [homeId, awayId] of pairs) {
     const fixture: Fixture = { week: seasonWk, competition: cup.competition, round, homeId, awayId, played: false }
     world.fixtures.push(fixture)
+    drawn.push(fixture)
+    playing.add(homeId)
+    playing.add(awayId)
+    emit(world, 'cup.tie', { competition: cup.competition, round, week: seasonWk, homeId, awayId, final, season: world.season })
+  }
+  for (const id of cup.remaining) {
+    if (!playing.has(id)) emit(world, 'cup.bye', { competition: cup.competition, round, week: seasonWk, clubId: id, season: world.season })
+  }
+  return drawn
+}
+
+/** Play a cup round: the ties drawn earlier, or a draw made now (the simulation draws at kick-off). */
+export function playCupRound(world: World, rng: Rng, cup: CupState, seasonWk: number): PlayedFixture[] {
+  const final = isFinal(cup)
+  let fixtures = drawnCupFixtures(world, cup)
+  if (fixtures.length === 0) fixtures = drawCupRound(world, rng, cup, seasonWk)
+  const played: PlayedFixture[] = []
+  const round = cup.roundsPlayed + 1
+  const out = new Set<ClubId>()
+  for (const fixture of fixtures) {
     const result = playFixture(world, rng, fixture)
     played.push(result)
     if (result.loserId === null || result.winnerId === null) throw new Error('cup tie without a winner')

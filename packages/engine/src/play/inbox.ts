@@ -24,6 +24,22 @@ function postTier(world: World, post: Post): string {
   return `${post.league} league abroad`
 }
 
+/** The competition as a fixture list names it. */
+export function competitionLabel(c: unknown): string {
+  switch (c) {
+    case 'league':
+      return 'League'
+    case 'nationalCup':
+      return 'National Cup'
+    case 'leagueCup':
+      return 'League Cup'
+    case 'european':
+      return 'European Cup'
+    default:
+      return String(c)
+  }
+}
+
 export function competitionName(c: unknown): string {
   switch (c) {
     case 'league':
@@ -70,6 +86,18 @@ export function inbox(world: World, fromWeek: number, toWeek: number = world.wee
         push(e, 'match', `${renderMatch(world, e)}${comp}${position}`)
         break
       }
+      case 'cup.tie': {
+        if (!myClub(e) && p['homeId'] !== myClubId && p['awayId'] !== myClubId) break
+        if (myClubId === null) break
+        const home = p['homeId'] === myClubId
+        const opponent = clubNameOf(world, (home ? p['awayId'] : p['homeId']) as number)
+        const key = p['final'] === true ? 'cup_draw_final' : home ? 'cup_draw_home' : 'cup_draw_away'
+        push(e, 'news', renderText('news', key, { competition: competitionLabel(p['competition']), round: p['round'] as number, opponent, week: (p['week'] as number) + 1 }, e.week))
+        break
+      }
+      case 'cup.bye':
+        if (myClub(e)) push(e, 'news', renderText('news', 'cup_draw_bye', { competition: competitionLabel(p['competition']), round: p['round'] as number }, e.week))
+        break
       case 'manager.hired':
         if (mine(e)) push(e, 'board', renderText('board', 'welcome', { club: postName(world, p['post'] as Post), expectation: ordinal(p['expectation'] as number), years: p['years'] as number, salary: p['salary'] as number }, e.week))
         break

@@ -27,7 +27,7 @@ export type { PopulationStats, StatLine, Histogram } from './stats/population.js
 export { createCareer, careerSummary } from './play/career.js'
 export type { CareerOptions, CareerSummary, SpellSummary } from './play/career.js'
 export { pendingDecisions } from './play/decisions.js'
-export { inbox, competitionName } from './play/inbox.js'
+export { inbox, competitionName, competitionLabel } from './play/inbox.js'
 export type { InboxItem, InboxFrom } from './play/inbox.js'
 export { boardMood } from './tenure/hooks.js'
 export { renderText, ordinal, clubNameOf } from './text/render.js'

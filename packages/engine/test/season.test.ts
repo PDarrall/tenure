@@ -147,6 +147,29 @@ describe('cups', () => {
   })
 })
 
+describe('cup draws', () => {
+  it('a round drawn before its week is played as drawn, one tie event per tie and a bye event per bye', async () => {
+    const { drawCupRound, drawnCupFixtures, playWeek } = await import('../src/season/season.js')
+    const world = createWorld(2)
+    runWeeks(world, 1) // season started, league cup round one (week 1) not yet played
+    const cup = world.cups.find((c) => c.competition === 'leagueCup')!
+    expect(cup.roundsPlayed).toBe(0)
+    const rng = createRng(99)
+    const drawn = drawCupRound(world, rng, cup, cup.roundWeeks[0]!)
+    expect(drawn).toHaveLength(matchesThisRound(cup.remaining.length))
+    expect(drawnCupFixtures(world, cup)).toEqual(drawn)
+    const ties = world.log.filter((e) => e.type === 'cup.tie' && e.payload['competition'] === 'leagueCup')
+    const byes = world.log.filter((e) => e.type === 'cup.bye' && e.payload['competition'] === 'leagueCup')
+    expect(ties).toHaveLength(drawn.length)
+    expect(ties.length * 2 + byes.length).toBe(cup.remaining.length)
+    const before = drawn.map((f) => `${f.homeId}-${f.awayId}`)
+    const played = playWeek(world, rng, cup.roundWeeks[0]!).filter((p) => p.fixture.competition === 'leagueCup')
+    expect(played.map((p) => `${p.fixture.homeId}-${p.fixture.awayId}`)).toEqual(before)
+    expect(cup.roundsPlayed).toBe(1)
+    expect(drawnCupFixtures(world, cup)).toHaveLength(0)
+  })
+})
+
 describe('a full season', () => {
   const world = createWorld(1)
   runSeasons(world, 1)
