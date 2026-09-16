@@ -1,4 +1,4 @@
-# TENURE — design bible v0.1
+# TENURE — design bible v0.2
 
 Working title. A football management game about surviving a career.
 
@@ -19,6 +19,7 @@ Three numbers, always visible:
 Composite for leaderboards: `Legacy = a·games + b·earnings(£m) + c·trophy points`.
 Tune a, b, c so that a 30-year mid-table career and a 12-year trophy-laden career land within ~20% of each other.
 Nothing is ever deducted. Unemployment scores zero — that is the real cost of being sacked.
+Age caps a career at a little under 40 seasons (see Age), so "longest" has a ceiling and Legacy stays comparable across careers.
 
 Trophy points (starting values): European title 120 · tier-1 title 100 · national cup 50 · league cup 25 ·
 tier-2 title 40 · tier-3/4/5 titles 25/15/10 · promotion without the title 20/12/8/5 by tier ·
@@ -122,22 +123,64 @@ Vacancies carry a want-list of tags. This is typecasting: the survival specialis
 - Approaches while employed: a bigger club calls. Accept (buy-out paid by them, "in demand") or decline (credit +3 at your club, loyalty progress).
 - Unemployed, each month: wait | punditry (small income, halves decay) | assistant role (income, −5 once, decay stops) | abroad (opens foreign vacancies; "abroad" tag after a season). Waiting is a bet.
 
+### Age
+
+Age ends every career. Success delays it; nothing prevents it.
+
+- Managers start at 33–38 and age one year per season. The same rules apply to the AI population, so managers retire, vacancies open, and a new cohort enters every summer.
+- From 60, shortlists apply an age penalty: `effective reputation = reputation − 3 × (age − 60)`. At 65 that costs about a band; at 70, two. A 95-reputation manager at 70 can still get a tier-2 job; a 60-reputation one is down to tier 4.
+- Contract offers shorten with age: up to three years at 60–64, two at 65–69, one at 70+. Payout protection fades as you need it most.
+- Hard cap: the season in which you turn 72 is your last. You retire at its end, employed or not, and the score is banked.
+- From 65 your agent raises retirement each summer — the prompt to choose the final chapter rather than have it chosen.
+- v2: international management. Associations discount age less, so it becomes the natural last chapter.
+
 ### Permadeath
 
-The career ends when no vacancy has shortlisted you for 24 consecutive months, at 72, or on a scandal event. The score is banked. Retire voluntarily at any time.
+The career ends when no vacancy has shortlisted you for 24 consecutive months, at the age cap, or on a scandal event. The score is banked. Retire voluntarily at any time.
 
-## Season and match (v1 abstraction — no players yet)
+## Fixtures
 
-- Match: home/away strengths, form (last six), tactic matchup (three shapes, rock-paper-scissors ±5%), mentality (attack / balanced / defend shifts variance), manager ability. Produces win/draw/loss probabilities and a scoreline; a text summary from a template library.
-- Squad: strength, age profile (peak 25–29; ageing squads lose 3–5 per year), morale. Summer window: spend budget to raise strength (diminishing returns), sell to raise cash, promote youth (cheap, slow, tag progress). Turnover feeds ownership.
-- Season: 38 or 46 league games, cups, two windows, ~40 weekly turns.
-
-What the player controls in v1: which jobs to chase and what to promise; contract terms; summer spend, sales and rebuild timing; a shape and a mentality per match; press and board responses; whether to take the approach; when to walk. That is enough to be a game. Players and transfers arrive in phase 5.
+The next fixture is always on screen: competition, opponent, venue, date, the opponent's form and league position. A fixtures tab lists the season's fixtures and results by competition, with the table beside it. Cup draws arrive in the inbox. AI clubs in the human's division play their matches at the same time as the human's, and their scores tick over during the match (see Match).
 
 ## Turn structure
 
-One week per turn. The screen is an inbox: board, agent, press, staff, match report. Most weeks: one match, zero or one decision.
-Target pace: a season in twenty minutes, a career in about ten hours.
+One match per turn. Continue plays the next fixture; everything due before it — board, agent, press, transfer window, cup draw, injuries and suspensions — arrives first as inbox items and decisions. Weeks with no fixture (international breaks, cup rounds you are out of, the summer) pass as single steps with their own inbox. A season is the league games plus cup ties plus around ten non-match steps.
+Target pace: a match in about a minute at full speed; a season in under an hour; a career in a long weekend.
+
+## Players
+
+Every home club has a squad: 22 players in tiers 1–2, 20 in tiers 3–4, 18 in tier 5. Foreign clubs get a squad generated on demand, seeded, when they meet a home club.
+
+A player: name, age, nationality, positions, ability 1–100, potential (hidden), fitness 0–100, morale, injury (weeks out), suspension (matches), yellow cards this season, contract years, wage, value.
+
+Positions are CM-style: a role — GK, SW, D, WB, DM, M, AM, F — and a side — L, C, R. A player holds one or more role/side combinations, each at a competence: natural, accomplished, competent or unconvincing. Playing outside a competence costs ability: 0 natural, −5 accomplished, −12 competent, −25 unconvincing, −40 anywhere else (tunables). Generated squads follow realistic shapes: for a 22, about 2 GK, 7 defenders, 8 midfielders, 4 forwards, with a spread of sides.
+
+The rule that keeps the validated world intact: **club strength stays the master number.** A squad is generated to match it — the best XI in the club's preferred formation averages the club's strength — and is re-anchored each summer, with players ageing (peak 26–30, decline from 31, goalkeepers from 33), developing toward potential under 24, and declining inside that. The human's club is the exception: match strength comes from the XI actually picked, in the formation picked, with positional penalties, fitness and morale applied. AI clubs pick their best XI by the same rule. Phase 6 reverses the direction — strength derived from the squad, named transfers against the budget.
+
+Fitness drops with minutes played and recovers with rest; below 80 it costs ability, below 70 it raises injury risk. Injuries come from matches (tunable rate) and last 1–20 weeks. Suspensions: five yellows is one match, ten is two; a red is one to three. Morale moves with playing time, results and events.
+
+Selection: a formation, an XI, and a bench of five with three substitutions, as in 2001. The assistant auto-picks in one tap and proposes changes in the pre-match step when injuries or suspensions force them.
+
+The summer window stays abstract in this phase: spending the budget raises squad strength by improving or adding generated players, and the engine picks which; named transfers arrive in phase 6.
+
+## Formations
+
+The basic shapes CM 01/02 offered, each defined by the positions it fields: 4-4-2, 4-4-2 diamond, 4-3-3, 4-5-1, 4-2-4, 4-1-3-2, 4-3-1-2, 3-5-2, 3-4-3, 5-3-2, 5-4-1, and 5-3-2 with a sweeper (to verify against the game's default list). Advantages come from structure, not a lookup table. Each formation is counted in three bands — defence (D, SW, WB, DM), midfield (M, AM), attack (F) — and by width (players on L or R sides). In the match model: the midfield difference drives pressure; attackers against defenders drive chance quality; width against a narrow defence adds chances from the flanks; a defensive overload reduces chances conceded. So 4-5-1 wins the midfield against 4-4-2 but creates less; 4-2-4 makes chances and concedes them; 3-5-2 is strong through the middle and open on the flanks; 5-4-1 concedes little and scores little. Mentality — attack, balanced, defend — shifts the bands' weight and the pressure lean. Every AI manager has a preferred formation and a fallback, part of their identity, and changes mentality by rule when chasing or protecting a result.
+
+## Match
+
+The engine runs minute by minute, 0 to 90 plus stoppage. State: score, minute, pressure (a lean from −100 to +100), the two XIs with fitness draining, cards, injuries, substitutions used.
+
+Each minute:
+- Pressure drifts toward a target set by effective XI strength, the midfield band difference, mentality, home advantage (a lean of 8 to the home side, tunable, to verify against real home-win rates), the score state (a leading side sits deeper unless attacking) and momentum from the last few events.
+- A chance may arise, with probability from pressure, the attack-versus-defence bands and chance-creation quality. It resolves to a goal, a save, a miss or a block from the striker against keeper and defenders. Every chance and event is a commentary line from templates naming the players.
+- Cards, injuries and substitutions happen; AI managers substitute by rule — injured, tired below 60, chasing or holding.
+
+Pace and control: the match runs at full speed — CM with the space bar held — with hold-to-run and pause available. It pauses on its own at goals, red cards, injuries that need a change, and half time. Mentality changes and substitutions are made while paused. Other matches in the human's division run in the same engine at the same minute; a latest-scores panel shows them, and the table is live at full time.
+
+Fast path: every match nobody is watching, and the whole population sim, samples results from a table calibrated from the minute engine (regenerated by a script whenever match tunables change). A test asserts that the minute engine and the fast path agree on result distributions, goals per game and the size of home advantage, so the 500-career simulation stays fast and honest.
+
+The tenure model reads results exactly as before. What the player controls now: which jobs to chase and what to promise; contract terms; summer spend and rebuild timing; formation, XI, mentality and substitutions; press and board responses; whether to take the approach; when to walk.
 
 ## Validation targets
 
@@ -148,6 +191,8 @@ The model is right when the AI population looks like the real one. Simulate 500 
 - Median career ≈ 6–8 seasons across three or four clubs; ~10% reach 20 seasons; a handful pass 1,000 games.
 - At any moment, two to four top-tier managers have tenure over five years.
 - Unjust sackings ≈ 20–30% of all sackings.
+- Age: nobody is employed past the cap; of managers still working at 60, most are out of the game by 68; the population stays stable with a new cohort each summer.
+- Match: goals per game ≈ 2.7; home win / draw / away win ≈ 45 / 26 / 29; yellow cards ≈ 3–4 a match, reds ≈ 0.2 — all to verify against real league averages. Across the AI population, no formation's points per game exceeds the mean by more than 10% when its squad fits it. The minute engine and the fast path agree within tolerance. A match plays in about a minute at full speed.
 
 These are starting targets from memory, to verify against the LMA's end-of-season figures before locking in. Encode them as tests.
 
@@ -156,10 +201,11 @@ These are starting targets from memory, to verify against the LMA's end-of-seaso
 0. This document. CLAUDE.md. Repo.
 1. Engine (TypeScript, pure, seeded): world gen, managers, tenure, career, market, season sim. CLI: `sim --careers 500` prints the validation stats. Tune until they pass.
 2. Browser play: same engine, one human manager, the inbox as plain unstyled HTML, deployed to GitHub Pages. Play it in Safari. If "one more season" doesn't happen, fix the model, not the UI.
-3. Claude Design: inbox, job market, contract talks, career page, obituary. Restraint; typographic; no dashboards.
-4. Web app: the designed shell replaces the phase-2 scaffold; JSON saves, shareable career page.
-5. Depth: players and transfers (the CM layer), tactics, commentary, foreign leagues simulated.
-6. Meta: Hall of Fame across careers, obituary generated from the event log, shared leaderboard.
+3. Match layer, in four PRs: (a) fixtures and one match per turn, with home advantage as an explicit tunable in the existing match model; (b) players, positions, formations and selection, with the one-shot model taking effective XI, bands and width until (c) replaces it; (c) the minute engine, the fast path and their validation; (d) the match view, squad and tactics screens, fixtures tab and latest scores — unstyled.
+4. Claude Design: match view, squad, inbox, job market, contract talks, career page, obituary. Restraint; typographic; no dashboards.
+5. Web app: the designed shell replaces the unstyled one; JSON saves, shareable career page.
+6. Transfers and depth: named transfers against the budget, strength derived from the squad, scouting, contracts, foreign leagues simulated.
+7. Meta: Hall of Fame across careers, obituary generated from the event log, shared leaderboard.
 
 ## Tunables
 
