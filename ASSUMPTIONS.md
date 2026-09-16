@@ -42,7 +42,8 @@ single branch, so they live here instead.
 - A season is 40 match weeks plus 6 summer weeks. Every tier shares the
   weeks; tier 1 plays 38 rounds with two blank weeks, tiers 2–5 play 46
   rounds with six double weeks, and cup ties land on top, so a club can
-  play two or three matches in a week.
+  play two or three matches in a week. (DESIGN.md v0.2 § Turn structure
+  makes each of those matches its own turn; see Match layer below.)
 - Three up, three down at every tier boundary, no play-offs. Nothing is
   relegated out of tier 5.
 - Cups are single-leg knockouts with random draws and byes in the first
@@ -56,9 +57,14 @@ single branch, so they live here instead.
 - Goals are Poisson from an expected-goals figure driven by the strength
   gap, form, morale and tactical ability; expected points come from the
   same distribution, so credit is judged against the model's own odds.
+  (Stands until phase 3(c): DESIGN.md § Match replaces it with the minute
+  engine and a fast path calibrated from it.)
 - Attack and defend mentalities scale both sides' expected goals up or
   down (variance only); the AI attacks weaker sides and defends against
-  stronger ones. Each manager has a fixed preferred shape.
+  stronger ones. Each manager has a fixed preferred shape. (Settled from
+  phase 3(b): DESIGN.md § Formations gives every AI manager a preferred
+  formation and a fallback, and has mentality shift the bands and the
+  pressure lean.)
 - Summer: academy gains from last summer are released, the squad ages a
   year, ageing squads lose 3–5 and young ones gain 1, strength gravitates
   toward the wealth target, then the window spends the whole budget with
@@ -142,7 +148,11 @@ single branch, so they live here instead.
 - Careers end after 24 months without a shortlist (also for entrants who
   never had a job, who are excluded from validation), at 72, on a scandal
   (0.05% a month), or when an AI manager over 60 chooses to retire
-  (5% + 3% a year over 60, doubled when unemployed).
+  (5% + 3% a year over 60, doubled when unemployed). (The cap is settled:
+  DESIGN.md § Age makes the season a manager turns 72 their last. The
+  AI retirement odds remain an assumption; § Age's shortlist penalty,
+  shorter contracts with age and the agent's prompt from 65 are not yet
+  in the code.)
 - Tags are reviewed at season end from season records with the windows
   in DESIGN.md; each expires a fixed number of seasons after it was last
   earned (see TAG_RULES). "Loyal" counts declined approaches as a season.
@@ -259,3 +269,47 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
 - In a career the log keeps only events that concern the human plus the
   news (hires, sackings, trophies, promotions, vacancies), so saves stay
   small. Every state change is still emitted.
+
+## Match layer (phase 3a)
+
+- A turn plays the human club's next fixture. A match week is a run of
+  slots played together: the earliest unplayed league round of every
+  tier, then any cup round due, in the order national cup, league cup,
+  European. AI clubs in the human's division play their round in the
+  same slot as the human's.
+- After the week's football the week closes (morale settles, monthly
+  rolls, windows, salaries, the board's roll, the market, next week's
+  cup draws) and, when the human's club plays next week and nothing is
+  waiting for an answer, the turn runs straight on into that fixture. A
+  pending decision of any kind stops the turn before the fixture (the
+  pre-match step); so do a change in the human's employment, the start
+  of the summer, and a week with no fixture for the human, which passes
+  as one step with its own inbox (the previous match week's close is
+  shown with it).
+- Summer weeks are one step each. The new season's fixtures are drawn at
+  the end of the last summer week, so the opening fixture is on the card
+  before it is played.
+- In a career, cup rounds are drawn at the close of the week before they
+  are played, so the tie is on the card and the draw is in the inbox.
+  The population simulation draws at kick-off, which keeps its random
+  sequence identical (`simpath.test.ts` hashes its state).
+- A career consumes the random sequence per slot rather than per week,
+  so a career and a no-human simulation of the same seed diverge; each
+  is deterministic on its own, and a save taken between two turns of
+  one week continues identically. `advanceWeek` on a career plays and
+  closes the whole week through the same loop.
+- "Date" on the fixture card is the season week; the calendar has weeks,
+  not dates, until something needs them.
+- Home advantage in the one-shot model is 0.35 extra expected goals for
+  the home side against an equal opponent (phase 1's 1.5 / 1.15 split,
+  restated as one tunable). The model reads about 3.1 goals a game and
+  47 / 19 / 34 home / draw / away over a season; DESIGN's 2.7 and
+  45 / 26 / 29 (to verify) are phase 3(c)'s calibration targets.
+- The round-robin's venues were keyed on round plus pair index, which
+  sat every rotating club at one ground for half a season; venues now
+  alternate, at most two rounds running at one ground. This shifts the
+  simulation's random sequence, so the validation readings moved within
+  seed noise; the turn loop itself moved nothing.
+- A season in post at tier 5 is about 55 turns: 47 matches and 8
+  non-match steps (six summer weeks and a couple of pre-match stops),
+  measured on seeds 1 to 3.

@@ -24,6 +24,22 @@ function postTier(world: World, post: Post): string {
   return `${post.league} league abroad`
 }
 
+/** The competition as a fixture list names it. */
+export function competitionLabel(c: unknown): string {
+  switch (c) {
+    case 'league':
+      return 'League'
+    case 'nationalCup':
+      return 'National Cup'
+    case 'leagueCup':
+      return 'League Cup'
+    case 'european':
+      return 'European Cup'
+    default:
+      return String(c)
+  }
+}
+
 export function competitionName(c: unknown): string {
   switch (c) {
     case 'league':
@@ -41,8 +57,34 @@ export function competitionName(c: unknown): string {
   }
 }
 
+/** A place in the log to read the inbox from: taken before a turn, read after it. */
+export interface InboxMark {
+  /** Log length when the mark was taken. */
+  index: number
+  /** World week when the mark was taken. */
+  week: number
+}
+
+export function inboxMark(world: World): InboxMark {
+  return { index: world.log.length, week: world.week }
+}
+
+/** Everything logged since the mark, as inbox items: one turn's post. */
+export function inboxSince(world: World, mark: InboxMark): InboxItem[] {
+  return render(world, world.log.slice(Math.max(0, Math.min(mark.index, world.log.length))), mark.week, world.week)
+}
+
 /** Events between fromWeek (inclusive) and toWeek (exclusive), as inbox items. */
 export function inbox(world: World, fromWeek: number, toWeek: number = world.week): InboxItem[] {
+  return render(
+    world,
+    world.log.filter((e) => e.week >= fromWeek && e.week < toWeek),
+    fromWeek,
+    toWeek,
+  )
+}
+
+function render(world: World, events: Event[], fromWeek: number, toWeek: number): InboxItem[] {
   const state = world.human
   if (!state) return []
   const me = state.managerId
@@ -59,8 +101,7 @@ export function inbox(world: World, fromWeek: number, toWeek: number = world.wee
   const myClub = (e: Event) => myClubId !== null && e.payload['clubId'] === myClubId
   const nameOf = (id: unknown) => (typeof id === 'number' ? (world.managers[id - 1]?.name ?? 'A manager') : 'A manager')
 
-  for (const e of world.log) {
-    if (e.week < fromWeek || e.week >= toWeek) continue
+  for (const e of events) {
     const p = e.payload
     switch (e.type) {
       case 'match.played': {
@@ -70,6 +111,18 @@ export function inbox(world: World, fromWeek: number, toWeek: number = world.wee
         push(e, 'match', `${renderMatch(world, e)}${comp}${position}`)
         break
       }
+      case 'cup.tie': {
+        if (!myClub(e) && p['homeId'] !== myClubId && p['awayId'] !== myClubId) break
+        if (myClubId === null) break
+        const home = p['homeId'] === myClubId
+        const opponent = clubNameOf(world, (home ? p['awayId'] : p['homeId']) as number)
+        const key = p['final'] === true ? 'cup_draw_final' : home ? 'cup_draw_home' : 'cup_draw_away'
+        push(e, 'news', renderText('news', key, { competition: competitionLabel(p['competition']), round: p['round'] as number, opponent, week: (p['week'] as number) + 1 }, e.week))
+        break
+      }
+      case 'cup.bye':
+        if (myClub(e)) push(e, 'news', renderText('news', 'cup_draw_bye', { competition: competitionLabel(p['competition']), round: p['round'] as number }, e.week))
+        break
       case 'manager.hired':
         if (mine(e)) push(e, 'board', renderText('board', 'welcome', { club: postName(world, p['post'] as Post), expectation: ordinal(p['expectation'] as number), years: p['years'] as number, salary: p['salary'] as number }, e.week))
         break

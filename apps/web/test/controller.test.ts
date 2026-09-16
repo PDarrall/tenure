@@ -5,7 +5,7 @@ import {
   canAdvance,
   isApplying,
   newSession,
-  nextWeek,
+  nextTurn,
   parseSave,
   serialize,
   sessionFromWorld,
@@ -30,13 +30,13 @@ function untilOffer(s: Session): Session {
     for (const v of openVacancies(s.world)) {
       if (v.post.kind === 'home' && qualifies(s.world, me(s), v) && !isApplying(s, v.id)) s = withApply(s, v.id)
     }
-    s = nextWeek(s)
+    s = nextTurn(s)
   }
   throw new Error('no offer')
 }
 
 describe('the web controller', () => {
-  it('queues and cancels resignation and retirement without ending anything until the week moves', () => {
+  it('queues and cancels resignation and retirement without ending anything until the turn is played', () => {
     let s = newSession(1, 'Paul', 'coach')
     s = withRetire(s, true)
     expect(s.inputs.retire).toBe(true)
@@ -44,13 +44,13 @@ describe('the web controller', () => {
     s = withResign(withResign(s, true), false)
     expect(s.inputs.retire).toBe(false)
     expect(s.inputs.resign).toBe(false)
-    s = nextWeek(s)
+    s = nextTurn(s)
     expect(me(s).status.kind).toBe('unemployed')
-    s = nextWeek(withRetire(s, true))
+    s = nextTurn(withRetire(s, true))
     expect(me(s).status.kind).toBe('retired')
   })
 
-  it('starts a career and queues inputs without touching the world until the week advances', () => {
+  it('starts a career and queues inputs without touching the world until the turn is played', () => {
     let s = newSession(1, ' Paul ', 'ex-pro')
     expect(me(s).name).toBe('Paul')
     expect(me(s).background).toBe('ex-pro')
@@ -58,13 +58,14 @@ describe('the web controller', () => {
     s = withShape(withMentality(s, 'attack'), 'C')
     expect(s.inputs.shape).toBe('C')
     expect(s.world.human!.shape).not.toBe('C')
-    s = nextWeek(s)
+    s = nextTurn(s)
     expect(s.world.week).toBe(1)
     expect(s.world.human!.shape).toBe('C')
     expect(s.world.human!.mentality).toBe('attack')
     expect(s.inputs).toEqual({ answers: {} })
     expect(s.turn).toBe(1)
-    expect(s.shownFromWeek).toBe(0)
+    expect(s.shownFrom.week).toBe(0)
+    expect(s.earlier).toEqual([{ index: 0, week: 0 }])
   })
 
   it('applies and withdraws, and knows what the human is applying for', () => {
@@ -77,27 +78,29 @@ describe('the web controller', () => {
     expect(s.inputs.withdraw).toEqual([3])
   })
 
-  it('blocks the week on a starred decision until it is answered, then hires on the chosen terms', () => {
+  it('blocks the turn on a starred decision until it is answered, then hires on the chosen terms', () => {
     let s = untilOffer(newSession(1, 'Paul', 'ex-pro'))
-    const offer = pendingDecisions(s.world).find((d) => d.kind === 'offer')!
-    expect(blockingUnanswered(s)).toHaveLength(1)
+    // Several clubs can come in the same week; take the first, turn the rest down.
+    const offers = pendingDecisions(s.world).filter((d) => d.kind === 'offer')
+    expect(blockingUnanswered(s).length).toBeGreaterThanOrEqual(1)
     expect(canAdvance(s)).toBe(false)
-    s = withAnswer(s, offer.id, 'promotion:3')
+    s = withAnswer(s, offers[0]!.id, 'promotion:3')
+    for (const other of offers.slice(1)) s = withAnswer(s, other.id, 'decline')
     expect(canAdvance(s)).toBe(true)
-    s = nextWeek(s)
+    s = nextTurn(s)
     expect(me(s).status.kind).toBe('employed')
     expect(pendingDecisions(s.world).some((d) => d.kind === 'offer')).toBe(false)
   })
 
   it('round-trips a save through JSON and rejects things that are not saves', () => {
     let s = newSession(2, 'Paul', 'analyst')
-    for (let i = 0; i < 5; i++) s = nextWeek(s)
+    for (let i = 0; i < 5; i++) s = nextTurn(s)
     const text = serialize(s.world)
     const restored = sessionFromWorld(parseSave(text))
     expect(restored.world.week).toBe(s.world.week)
-    expect(restored.shownFromWeek).toBe(s.world.week - 1)
-    const a = nextWeek(restored)
-    const b = nextWeek(s)
+    expect(restored.shownFrom.week).toBe(s.world.week - 1)
+    const a = nextTurn(restored)
+    const b = nextTurn(s)
     expect(serialize(a.world)).toBe(serialize(b.world))
     expect(() => parseSave('42')).toThrow()
     expect(() => parseSave('{"week": 1}')).toThrow()
@@ -106,7 +109,7 @@ describe('the web controller', () => {
 
   it('keeps a season of saves small enough for localStorage', () => {
     let s = newSession(3, 'Paul', 'coach')
-    for (let i = 0; i < tunables.SEASON_WEEKS; i++) s = nextWeek(s)
+    for (let i = 0; i < tunables.SEASON_WEEKS; i++) s = nextTurn(s)
     expect(serialize(s.world).length).toBeLessThan(2_000_000)
   })
 })

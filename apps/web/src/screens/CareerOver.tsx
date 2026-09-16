@@ -1,8 +1,8 @@
-import { inbox, seasonWeek, type World } from '@tenure/engine'
+import { inboxSince, seasonWeek, type InboxMark, type World } from '@tenure/engine'
 import { Career } from './Game.js'
 
-export function CareerOver({ world, fromWeek, onExport, onNewCareer }: { world: World; fromWeek: number; onExport: () => void; onNewCareer: () => void }) {
-  const items = inbox(world, Math.max(0, fromWeek), world.week)
+export function CareerOver({ world, from, onExport, onNewCareer }: { world: World; from: InboxMark; onExport: () => void; onNewCareer: () => void }) {
+  const items = inboxSince(world, from)
   return (
     <main>
       <h1>The career is over</h1>

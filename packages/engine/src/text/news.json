@@ -1,9 +1,35 @@
 {
-  "season_end": ["Season {season} is over. Tier 1 champions: {champion}."],
-  "sacked": ["{manager} has been sacked by {club} (tier {tier})."],
-  "poached": ["{manager} has left {from} for {to}."],
-  "trophy": ["{club} have won the {competition}."],
-  "promotion": ["{club} are promoted to tier {toTier}."],
-  "relegation": ["{club} are relegated to tier {toTier}."],
-  "takeover": ["{club} have been taken over."]
+  "season_end": [
+    "Season {season} is over. Tier 1 champions: {champion}."
+  ],
+  "sacked": [
+    "{manager} has been sacked by {club} (tier {tier})."
+  ],
+  "poached": [
+    "{manager} has left {from} for {to}."
+  ],
+  "trophy": [
+    "{club} have won the {competition}."
+  ],
+  "promotion": [
+    "{club} are promoted to tier {toTier}."
+  ],
+  "relegation": [
+    "{club} are relegated to tier {toTier}."
+  ],
+  "takeover": [
+    "{club} have been taken over."
+  ],
+  "cup_draw_home": [
+    "{competition} draw, round {round}: {opponent} come to you in week {week}."
+  ],
+  "cup_draw_away": [
+    "{competition} draw, round {round}: you go to {opponent} in week {week}."
+  ],
+  "cup_draw_final": [
+    "The {competition} final, week {week}: {opponent}."
+  ],
+  "cup_draw_bye": [
+    "{competition} draw, round {round}: a bye. You are through without playing."
+  ]
 }

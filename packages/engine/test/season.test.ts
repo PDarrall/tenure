@@ -34,6 +34,24 @@ describe('fixtures', () => {
     for (const h of ids) for (const a of ids) if (h !== a) expect(seen.get(`${h}-${a}`)).toBe(1)
   })
 
+  it('never sends a club to the same venue more than three rounds running', () => {
+    const ids = Array.from({ length: 20 }, (_, i) => i + 1)
+    const rounds = roundRobin(ids)
+    let longest = 0
+    for (const id of ids) {
+      let run = 0
+      let last: 'H' | 'A' | null = null
+      for (const round of rounds) {
+        const pair = round.find(([h, a]) => h === id || a === id)!
+        const venue = pair[0] === id ? 'H' : 'A'
+        run = venue === last ? run + 1 : 1
+        last = venue
+        longest = Math.max(longest, run)
+      }
+    }
+    expect(longest).toBeLessThanOrEqual(3)
+  })
+
   it('spreads league rounds over the match weeks with doubles where needed', () => {
     const world = createWorld(1)
     const fixtures = leagueFixtures(world, createRng(1))
@@ -89,6 +107,46 @@ describe('match model', () => {
     expect(shootouts).toBeGreaterThan(30)
   })
 
+  it('gives the home side of two equal teams the tunable lean, and nothing else', () => {
+    const odds = matchOdds(side(), side({ id: 2 }))
+    expect(odds.lambdaHome).toBeCloseTo(T.GOALS_BASE + T.HOME_ADVANTAGE_GOALS, 12)
+    expect(odds.lambdaAway).toBeCloseTo(T.GOALS_BASE, 12)
+    // Home win / draw / away win for equal sides. DESIGN target ≈ 45 / 26 / 29, to verify.
+    expect(odds.pHome).toBeGreaterThan(0.4)
+    expect(odds.pHome).toBeLessThan(0.52)
+    expect(odds.pDraw).toBeGreaterThan(0.2)
+    expect(odds.pDraw).toBeLessThan(0.32)
+    expect(odds.pAway).toBeGreaterThan(0.22)
+    expect(odds.pAway).toBeLessThan(0.34)
+  })
+
+  it('a simulated season lands near the goals-per-game and result-split targets (to verify)', () => {
+    const world = createWorld(3)
+    runSeasons(world, 1)
+    const league = world.log.filter((e) => e.type === 'match.played' && e.payload['competition'] === 'league')
+    let goals = 0
+    let home = 0
+    let draw = 0
+    for (const e of league) {
+      const hg = e.payload['homeGoals'] as number
+      const ag = e.payload['awayGoals'] as number
+      goals += hg + ag
+      if (hg > ag) home++
+      else if (hg === ag) draw++
+    }
+    const n = league.length
+    expect(n).toBeGreaterThan(2000)
+    // The one-shot model reads about 3.1 goals a game and 47 / 19 / 34 across a
+    // season: strength gaps inflate goals and thin out draws. Phase 3(c)
+    // calibrates against 2.7 and 45 / 26 / 29; these bands only catch a break.
+    expect(goals / n).toBeGreaterThan(2.3)
+    expect(goals / n).toBeLessThan(3.4)
+    expect(home / n).toBeGreaterThan(0.38)
+    expect(home / n).toBeLessThan(0.54)
+    expect(draw / n).toBeGreaterThan(0.14)
+    expect(draw / n).toBeLessThan(0.32)
+  })
+
   it('poisson pmf is normalised', () => {
     const pmf = poissonPmf(1.4, T.MAX_GOALS)
     expect(pmf.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 9)
@@ -104,6 +162,29 @@ describe('cups', () => {
     expect(roundsNeeded(44)).toBe(T.LEAGUE_CUP_ROUND_WEEKS.length)
     const euro = T.EUROPEAN_LEAGUE_PLACES + 1 + Object.values(T.EUROPEAN_FOREIGN_ENTRANTS).reduce((a, b) => a + b, 0)
     expect(roundsNeeded(euro)).toBe(T.EUROPEAN_ROUND_WEEKS.length)
+  })
+})
+
+describe('cup draws', () => {
+  it('a round drawn before its week is played as drawn, one tie event per tie and a bye event per bye', async () => {
+    const { drawCupRound, drawnCupFixtures, playWeek } = await import('../src/season/season.js')
+    const world = createWorld(2)
+    runWeeks(world, 1) // season started, league cup round one (week 1) not yet played
+    const cup = world.cups.find((c) => c.competition === 'leagueCup')!
+    expect(cup.roundsPlayed).toBe(0)
+    const rng = createRng(99)
+    const drawn = drawCupRound(world, rng, cup, cup.roundWeeks[0]!)
+    expect(drawn).toHaveLength(matchesThisRound(cup.remaining.length))
+    expect(drawnCupFixtures(world, cup)).toEqual(drawn)
+    const ties = world.log.filter((e) => e.type === 'cup.tie' && e.payload['competition'] === 'leagueCup')
+    const byes = world.log.filter((e) => e.type === 'cup.bye' && e.payload['competition'] === 'leagueCup')
+    expect(ties).toHaveLength(drawn.length)
+    expect(ties.length * 2 + byes.length).toBe(cup.remaining.length)
+    const before = drawn.map((f) => `${f.homeId}-${f.awayId}`)
+    const played = playWeek(world, rng, cup.roundWeeks[0]!).filter((p) => p.fixture.competition === 'leagueCup')
+    expect(played.map((p) => `${p.fixture.homeId}-${p.fixture.awayId}`)).toEqual(before)
+    expect(cup.roundsPlayed).toBe(1)
+    expect(drawnCupFixtures(world, cup)).toHaveLength(0)
   })
 })
 

@@ -47,10 +47,9 @@ export function formScore(form: readonly Result[]): number {
   return (points / (3 * form.length) - 0.5) * 2
 }
 
-export function effectiveStrength(p: Participant, home: boolean): number {
+export function effectiveStrength(p: Participant): number {
   return (
     p.strength +
-    (home ? T.HOME_ADV : 0) +
     T.FORM_WEIGHT * formScore(p.form) +
     (T.ABILITY_WEIGHT * (p.tactical - T.SCALE_MIDPOINT)) / T.SCALE_MIDPOINT +
     (T.MORALE_WEIGHT * (p.morale - T.SCALE_MIDPOINT)) / T.SCALE_MIDPOINT
@@ -74,9 +73,10 @@ export function poissonPmf(lambda: number, max: number): number[] {
 }
 
 export function matchOdds(home: Participant, away: Participant): MatchOdds {
-  const diff = effectiveStrength(home, true) - effectiveStrength(away, false)
-  let lambdaHome = T.GOALS_BASE_HOME * Math.exp(T.GOAL_SENSITIVITY * diff)
-  let lambdaAway = T.GOALS_BASE_AWAY * Math.exp(-T.GOAL_SENSITIVITY * diff)
+  const diff = effectiveStrength(home) - effectiveStrength(away)
+  // Home advantage is the only asymmetry between the sides before strength is read.
+  let lambdaHome = (T.GOALS_BASE + T.HOME_ADVANTAGE_GOALS) * Math.exp(T.GOAL_SENSITIVITY * diff)
+  let lambdaAway = T.GOALS_BASE * Math.exp(-T.GOAL_SENSITIVITY * diff)
   if (BEATS[home.shape] === away.shape) {
     lambdaHome *= 1 + T.TACTIC_RPS
     lambdaAway *= 1 - T.TACTIC_RPS
@@ -123,7 +123,7 @@ function samplePoisson(rng: Rng, lambda: number): number {
 
 /** Probability the home side wins a shoot-out, from the strength gap. */
 export function shootoutHomeChance(home: Participant, away: Participant): number {
-  const gap = (effectiveStrength(home, true) - effectiveStrength(away, false)) / 50
+  const gap = (effectiveStrength(home) - effectiveStrength(away)) / 50
   const edge = Math.max(-1, Math.min(1, gap)) * T.SHOOTOUT_STRENGTH_EDGE
   return 0.5 + edge
 }
