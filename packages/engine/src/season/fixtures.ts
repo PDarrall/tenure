@@ -6,6 +6,12 @@ import { leagueRoundWeek } from './calendar.js'
 /**
  * Double round-robin by the circle method. Each pair meets twice, once at
  * each ground. `ids.length` must be even.
+ *
+ * Venues: the fixed club (index 0) alternates by round; every other pair
+ * takes its venue from the pair's index. A rotating club moves one pair
+ * index per round, so its venue alternates too, with at most two games
+ * running at one ground where it passes the fixed club. (Keyed on round
+ * plus index, every rotating club sat at one ground for half a season.)
  */
 export function roundRobin(ids: readonly ClubId[]): [ClubId, ClubId][][] {
   const n = ids.length
@@ -17,7 +23,8 @@ export function roundRobin(ids: readonly ClubId[]): [ClubId, ClubId][][] {
     for (let i = 0; i < n / 2; i++) {
       const a = arr[i] as ClubId
       const b = arr[n - 1 - i] as ClubId
-      pairs.push((r + i) % 2 === 0 ? [a, b] : [b, a])
+      const aHome = i === 0 ? r % 2 === 0 : i % 2 === 0
+      pairs.push(aHome ? [a, b] : [b, a])
     }
     first.push(pairs)
     const last = arr.pop() as ClubId

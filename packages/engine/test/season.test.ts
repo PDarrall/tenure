@@ -34,6 +34,24 @@ describe('fixtures', () => {
     for (const h of ids) for (const a of ids) if (h !== a) expect(seen.get(`${h}-${a}`)).toBe(1)
   })
 
+  it('never sends a club to the same venue more than three rounds running', () => {
+    const ids = Array.from({ length: 20 }, (_, i) => i + 1)
+    const rounds = roundRobin(ids)
+    let longest = 0
+    for (const id of ids) {
+      let run = 0
+      let last: 'H' | 'A' | null = null
+      for (const round of rounds) {
+        const pair = round.find(([h, a]) => h === id || a === id)!
+        const venue = pair[0] === id ? 'H' : 'A'
+        run = venue === last ? run + 1 : 1
+        last = venue
+        longest = Math.max(longest, run)
+      }
+    }
+    expect(longest).toBeLessThanOrEqual(3)
+  })
+
   it('spreads league rounds over the match weeks with doubles where needed', () => {
     const world = createWorld(1)
     const fixtures = leagueFixtures(world, createRng(1))

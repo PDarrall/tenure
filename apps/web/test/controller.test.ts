@@ -80,10 +80,12 @@ describe('the web controller', () => {
 
   it('blocks the turn on a starred decision until it is answered, then hires on the chosen terms', () => {
     let s = untilOffer(newSession(1, 'Paul', 'ex-pro'))
-    const offer = pendingDecisions(s.world).find((d) => d.kind === 'offer')!
-    expect(blockingUnanswered(s)).toHaveLength(1)
+    // Several clubs can come in the same week; take the first, turn the rest down.
+    const offers = pendingDecisions(s.world).filter((d) => d.kind === 'offer')
+    expect(blockingUnanswered(s).length).toBeGreaterThanOrEqual(1)
     expect(canAdvance(s)).toBe(false)
-    s = withAnswer(s, offer.id, 'promotion:3')
+    s = withAnswer(s, offers[0]!.id, 'promotion:3')
+    for (const other of offers.slice(1)) s = withAnswer(s, other.id, 'decline')
     expect(canAdvance(s)).toBe(true)
     s = nextTurn(s)
     expect(me(s).status.kind).toBe('employed')
