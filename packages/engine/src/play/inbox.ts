@@ -57,8 +57,34 @@ export function competitionName(c: unknown): string {
   }
 }
 
+/** A place in the log to read the inbox from: taken before a turn, read after it. */
+export interface InboxMark {
+  /** Log length when the mark was taken. */
+  index: number
+  /** World week when the mark was taken. */
+  week: number
+}
+
+export function inboxMark(world: World): InboxMark {
+  return { index: world.log.length, week: world.week }
+}
+
+/** Everything logged since the mark, as inbox items: one turn's post. */
+export function inboxSince(world: World, mark: InboxMark): InboxItem[] {
+  return render(world, world.log.slice(Math.max(0, Math.min(mark.index, world.log.length))), mark.week, world.week)
+}
+
 /** Events between fromWeek (inclusive) and toWeek (exclusive), as inbox items. */
 export function inbox(world: World, fromWeek: number, toWeek: number = world.week): InboxItem[] {
+  return render(
+    world,
+    world.log.filter((e) => e.week >= fromWeek && e.week < toWeek),
+    fromWeek,
+    toWeek,
+  )
+}
+
+function render(world: World, events: Event[], fromWeek: number, toWeek: number): InboxItem[] {
   const state = world.human
   if (!state) return []
   const me = state.managerId
@@ -75,8 +101,7 @@ export function inbox(world: World, fromWeek: number, toWeek: number = world.wee
   const myClub = (e: Event) => myClubId !== null && e.payload['clubId'] === myClubId
   const nameOf = (id: unknown) => (typeof id === 'number' ? (world.managers[id - 1]?.name ?? 'A manager') : 'A manager')
 
-  for (const e of world.log) {
-    if (e.week < fromWeek || e.week >= toWeek) continue
+  for (const e of events) {
     const p = e.payload
     switch (e.type) {
       case 'match.played': {
