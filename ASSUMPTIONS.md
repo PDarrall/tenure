@@ -218,6 +218,11 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
 
 ## Play (phase 2)
 
+- Phase 2 is played in the browser, not the terminal: the developer works
+  from an iPad. `apps/web` is an unstyled but playable single page over
+  the engine's play module, deployed to GitHub Pages from `main`. The
+  terminal `play` command stays as a second client over the same module.
+
 - The human enters as an ordinary entrant: unemployed, entry reputation,
   chosen name and background. They are one of the 400 and the AI treats
   them like any other manager except where a decision is theirs.

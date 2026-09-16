@@ -7,7 +7,8 @@ Read `DESIGN.md` before anything else. It is the source of truth. If code and `D
 
 - `packages/engine` — pure TypeScript. No UI, no I/O, no `Date.now()`, no `Math.random()`. All randomness comes through the injected seeded RNG. All state is plain JSON-serialisable objects; a saved game is the state object and nothing else.
 - `packages/cli` — headless simulation (`sim`) and terminal play (`play`). Depends on engine only.
-- `apps/web` — React shell. Depends on engine only. Do not scaffold until phase 4.
+- `apps/web` — React shell. Depends on engine only. Scaffolded now as an unstyled but playable build; it gets its real design in phase 4.
+- **Deployment.** `apps/web` builds to static files and a GitHub Actions workflow deploys `main` to GitHub Pages. Nothing may depend on a local machine: every check runs in CI, every playtest happens in the browser.
 - `packages/engine/src/tunables.ts` — every constant, each with a comment naming the validation target it serves. No magic numbers anywhere else.
 
 ## Rules
