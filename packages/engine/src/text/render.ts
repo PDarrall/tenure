@@ -19,6 +19,14 @@ const banks: Record<Bank, Templates> = {
   news: newsTemplates,
 }
 
+/** 1 → 1st, 2 → 2nd, 11 → 11th, 23 → 23rd. */
+export function ordinal(n: number): string {
+  const v = n % 100
+  if (v >= 11 && v <= 13) return `${n}th`
+  const last = n % 10
+  return `${n}${last === 1 ? 'st' : last === 2 ? 'nd' : last === 3 ? 'rd' : 'th'}`
+}
+
 /** Render a template from a bank; the variant is a function of `salt`, never of the RNG. */
 export function renderText(bank: Bank, key: string, vars: Record<string, string | number>, salt: number): string {
   const options = banks[bank][key]

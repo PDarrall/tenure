@@ -4,7 +4,7 @@
  */
 import { T } from '../tunables.js'
 import type { Event, Post, World } from '../types.js'
-import { renderMatch, renderText, clubNameOf } from '../text/render.js'
+import { renderMatch, renderText, clubNameOf, ordinal } from '../text/render.js'
 import { qualifies } from '../market/shortlist.js'
 
 export type InboxFrom = 'board' | 'agent' | 'press' | 'staff' | 'match' | 'news'
@@ -65,13 +65,13 @@ export function inbox(world: World, fromWeek: number, toWeek: number = world.wee
     switch (e.type) {
       case 'match.played': {
         if (p['homeManagerId'] !== me && p['awayManagerId'] !== me) break
-        const position = typeof p['positionAfter'] === 'number' && p['competition'] === 'league' ? ` You are ${p['positionAfter']}th.` : ''
+        const position = typeof p['positionAfter'] === 'number' && p['competition'] === 'league' ? ` You are ${ordinal(p['positionAfter'])}.` : ''
         const comp = p['competition'] === 'league' ? '' : ` (${competitionName(p['competition'])}, round ${p['round']})`
         push(e, 'match', `${renderMatch(world, e)}${comp}${position}`)
         break
       }
       case 'manager.hired':
-        if (mine(e)) push(e, 'board', renderText('board', 'welcome', { club: postName(world, p['post'] as Post), expectation: p['expectation'] as number, years: p['years'] as number, salary: p['salary'] as number }, e.week))
+        if (mine(e)) push(e, 'board', renderText('board', 'welcome', { club: postName(world, p['post'] as Post), expectation: ordinal(p['expectation'] as number), years: p['years'] as number, salary: p['salary'] as number }, e.week))
         break
       case 'manager.sacked':
         if (mine(e)) push(e, 'board', renderText('board', p['deserved'] ? 'sacked_deserved' : 'sacked_unjust', { club: postName(world, p['post'] as Post), payout: p['payout'] as number }, e.week))
@@ -110,17 +110,17 @@ export function inbox(world: World, fromWeek: number, toWeek: number = world.wee
         const finish = p['finish'] as number
         const expectation = p['expectation'] as number
         const key = finish < expectation ? 'review_beat' : finish === expectation ? 'review_met' : 'review_missed'
-        push(e, 'board', renderText('board', key, { finish, expectation }, e.week))
+        push(e, 'board', renderText('board', key, { finish: ordinal(finish), expectation: ordinal(expectation) }, e.week))
         break
       }
       case 'expectation.reset':
-        if (mySpell(e)) push(e, 'board', renderText('board', 'target', { to: p['to'] as number }, e.week))
+        if (mySpell(e)) push(e, 'board', renderText('board', 'target', { to: ordinal(p['to'] as number) }, e.week))
         break
       case 'board.note': {
         if (!mine(e)) break
         const mood = String(p['mood'])
         if (mood === 'secure' || mood === 'settled') break
-        push(e, 'board', renderText('board', `mood_${mood}`, { position: p['position'] as number, expectation: p['expectation'] as number }, e.week))
+        push(e, 'board', renderText('board', `mood_${mood}`, { position: ordinal(p['position'] as number), expectation: ordinal(p['expectation'] as number) }, e.week))
         break
       }
       case 'shock.takeover':
@@ -128,10 +128,10 @@ export function inbox(world: World, fromWeek: number, toWeek: number = world.wee
         else push(e, 'news', renderText('news', 'takeover', { club: clubNameOf(world, p['clubId'] as number) }, e.week))
         break
       case 'shock.crisis':
-        if (mySpell(e)) push(e, 'board', renderText('board', 'crisis', { expectation: p['expectation'] as number }, e.week))
+        if (mySpell(e)) push(e, 'board', renderText('board', 'crisis', { expectation: ordinal(p['expectation'] as number) }, e.week))
         break
       case 'shock.starSale':
-        if (mySpell(e)) push(e, 'board', renderText('board', 'star_sale', { expectation: p['expectation'] as number }, e.week))
+        if (mySpell(e)) push(e, 'board', renderText('board', 'star_sale', { expectation: ordinal(p['expectation'] as number) }, e.week))
         break
       case 'shock.boardRow':
         if (mySpell(e)) push(e, 'board', renderText('board', 'row', {}, e.week))

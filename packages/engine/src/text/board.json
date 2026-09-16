@@ -1,27 +1,27 @@
 {
   "welcome": [
-    "Welcome to {club}. The board expect a {expectation}th-place finish or better. Your deal runs {years} years at £{salary}m a season.",
-    "The chairman of {club} shakes your hand: {years} years, £{salary}m a season, and a target of {expectation}th. Don't make him regret it."
+    "Welcome to {club}. The board expect a {expectation}-place finish or better. Your deal runs {years} years at £{salary}m a season.",
+    "The chairman of {club} shakes your hand: {years} years, £{salary}m a season, and a target of {expectation}. Don't make him regret it."
   ],
   "review_beat": [
-    "Season over. You finished {finish}th against a target of {expectation}th. The board are pleased, and the target moves to {finish}th.",
-    "{finish}th, when {expectation}th would have done. The board's letter is warm; next year they will want {finish}th again."
+    "Season over. You finished {finish} against a target of {expectation}. The board are pleased, and the target moves to {finish}.",
+    "{finish}, when {expectation} would have done. The board's letter is warm; next year they will want {finish} again."
   ],
-  "review_met": ["Season over. {finish}th, as asked. The board note it and say nothing more."],
+  "review_met": ["Season over. {finish}, as asked. The board note it and say nothing more."],
   "review_missed": [
-    "Season over. {finish}th against a target of {expectation}th. The board's letter is short.",
-    "The board wanted {expectation}th and got {finish}th. Their statement thanks the players."
+    "Season over. {finish} against a target of {expectation}. The board's letter is short.",
+    "The board wanted {expectation} and got {finish}. Their statement thanks the players."
   ],
-  "target": ["The board have set this season's target: {to}th."],
+  "target": ["The board have set this season's target: {to}."],
   "mood_secure": ["The board are content. No note this month."],
   "mood_settled": ["A quiet month from the board."],
   "mood_uneasy": [
-    "The chairman has asked to see you. {position}th, with {expectation}th expected, is not what he had in mind.",
-    "A note from the board: results must improve. You sit {position}th."
+    "The chairman has asked to see you. {position}, with {expectation} expected, is not what he had in mind.",
+    "A note from the board: results must improve. You sit {position}."
   ],
   "mood_under review": [
     "Your position is under review. The board meet weekly and your name is on the agenda.",
-    "The board have stopped returning calls. {position}th is not going to be tolerated much longer."
+    "The board have stopped returning calls. {position} is not going to be tolerated much longer."
   ],
   "mood_on the brink": ["One more result like the last and you will not be here for the next."],
   "sacked_deserved": [
@@ -38,8 +38,8 @@
   "released": ["{club} have let your contract run out. The board thank you for your service and mean about half of it."],
   "left": ["You have chosen not to renew at {club}. You leave at the end of the contract, with nothing owed and no hard feelings."],
   "takeover": ["{club} have new owners: {to} by all accounts. Whether they want their own man is not yet clear."],
-  "crisis": ["The accountants have been in. Next summer's budget is cut hard; the board have eased your target to {expectation}th."],
-  "star_sale": ["The board have sold your best player to balance the books. They have eased the target to {expectation}th by way of apology."],
+  "crisis": ["The accountants have been in. Next summer's budget is cut hard; the board have eased your target to {expectation}."],
+  "star_sale": ["The board have sold your best player to balance the books. They have eased the target to {expectation} by way of apology."],
   "row": ["A row with the board over selection has leaked. It will not have helped."],
   "promoted": ["Promotion. {club} go up to tier {toTier}. The champagne is the board's; the target next season will be theirs too."],
   "relegated": ["Relegation. {club} go down to tier {toTier}. The board's statement talks of a fresh start."],

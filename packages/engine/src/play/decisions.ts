@@ -17,7 +17,7 @@ import { resolveFallout } from '../tenure/shocks.js'
 import { salaryForYears } from '../market/vacancies.js'
 import { acceptApproach, declineApproach, hire } from '../market/hiring.js'
 import { setActivity } from '../market/unemployment.js'
-import { renderText } from '../text/render.js'
+import { ordinal, renderText } from '../text/render.js'
 
 export function human(world: World): Manager {
   if (!world.human) throw new Error('no human in this world')
@@ -89,7 +89,7 @@ export function queueOffer(world: World, vacancy: Vacancy): Decision {
       options.push({
         key: `${promise}:${years}`,
         label: `Promise ${promise}, ${years}-year deal`,
-        detail: `target ${expectation}${vacancy.post.kind === 'home' ? `th` : ''}, budget ×${effect.budget}, £${salary}m a season`,
+        detail: `target ${ordinal(expectation)}, budget ×${effect.budget}, £${salary}m a season`,
       })
     }
   }
