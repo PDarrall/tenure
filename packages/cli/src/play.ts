@@ -1,17 +1,20 @@
 /**
- * Terminal play: one week per turn, the inbox in text, decisions answered by
+ * Terminal play: one match per turn, the inbox in text, decisions answered by
  * number and letter. `pnpm play --seed 1 --name "Your Name" --background coach`
  */
 import { createInterface } from 'node:readline'
 import { readFileSync, writeFileSync } from 'node:fs'
 import {
-  advanceWeek,
+  advanceTurn,
   boardMood,
   careerSummary,
   competitionName,
   createCareer,
-  inbox,
+  inboxMark,
+  inboxSince,
+  nextFixture,
   openVacancies,
+  seasonFixtures,
   ordinal,
   pendingDecisions,
   qualifies,
@@ -22,6 +25,7 @@ import {
   type Background,
   type Decision,
   type HumanInputs,
+  type InboxMark,
   type Manager,
   type Mentality,
   type Shape,
@@ -76,6 +80,7 @@ function header(world: World): string {
       const table = tableFor(world, club.tier)
       const pos = table.findIndex((r) => r.clubId === club.id) + 1
       lines.push(`${club.name} (tier ${club.tier}), ${ordinal(pos)} of ${table.length}.  Target ${ordinal(spell.expectation)}.  Board: ${boardMood(spell)}.  Shape ${world.human!.shape}, ${world.human!.mentality}.  Contract to season ${Math.floor(spell.contract.endWeek / tunables.SEASON_WEEKS) + 1}.`)
+      lines.push(nextFixtureLine(world))
     } else {
       lines.push(`Abroad in the ${spell.post.league} league.  Target ${ordinal(spell.expectation)}.  Board: ${boardMood(spell)}.`)
     }
@@ -84,6 +89,33 @@ function header(world: World): string {
     lines.push(`Out of work: ${months} months (${me.status.activity}).  Reputation band: ${bandName(me.reputation)}.  ${tunables.NO_SHORTLIST_MONTHS - me.status.monthsSinceShortlisted} months before the phone stops ringing for good.`)
   }
   return lines.join('\n')
+}
+
+/** What Continue plays next (DESIGN.md "Fixtures"). */
+function nextFixtureLine(world: World): string {
+  const next = nextFixture(world)
+  const sw = seasonWeek(world.week)
+  if (!next) return sw >= tunables.MATCH_WEEKS ? 'Next: the summer; fixtures come out with the new season.' : 'Next: no more fixtures this season.'
+  const when = next.seasonWeek === sw ? 'this week' : `week ${next.seasonWeek + 1}`
+  if (next.kind === 'draw') return `Next: ${next.competitionLabel} round ${next.round}, ${when}, draw to come.`
+  const where = next.opponentAbroad ?? `${next.opponentPosition !== null ? ordinal(next.opponentPosition) : '?'} in tier ${next.opponentTier}`
+  const form = next.opponentForm.length ? next.opponentForm.join('') : 'no games yet'
+  return `Next: ${next.opponent} (${next.home ? 'H' : 'A'}), ${next.competitionLabel}${next.competition === 'league' ? '' : ` round ${next.round}`}, ${when}.  They are ${where}, form ${form}.`
+}
+
+function showFixtures(world: World): void {
+  const groups = seasonFixtures(world)
+  if (groups.length === 0) {
+    console.log('  No club, no fixtures.')
+    return
+  }
+  for (const g of groups) {
+    console.log(`  ${g.label}${g.status ? `  (${g.status})` : ''}`)
+    for (const f of g.fixtures) {
+      const score = f.played ? `${f.result} ${f.goalsFor}-${f.goalsAgainst}${f.shootoutWon === null ? '' : f.shootoutWon ? ' (pens won)' : ' (pens lost)'}` : ''
+      console.log(`    wk ${String(f.seasonWeek + 1).padStart(2)}  ${`${f.opponent} (${f.home ? 'H' : 'A'})`.padEnd(32)}${f.competition === 'league' ? '' : `r${f.round} `}${score}`)
+    }
+  }
 }
 
 function bandName(rep: number): string {
@@ -95,8 +127,8 @@ function bandName(rep: number): string {
   return 'non-league'
 }
 
-function showInbox(world: World, fromWeek: number): void {
-  const items = inbox(world, fromWeek, world.week)
+function showInbox(world: World, from: InboxMark): void {
+  const items = inboxSince(world, from)
   if (items.length === 0) return
   console.log('')
   for (const item of items) console.log(`  ${item.from.padEnd(6)} ${item.text}`)
@@ -155,10 +187,11 @@ function showCareer(world: World): void {
 }
 
 function help(): void {
-  console.log(`  enter          next week            1 b            answer decision 1 with option b
+  console.log(`  enter          continue: play the next fixture, or take the next step
+  1 b            answer decision 1 with option b
   a <id>         apply for vacancy    w <id>         withdraw an application
   s A|B|C        shape                m attack|balanced|defend   mentality
-  act <what>     wait|punditry|assistant|abroad       v   vacancies   t   table   c   career page
+  act <what>     wait|punditry|assistant|abroad       v   vacancies   f   fixtures   t   table   c   career page
   resign         resign now           retire         end the career and bank the score
   save [file]    save                 q              quit (autosaves if --save given)   h   help`)
 }
@@ -209,7 +242,9 @@ async function main(): Promise<void> {
   }
 
   let inputs: HumanInputs = { answers: {} }
-  let shownFrom = Math.max(0, world.week - 1)
+  const lastWeek = Math.max(0, world.week - 1)
+  const firstIndex = world.log.findIndex((e) => e.week >= lastWeek)
+  let shownFrom: InboxMark = { index: firstIndex < 0 ? world.log.length : firstIndex, week: lastWeek }
   let confirmRetire = false
 
   while (!closed) {
@@ -217,7 +252,6 @@ async function main(): Promise<void> {
     console.log('')
     console.log(header(world))
     showInbox(world, shownFrom)
-    shownFrom = world.week
     if (me.status.kind === 'retired') {
       console.log('')
       console.log('The career is over.')
@@ -262,19 +296,20 @@ async function main(): Promise<void> {
         inputs.withdraw = [...(inputs.withdraw ?? []), Number(arg)]
       } else if (cmd === 's' && ['A', 'B', 'C'].includes(arg.toUpperCase())) {
         inputs.shape = arg.toUpperCase() as Shape
-        console.log(`  Shape ${inputs.shape} from next match.`)
+        console.log(`  Shape ${inputs.shape} from the next match.`)
       } else if (cmd === 'm' && ['attack', 'balanced', 'defend'].includes(arg)) {
         inputs.mentality = arg as Mentality
-        console.log(`  Mentality ${arg} from next match.`)
+        console.log(`  Mentality ${arg} from the next match.`)
       } else if (cmd === 'act' && ['wait', 'punditry', 'assistant', 'abroad'].includes(arg)) {
         inputs.activity = arg as UnemployedActivity
         console.log(`  ${arg} from this week.`)
       } else if (cmd === 'v') showVacancies(world)
+      else if (cmd === 'f') showFixtures(world)
       else if (cmd === 't') showTable(world)
       else if (cmd === 'c') showCareer(world)
       else if (cmd === 'resign') {
         inputs.resign = true
-        console.log('  You will resign this week.')
+        console.log('  You will resign this turn.')
       } else if (cmd === 'retire') {
         if (confirmRetire) {
           inputs.retire = true
@@ -299,7 +334,8 @@ async function main(): Promise<void> {
       confirmRetire = cmd === 'retire'
     }
     if (closed) break
-    advanceWeek(world, inputs)
+    shownFrom = inboxMark(world)
+    advanceTurn(world, inputs)
     inputs = { answers: {} }
     if (args.save) save(world, args.save)
   }
