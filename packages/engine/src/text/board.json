@@ -44,5 +44,9 @@
   "promoted": ["Promotion. {club} go up to tier {toTier}. The champagne is the board's; the target next season will be theirs too."],
   "relegated": ["Relegation. {club} go down to tier {toTier}. The board's statement talks of a fresh start."],
   "trophy": ["{club} have won the {competition}. Whatever else happens, that is on your record."],
-  "career_over": ["The phone has stopped ringing. After {games} games, £{earnings}m and {trophyPoints} trophy points, the career is over: {reason}."]
+  "career_over": ["The phone has stopped ringing. After {games} games, £{earnings}m and {trophyPoints} trophy points, the career is over: {reason}."],
+  "career_over_voluntary": ["You have called it a day on your own terms. {games} games, £{earnings}m and {trophyPoints} trophy points go on the record."],
+  "career_over_no-offers": ["Two years without a shortlist. The phone has stopped ringing. After {games} games, £{earnings}m and {trophyPoints} trophy points, the career is over."],
+  "career_over_age": ["The years have done what no chairman managed. After {games} games, £{earnings}m and {trophyPoints} trophy points, you retire."],
+  "career_over_scandal": ["No club will touch you now. After {games} games, £{earnings}m and {trophyPoints} trophy points, the career is over."]
 }

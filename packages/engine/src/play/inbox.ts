@@ -204,7 +204,13 @@ export function inbox(world: World, fromWeek: number, toWeek: number = world.wee
         if (p['byDefault'] === true) push(e, 'agent', renderText('agent', 'default_taken', { key: String(p['key']) }, e.week))
         break
       case 'career.ended':
-        if (mine(e)) push(e, 'board', renderText('board', 'career_over', { games: p['games'] as number, earnings: p['earnings'] as number, trophyPoints: p['trophyPoints'] as number, reason: String(p['reason']) }, e.week))
+        if (mine(e)) {
+          // One message per ending; the generic line covers any reason without its own template.
+          const reason = String(p['reason'])
+          const vars = { games: p['games'] as number, earnings: p['earnings'] as number, trophyPoints: p['trophyPoints'] as number, reason }
+          const specific = renderText('board', `career_over_${reason}`, vars, e.week)
+          push(e, 'board', specific.startsWith('[board.') ? renderText('board', 'career_over', vars, e.week) : specific)
+        }
         break
       default:
         break

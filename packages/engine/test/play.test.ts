@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { careerSummary, createCareer } from '../src/play/career.js'
-import { pendingDecisions } from '../src/play/decisions.js'
+import { pendingDecisions, resolveDecisions } from '../src/play/decisions.js'
+import { tryToFill } from '../src/market/hiring.js'
+import { rngFromState } from '../src/rng.js'
 import { advanceWeek, runWeeks } from '../src/sim/advance.js'
 import { openVacancies } from '../src/market/vacancies.js'
 import { qualifies } from '../src/market/shortlist.js'
@@ -81,6 +83,31 @@ describe('a human career', () => {
     runWeeks(world, 6)
     const vacancy = world.vacancies[vacancyId - 1]!
     expect(vacancy.hiredManagerId === null || vacancy.hiredManagerId !== player.id).toBe(true)
+  })
+
+  it('asks an employed human about an approach once; a decline sends the club down its shortlist', () => {
+    const world = createCareer(1, { name: 'Test Player', background: 'coach' })
+    const player = me(world)
+    getFirstJob(world, () => 'stability:2')
+    // Find a week in post with another club's job open, then make the human that club's chosen target.
+    let vacancy = openVacancies(world).find((v) => v.post.kind === 'home')
+    for (let i = 0; i < 60 && (!vacancy || player.status.kind !== 'employed'); i++) {
+      advanceWeek(world, {})
+      vacancy = openVacancies(world).find((v) => v.post.kind === 'home')
+    }
+    expect(player.status.kind).toBe('employed')
+    expect(vacancy).toBeDefined()
+    const rng = rngFromState(world.rng)
+    vacancy!.poachTargetId = player.id
+    vacancy!.shortlist = [player.id, ...vacancy!.shortlist.filter((id) => id !== player.id)]
+    expect(tryToFill(world, rng, vacancy!)).toBe('waiting')
+    const approach = pendingDecisions(world).find((d) => d.kind === 'approach' && d.payload['vacancyId'] === vacancy!.id)
+    expect(approach).toBeDefined()
+    resolveDecisions(world, rng, { [approach!.id]: 'decline' })
+    expect(player.status.kind).toBe('employed')
+    expect(world.human!.declinedVacancies).toContain(vacancy!.id)
+    expect(tryToFill(world, rng, vacancy!)).not.toBe('waiting')
+    expect(pendingDecisions(world).some((d) => d.kind === 'approach' && d.payload['vacancyId'] === vacancy!.id)).toBe(false)
   })
 
   it('applies defaults to unanswered decisions and gets through a season in post', () => {

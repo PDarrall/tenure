@@ -239,7 +239,11 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   moves 8% per year away from a two-year deal. Declining marks the
   vacancy and the club moves on.
 - An employed human may apply elsewhere; if the club calls, the usual
-  approach rules apply (buy-out or walk-out).
+  approach rules apply (buy-out or walk-out). Declining an approach is
+  recorded like declining an offer: the club works down its shortlist
+  and does not call the human again for that vacancy.
+- The career-over board message is one template per ending (voluntary,
+  no offers, age, scandal) with a generic line as fallback.
 - A human offered renewal may decline and leave when the contract ends,
   with nothing owed and no mark on the record.
 - Window plans are presets: spend, rebuild, youth first, sell a senior
