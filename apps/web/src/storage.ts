@@ -36,5 +36,6 @@ export function downloadText(filename: string, text: string): void {
   document.body.appendChild(a)
   a.click()
   a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  // Safari shows a confirmation before it reads the blob; revoking early leaves an empty download.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }

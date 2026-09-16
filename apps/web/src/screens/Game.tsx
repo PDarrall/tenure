@@ -74,6 +74,13 @@ export function Game({ session, onChange, onNextWeek, onExport, onImport, onRese
   const [tab, setTab] = useState<Tab>('inbox')
   const [weeksBack, setWeeksBack] = useState(0)
   const [confirm, setConfirm] = useState<'resign' | 'retire' | 'reset' | null>(null)
+  // Week-scoped state: a half-finished confirm or an unrolled inbox belongs to the week it was made in.
+  const [seenTurn, setSeenTurn] = useState(session.turn)
+  if (seenTurn !== session.turn) {
+    setSeenTurn(session.turn)
+    setWeeksBack(0)
+    setConfirm(null)
+  }
   const world = session.world
   const me = player(world)
   const decisions = pendingDecisions(world)
@@ -90,6 +97,7 @@ export function Game({ session, onChange, onNextWeek, onExport, onImport, onRese
             Next week
           </button>
           {session.inputs.resign && <span className="notice">You will resign this week.</span>}
+          {session.inputs.retire && <span className="notice">You will retire this week and the career will end.</span>}
         </p>
         {blocked.length > 0 && <p className="notice">Answer the starred decision{blocked.length > 1 ? 's' : ''} below before the week can move.</p>}
         {saveNote && <p className="muted">{saveNote}</p>}
@@ -223,7 +231,11 @@ function Controls({ session, onChange, confirm, setConfirm }: { session: Session
   const employed = me.status.kind === 'employed'
   const shape = session.inputs.shape ?? world.human!.shape
   const mentality = session.inputs.mentality ?? world.human!.mentality
-  const activity = session.inputs.activity ?? (me.status.kind === 'unemployed' ? me.status.activity : 'wait')
+  // When the monthly card is pending the buttons answer it, so the two controls never disagree.
+  const activityCard = pendingDecisions(world).find((d) => d.kind === 'activity')
+  const cardAnswer = activityCard ? (session.inputs.answers ?? {})[activityCard.id] : undefined
+  const activity = cardAnswer ?? session.inputs.activity ?? (me.status.kind === 'unemployed' ? me.status.activity : 'wait')
+  const chooseActivity = (a: UnemployedActivity) => onChange(activityCard ? withAnswer(session, activityCard.id, a) : withActivity(session, a))
   return (
     <section aria-label="Controls">
       {employed && (
@@ -252,7 +264,7 @@ function Controls({ session, onChange, confirm, setConfirm }: { session: Session
           <h3>This month</h3>
           <div className="row">
             {(['wait', 'punditry', 'assistant', 'abroad'] as UnemployedActivity[]).map((a) => (
-              <button key={a} className={activity === a ? 'selected' : ''} onClick={() => onChange(withActivity(session, a))} aria-pressed={activity === a}>
+              <button key={a} className={activity === a ? 'selected' : ''} onClick={() => chooseActivity(a)} aria-pressed={activity === a}>
                 <span>{a}</span>
               </button>
             ))}
@@ -274,9 +286,11 @@ function Controls({ session, onChange, confirm, setConfirm }: { session: Session
           ))}
         {confirm === 'retire' ? (
           <>
-            <button onClick={() => { onChange(withRetire(session)); setConfirm(null) }}>Yes, retire and bank the score</button>
+            <button onClick={() => { onChange(withRetire(session, true)); setConfirm(null) }}>Yes, retire and bank the score</button>
             <button onClick={() => setConfirm(null)}>Carry on</button>
           </>
+        ) : session.inputs.retire ? (
+          <button onClick={() => onChange(withRetire(session, false))}>Cancel retirement</button>
         ) : (
           <button onClick={() => setConfirm('retire')}>Retire</button>
         )}

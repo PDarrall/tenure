@@ -12,6 +12,8 @@ import {
   withAnswer,
   withApply,
   withMentality,
+  withResign,
+  withRetire,
   withShape,
   withWithdraw,
   type Session,
@@ -34,6 +36,20 @@ function untilOffer(s: Session): Session {
 }
 
 describe('the web controller', () => {
+  it('queues and cancels resignation and retirement without ending anything until the week moves', () => {
+    let s = newSession(1, 'Paul', 'coach')
+    s = withRetire(s, true)
+    expect(s.inputs.retire).toBe(true)
+    s = withRetire(s, false)
+    s = withResign(withResign(s, true), false)
+    expect(s.inputs.retire).toBe(false)
+    expect(s.inputs.resign).toBe(false)
+    s = nextWeek(s)
+    expect(me(s).status.kind).toBe('unemployed')
+    s = nextWeek(withRetire(s, true))
+    expect(me(s).status.kind).toBe('retired')
+  })
+
   it('starts a career and queues inputs without touching the world until the week advances', () => {
     let s = newSession(1, ' Paul ', 'ex-pro')
     expect(me(s).name).toBe('Paul')

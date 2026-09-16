@@ -7,6 +7,9 @@
 body {
   margin: 0;
   padding: 1rem;
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
   max-width: 44rem;
   margin-inline: auto;
 }
@@ -45,12 +48,12 @@ label { display: block; margin: 0.6rem 0 0.2rem; font-weight: 600; }
 .row { display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
 .tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; margin: 1rem 0; }
 .muted { opacity: 0.7; }
-.item { padding: 0.5rem 0; border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent); }
+.item { padding: 0.5rem 0; border-bottom: 1px solid rgba(128, 128, 128, 0.4); border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent); }
 .from { font-weight: 700; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; opacity: 0.7; }
 .decision { border: 2px solid currentColor; border-radius: 8px; padding: 0.75rem; margin: 0.75rem 0; }
 .decision.blocking { border-width: 3px; }
 table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
-td, th { padding: 0.35rem 0.4rem; text-align: right; border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
+td, th { padding: 0.35rem 0.4rem; text-align: right; border-bottom: 1px solid rgba(128, 128, 128, 0.3); border-bottom: 1px solid color-mix(in srgb, currentColor 15%, transparent); }
 td:first-child, th:first-child, td.name, th.name { text-align: left; }
 tr.me td { font-weight: 700; }
 .notice { padding: 0.6rem 0.8rem; border-left: 4px solid currentColor; margin: 0.5rem 0; }

@@ -7,7 +7,17 @@ const BACKGROUNDS: { key: Background; label: string; blurb: string }[] = [
   { key: 'analyst', label: 'Analyst', blurb: 'Deals and development; the dressing room will take convincing.' },
 ]
 
-export function NewCareer({ onStart, hasSave, onResume }: { onStart: (seed: number, name: string, background: Background) => void; hasSave: boolean; onResume: () => void }) {
+export type SaveState = 'none' | 'ok' | 'broken'
+
+interface Props {
+  onStart: (seed: number, name: string, background: Background) => void
+  save: SaveState
+  onResume: () => void
+  onExportBroken: () => void
+  onDiscard: () => void
+}
+
+export function NewCareer({ onStart, save, onResume, onExportBroken, onDiscard }: Props) {
   const [name, setName] = useState('')
   const [background, setBackground] = useState<Background>('coach')
   const [seed, setSeed] = useState(String(tunables.DEFAULT_SEED))
@@ -16,9 +26,15 @@ export function NewCareer({ onStart, hasSave, onResume }: { onStart: (seed: numb
     <main>
       <h1>Tenure</h1>
       <p>A football management game about surviving a career. You start with no record and no job.</p>
-      {hasSave && (
+      {save === 'ok' && (
         <p className="notice">
           There is a career in progress on this device. <button onClick={onResume}>Resume it</button>
+        </p>
+      )}
+      {save === 'broken' && (
+        <p className="notice">
+          There is a save on this device that could not be read. <button onClick={onExportBroken}>Export it as a file</button>{' '}
+          <button onClick={onDiscard}>Delete it</button>
         </p>
       )}
       <label htmlFor="name">Your name</label>

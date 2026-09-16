@@ -69,8 +69,8 @@ export function withResign(s: Session, resign: boolean): Session {
   return bump(s, { ...s.inputs, resign })
 }
 
-export function withRetire(s: Session): Session {
-  return bump(s, { ...s.inputs, retire: true })
+export function withRetire(s: Session, retire: boolean): Session {
+  return bump(s, { ...s.inputs, retire })
 }
 
 /** Is the human already applying (queued this week or lodged earlier) for a vacancy? */
