@@ -1,0 +1,17 @@
+{
+  "vacancies": ["{count} new vacancies this week: {list}.", "Jobs going: {list}."],
+  "shortlisted": ["You are on the shortlist at {club}. Sit tight; they will call if it goes further.", "{club} have you on their list."],
+  "missed_out": ["{club} have gone with someone else. Their loss, allegedly."],
+  "applied": ["Your name has gone in for {club}."],
+  "approach_taken": ["Done. You are the new manager of {club}; your old club got £{buyout}m for you."],
+  "walked_out": ["You have walked out to join {club}. That is a mark on the record, and the second would make you a mercenary."],
+  "approach_declined": ["You have turned {club} down. Your board have noticed, and approve."],
+  "payout": ["£{amount}m has landed in your account from the settlement."],
+  "months_out": ["{months} months out of work. {shortlistMonths} since anyone shortlisted you.", "Another month gone. {months} since the last job; {shortlistMonths} since a shortlist."],
+  "activity_wait": ["You are waiting for the right job."],
+  "activity_punditry": ["The television work keeps your name in circulation, and pays a little."],
+  "activity_assistant": ["You have taken an assistant's role. It stops the slide, but it is a step down and everyone knows it."],
+  "activity_abroad": ["You have told clubs abroad you are available."],
+  "default_taken": ["You let that one pass; your agent took the usual line: {key}."],
+  "clock": ["A word of warning: {monthsLeft} months more without a shortlist and the game is up."]
+}

@@ -1,0 +1,34 @@
+{
+  "home_win_big": [
+    "{home} swept {away} aside, {hg}-{ag}.",
+    "{home} ran riot against {away}: {hg}-{ag}.",
+    "A rout at home: {home} {hg}, {away} {ag}."
+  ],
+  "home_win": [
+    "{home} beat {away} {hg}-{ag}.",
+    "{home} edged past {away}, {hg}-{ag}.",
+    "{home} took the points against {away}, {hg}-{ag}."
+  ],
+  "away_win_big": [
+    "{away} won at a canter, {ag}-{hg} at {home}.",
+    "{away} embarrassed {home} on their own ground, {hg}-{ag}.",
+    "{home} were taken apart by {away}: {hg}-{ag}."
+  ],
+  "away_win": [
+    "{away} won {ag}-{hg} at {home}.",
+    "{away} left {home} with the points after a {hg}-{ag} win.",
+    "{home} fell {hg}-{ag} to {away}."
+  ],
+  "draw_goalless": [
+    "{home} and {away} played out a goalless draw.",
+    "Nothing to separate {home} and {away}: 0-0."
+  ],
+  "draw": [
+    "{home} and {away} shared the points, {hg}-{ag}.",
+    "Honours even between {home} and {away} at {hg}-{ag}."
+  ],
+  "shootout": [
+    "{winner} beat {loser} on penalties after a {hg}-{ag} draw.",
+    "{loser} went out on penalties to {winner}, {hg}-{ag} after normal time."
+  ]
+}

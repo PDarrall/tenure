@@ -1,0 +1,14 @@
+{
+  "window": [
+    "Window closed: £{spend}m spent, the squad is up {gain} points, {turnoverPct}% of the XI is new{youthNote}.",
+    "The window is done. Spend £{spend}m, gain {gain}, turnover {turnoverPct}%{youthNote}."
+  ],
+  "window_sold": ["You sold {sold} senior player{soldPlural} for £{cash}m. The squad is thinner, and more yours."],
+  "summer": [
+    "Pre-season report: the squad aged a year ({ageing} for age), drifted {gravity} toward its natural level, and the academy added {youthReleased}. Strength now {strength}.",
+    "Pre-season: age {ageing}, gravity {gravity}, academy {youthReleased}. Squad strength {strength}."
+  ],
+  "fallout": ["A senior player has gone to the press about you. The dressing room is watching how you respond."],
+  "fallout_sold": ["He is gone. The squad is weaker and quieter, and more yours."],
+  "fallout_backed_down": ["You backed down. The squad noticed."]
+}

@@ -1,0 +1,9 @@
+{
+  "season_end": ["Season {season} is over. Tier 1 champions: {champion}."],
+  "sacked": ["{manager} has been sacked by {club} (tier {tier})."],
+  "poached": ["{manager} has left {from} for {to}."],
+  "trophy": ["{club} have won the {competition}."],
+  "promotion": ["{club} are promoted to tier {toTier}."],
+  "relegation": ["{club} are relegated to tier {toTier}."],
+  "takeover": ["{club} have been taken over."]
+}

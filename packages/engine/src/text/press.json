@@ -1,0 +1,20 @@
+{
+  "win": [
+    "A good day for {club}. Is this the turning point, or one result?",
+    "Three points. Your critics are quiet this week; do you expect them to stay that way?"
+  ],
+  "draw": [
+    "A point for {club}. Was that two dropped or one gained?",
+    "Honours even. Are you satisfied with a draw, given where you are?"
+  ],
+  "loss": [
+    "A defeat for {club}. Where does that leave you with the board?",
+    "Another loss. Do you still have the dressing room?"
+  ],
+  "streak": [
+    "That is {defeats} defeats in a row. Is your position under threat?",
+    "{defeats} straight losses. Do you understand why supporters are asking questions?"
+  ],
+  "tag": ["The press have started calling you a {tag}. It will follow you into every interview."],
+  "tag_expired": ["Nobody calls you a {tag} any more."]
+}

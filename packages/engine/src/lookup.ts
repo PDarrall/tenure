@@ -1,0 +1,60 @@
+import type { Club, ClubId, ForeignClub, Manager, ManagerId, Post, Spell, SpellId, World } from './types.js'
+
+/** Ids are sequential from 1 and never removed, so position is id − 1. */
+export function clubById(world: World, id: ClubId): Club {
+  const club = world.clubs[id - 1]
+  if (club && club.id === id) return club
+  const found = world.clubs.find((c) => c.id === id)
+  if (!found) throw new Error(`no home club ${id}`)
+  return found
+}
+
+export function homeClub(world: World, id: ClubId): Club | undefined {
+  const club = world.clubs[id - 1]
+  if (club && club.id === id) return club
+  return world.clubs.find((c) => c.id === id)
+}
+
+export function foreignClubById(world: World, id: ClubId): ForeignClub | undefined {
+  for (const league of world.foreign) {
+    const club = league.clubs.find((c) => c.id === id)
+    if (club) return club
+  }
+  return undefined
+}
+
+export function managerById(world: World, id: ManagerId): Manager {
+  const manager = world.managers[id - 1]
+  if (manager && manager.id === id) return manager
+  const found = world.managers.find((m) => m.id === id)
+  if (!found) throw new Error(`no manager ${id}`)
+  return found
+}
+
+export function spellById(world: World, id: SpellId): Spell {
+  const spell = world.spells[id - 1]
+  if (spell && spell.id === id) return spell
+  const found = world.spells.find((s) => s.id === id)
+  if (!found) throw new Error(`no spell ${id}`)
+  return found
+}
+
+/** The manager's live spell, if employed. */
+export function spellOf(world: World, manager: Manager): Spell | undefined {
+  if (manager.status.kind !== 'employed') return undefined
+  return spellById(world, manager.status.spellId)
+}
+
+/** The manager at a home club, if any. */
+export function managerAt(world: World, club: Club): Manager | undefined {
+  return club.managerId === null ? undefined : managerById(world, club.managerId)
+}
+
+export function postClubName(world: World, post: Post): string {
+  if (post.kind === 'home') return clubById(world, post.clubId).name
+  return foreignClubById(world, post.clubId)?.name ?? `Club ${post.clubId}`
+}
+
+export function samePost(a: Post, b: Post): boolean {
+  return a.kind === b.kind && a.clubId === b.clubId
+}

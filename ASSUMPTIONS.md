@@ -1,0 +1,252 @@
+# Assumptions
+
+Where DESIGN.md is ambiguous the engine takes the simplest reading. Each
+reading is listed here, by system, so it can be challenged. CLAUDE.md asks for
+these in the PR description; phase 1 is built as one commit per system on a
+single branch, so they live here instead.
+
+## Scaffold
+
+- The design documents were renamed to `CLAUDE.md` and `DESIGN.md` (uppercase)
+  so that tooling finds them.
+- Phase 1 is delivered as one commit per system on one branch, as agreed,
+  rather than one pull request per system.
+- `population.test.ts` runs in its own CI job that is allowed to fail until
+  the model is tuned. Every other test blocks.
+- The RNG is xoshiro128** seeded via splitmix32. Its state is four unsigned
+  32-bit integers stored inside the world state, so a saved game resumes on
+  exactly the same sequence.
+
+## World gen
+
+- Tier 5 ("non-league pool") is a real 24-club division simulated like
+  the others, so it is the bottom of the pyramid with no relegation out.
+- Foreign leagues are lists of named job slots with a prestige and a
+  strength, not simulated teams.
+- Rivals are drawn within one of twelve fictional regions, up to two per
+  club, symmetric.
+
+## Managers
+
+- Foreign club slots are filled from the same 400-strong pool, so
+  vacancies abroad arise the same way as at home.
+- "Coach starts with no name" is a reputation offset; "ex-pro" gets a
+  small positive one.
+- Entrants' reputation is capped so that nobody qualifies above tier 4 on
+  day one, matching "you start with no record".
+- Elite clubs are the six highest-prestige tier-1 clubs at the moment of
+  the check.
+
+## Season sim
+
+- A season is 40 match weeks plus 6 summer weeks. Every tier shares the
+  weeks; tier 1 plays 38 rounds with two blank weeks, tiers 2–5 play 46
+  rounds with six double weeks, and cup ties land on top, so a club can
+  play two or three matches in a week.
+- Three up, three down at every tier boundary, no play-offs. Nothing is
+  relegated out of tier 5.
+- Cups are single-leg knockouts with random draws and byes in the first
+  round; level ties go to a shoot-out weighted by strength. Every club
+  enters the national cup in round one.
+- The European competition is a 32-club knockout: five home clubs (top
+  four of tier 1 plus the cup winner, or fifth place) and 27 foreign
+  clubs picked by strength. Foreign leagues are settled once a season by
+  ranking strength, manager ability and noise; a season abroad counts as
+  34 games.
+- Goals are Poisson from an expected-goals figure driven by the strength
+  gap, form, morale and tactical ability; expected points come from the
+  same distribution, so credit is judged against the model's own odds.
+- Attack and defend mentalities scale both sides' expected goals up or
+  down (variance only); the AI attacks weaker sides and defends against
+  stronger ones. Each manager has a fixed preferred shape.
+- Summer: academy gains from last summer are released, the squad ages a
+  year, ageing squads lose 3–5 and young ones gain 1, strength gravitates
+  toward the wealth target, then the window spends the whole budget with
+  diminishing returns and churns the first XI. The winter pot is 30% of
+  the normal budget. Net spend is ranked within the division as played.
+- Match summaries are stored as a template key on the event and rendered
+  on demand from text/match.json; rendering never draws from the RNG.
+
+## Tenure
+
+- Genesis incumbents have already served 0–4 seasons (staleness applies)
+  and hold 1–3 years of contract; their ownership is 0.35 per season served.
+- A contract signed mid-season counts that season as its first year; one
+  signed in the summer starts with the season about to begin. Contracts end
+  on the season-end week. Payout is salary × weeks left / season weeks.
+- "Deserved" means the manager has spent eight or more weeks of the spell
+  below the threshold, counted cumulatively rather than consecutively, at
+  the moment of sacking, or has collapsed to the instant-sack line (credit
+  5). Takeover replacements are always unjust.
+- The board rolls every week, including summer weeks.
+- Expectation: beating or meeting the target sets next target = finish;
+  missing it eases the target one place, but never past the structural
+  target and never tighter. A promoted or relegated club restarts from the
+  structural target plus ambition. The structural target is the squad's
+  strength rank after the summer window.
+- The ceiling is 100 for seasons one to three and 90 for season four; the
+  credit clamp to a lowered ceiling is applied after the summer window, so
+  a big turnover that resets the ceiling keeps the credit.
+- "Beat a top-three side" reads the opponent's position at kick-off. Monthly rolls (shocks, gap check, mutual consent) happen every
+  four match weeks and not in the summer.
+- Trophies count for credit and reputation only for the spell they were
+  won in (honours record the club).
+- The season-end reputation move (±2 per place, clamped ±8) is measured
+  against the structural expectation, the squad's strength rank, rather
+  than the board's ratcheting target. Credit uses the board's target.
+  Measured against the board's target the whole population's reputation
+  drained by about two places a season.
+- Blame applies while fewer than two seasons of the spell are complete.
+- Cup ties: points are 3 for the winner (shoot-outs included) and 0 for
+  the loser; expected points fold the shoot-out into the win chance.
+- "Beat a top-three side" reads the opponent's current position in its own
+  division. "Derby" means the opponent is in the club's rivals list.
+- A financial crisis multiplies the next summer budget by 0.6 and the
+  multiplier returns to the promise level after that window.
+- Fallout triggers once per losing run of four; the AI sells the player
+  when its motivation ability is below 50, else backs down (morale −10).
+  Both count toward "difficult".
+- Board rows: 5% a month while credit is within 10 of the threshold, −3.
+- AI takes mutual consent 30% of the months it is offered, and resigns
+  2% of months while below the threshold.
+- Spells abroad only move credit at season end (no match-by-match play)
+  and see no shocks.
+- Abroad, "ambition" is 0.5 for the expectation formula.
+- Salary accrues weekly as a raw float; only displayed figures are rounded.
+
+## Market
+
+- A vacancy opens the week a post empties, the shortlist is drawn a week
+  later, and the hire is attempted the week after. Unfilled searches widen
+  by one reputation band a week from the third week.
+- "Band covers its tier" is read as: the manager's band is at or above the
+  club's band. AI managers apply no lower than one band below their own
+  until a year out of work; foreign posts are open to that league's
+  nationals and to managers who chose "abroad".
+- "A bigger club calls" is an event: a quarter of vacancies approach the
+  single best-fitting employed manager at a club at least 10 prestige
+  points smaller who has been in post at least a season; the AI accepts
+  70% of calls. If the hiring club cannot
+  pay the buy-out (over half its wage budget) the manager must walk out,
+  which the AI only does for a much bigger club.
+- Salary is tier × reputation, scaled down 8% per contract year beyond
+  two (and up for one-year deals). The AI takes the years offered and
+  promises promotion when the squad ranks top four in tiers 2–5,
+  stability when it ranks in the bottom four, top-half otherwise.
+- The AI's unemployed activity: wait; punditry after six months if
+  reputation ≥ 40; assistant after twelve months if reputation < 40;
+  abroad after nine months with a 30% monthly chance if its band covers a
+  foreign league.
+- Punditry pays £10k a month, an assistant role £30k; both count toward
+  career earnings. Waiting scores zero.
+- Careers end after 24 months without a shortlist (also for entrants who
+  never had a job, who are excluded from validation), at 72, on a scandal
+  (0.05% a month), or when an AI manager over 60 chooses to retire
+  (5% + 3% a year over 60, doubled when unemployed).
+- Tags are reviewed at season end from season records with the windows
+  in DESIGN.md; each expires a fixed number of seasons after it was last
+  earned (see TAG_RULES). "Loyal" counts declined approaches as a season.
+- The working population is topped up to 400 with new entrants each
+  summer.
+
+## Scoring
+
+- Trophy points are banked the moment the trophy is won by the manager in
+  post, so a sacking later in the season does not cost them.
+- Promotion points go to the manager in post at season end; a champion
+  gets the title points, not the promotion points.
+- Bonuses are a share of the season's salary: 25% for a trophy, 50% for a
+  promotion. They count toward career earnings.
+- The Legacy weights are checked against two fixture careers (1,260 games,
+  £35m, 30 points versus 600 games, £45m, 900 points) rather than drawn
+  from the simulation.
+
+## Validation
+
+- A tracked career belongs to a manager whose first spell began after
+  genesis. `sim --careers N` follows the first N such managers to the end
+  of their careers (bounded by the age limit), so no career is censored.
+- Career length is the calendar span from first hire to the end of the
+  career, unemployment included, which is what makes "10% reach 20
+  seasons" and "a handful pass 1,000 games" consistent. Seasons employed
+  is reported alongside. "Clubs" is the number of spells.
+- Spells abroad get a monthly credit move drawn from normal(−1.5, 6) in
+  place of match-by-match credit, so a job abroad carries a similar
+  hazard to one at home.
+- "Inside a season" means the first spell lasted fewer than 46 weeks.
+- "Unjust" means credit had been below the threshold for fewer than eight
+  weeks of the spell at the sacking, or the sacking followed a takeover;
+  the share is over every sacking in the run, not only tracked careers.
+- Top-tier long tenures are counted at every season end from season nine,
+  at the clubs then in tier 1, and the reported figure is the mean.
+- "A handful" past 1,000 games is read as 2 to 15 of 500.
+
+## Tuning (phase 1)
+
+Values were chosen by sweeping seeds 1 to 3 and confirmed on seeds 1 to 5
+with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
+
+- Credit no longer drifts: the loss weighting is 1.0 (DESIGN started at
+  1.5). With any drift every top-tier manager eroded to the threshold in
+  about three seasons and no five-year tenure existed. Variance still
+  ends spells; k is 2.5.
+- A collapse to the instant-sack line (now credit 8) counts as deserved.
+- Blame protection lasts one season at 0.85 + 0.15 × ownership. At the
+  DESIGN's two seasons of 0.5 + 0.5 × ownership first spells were the
+  longest spells in the game.
+- Mutual consent is accepted by the AI 5% of the months it is offered.
+  At 30% it removed most long-suffering managers before eight weeks
+  below the threshold, so nearly every remaining sacking read as unjust.
+- Erratic owners are 5% of clubs and patient ones 30%; takeover
+  replacements happen 25% of the time and 1.5× as often at poor clubs.
+- The squad model's equilibrium is about 8 points above the wealth
+  level (gravity 0.5, slope 0.85, spend gain 6). Before, summer spending
+  outran gravity and every rich club sat at the 100 cap, which made
+  titles a lottery.
+- Manager ability moves strength by ±8 (was ±4), so good managers last
+  and bad ones fail.
+- Hiring: a quarter of vacancies became a tenth calling an employed
+  manager, who accepts half the time; shortlist randomness is 0.4; AI
+  managers rest nine months after losing a job and never apply below
+  one band under their own; AI managers start considering retirement
+  at 55.
+- Not reached: "median career across three or four clubs". With 40–50%
+  of managers never getting a second job, a median of three clubs would
+  need almost nobody to stop at exactly two, which no reading of the
+  rules produced. The median is two clubs on every seed. The
+  20-season share sits at the top of its band (12–14% by seed).
+
+## Play (phase 2)
+
+- The human enters as an ordinary entrant: unemployed, entry reputation,
+  chosen name and background. They are one of the 400 and the AI treats
+  them like any other manager except where a decision is theirs.
+- Decisions are queued by the engine with options and a default, and
+  answered from the next turn's inputs. Unanswered decisions take their
+  default after one week. Blocking decisions (offers, approaches, mutual
+  consent, renewals, fallouts, window plans) hold the club for a week;
+  press and board questions and the monthly activity choice do not.
+- Applying is an active act: a qualifying application by the human makes
+  the shortlist with a 30% chance, and a shortlisted human interviews
+  first. Scored like the AI, a novice ranked around 100th of 180
+  applicants for every non-league vacancy and never got a first job.
+- At interview the human picks a promise and a contract length; salary
+  moves 8% per year away from a two-year deal. Declining marks the
+  vacancy and the club moves on.
+- An employed human may apply elsewhere; if the club calls, the usual
+  approach rules apply (buy-out or walk-out).
+- A human offered renewal may decline and leave when the contract ends,
+  with nothing owed and no mark on the record.
+- Window plans are presets: spend, rebuild, youth first, sell a senior
+  player, hold. Selling raises cash worth 40% of the normal budget per
+  player and costs 3 strength.
+- Press responses: confident +2 morale, measured nothing, defiant −2
+  morale and +1 credit. Board responses when uneasy: accept nothing,
+  push back a coin flip of ±3 credit, promise +3 credit and a target one
+  place harder. DESIGN names these controls without effects; these are
+  the smallest ones that matter.
+- The board's mood is shown in words derived from credit against the
+  threshold; the number itself is never shown.
+- In a career the log keeps only events that concern the human plus the
+  news (hires, sackings, trophies, promotions, vacancies), so saves stay
+  small. Every state change is still emitted.
