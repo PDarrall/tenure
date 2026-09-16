@@ -12,7 +12,9 @@
     "test:validation": "vitest run --passWithNoTests packages/engine/test/population.test.ts",
     "typecheck": "pnpm -r typecheck",
     "sim": "tsx packages/cli/src/sim.ts",
-    "play": "tsx packages/cli/src/play.ts"
+    "play": "tsx packages/cli/src/play.ts",
+    "web:dev": "pnpm --filter @tenure/web dev",
+    "web:build": "pnpm --filter @tenure/web build"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

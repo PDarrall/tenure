@@ -274,8 +274,13 @@ export function applyAnswer(world: World, rng: Rng, decision: Decision, rawKey: 
       const vacancy = world.vacancies[(decision.payload['vacancyId'] as number) - 1]
       const spell = spellOf(world, manager)
       if (!vacancy || !spell) break
-      if (key === 'accept' && vacancy.filledWeek === null) acceptApproach(world, rng, manager, vacancy, decision.payload['buyoutPaid'] === true)
-      else declineApproach(world, spell, vacancy)
+      if (key === 'accept' && vacancy.filledWeek === null) {
+        acceptApproach(world, rng, manager, vacancy, decision.payload['buyoutPaid'] === true)
+        break
+      }
+      // Recorded like a declined offer so the club works down its shortlist instead of calling again next week.
+      state.declinedVacancies.push(vacancy.id)
+      declineApproach(world, spell, vacancy)
       break
     }
     case 'mutualConsent': {

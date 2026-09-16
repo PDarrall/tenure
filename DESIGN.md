@@ -155,9 +155,9 @@ These are starting targets from memory, to verify against the LMA's end-of-seaso
 
 0. This document. CLAUDE.md. Repo.
 1. Engine (TypeScript, pure, seeded): world gen, managers, tenure, career, market, season sim. CLI: `sim --careers 500` prints the validation stats. Tune until they pass.
-2. Terminal play: same engine, one human manager, inbox in text. Play it. If "one more season" doesn't happen, fix the model, not the UI.
+2. Browser play: same engine, one human manager, the inbox as plain unstyled HTML, deployed to GitHub Pages. Play it in Safari. If "one more season" doesn't happen, fix the model, not the UI.
 3. Claude Design: inbox, job market, contract talks, career page, obituary. Restraint; typographic; no dashboards.
-4. Web app: engine package plus React shell, JSON saves, shareable career page.
+4. Web app: the designed shell replaces the phase-2 scaffold; JSON saves, shareable career page.
 5. Depth: players and transfers (the CM layer), tactics, commentary, foreign leagues simulated.
 6. Meta: Hall of Fame across careers, obituary generated from the event log, shared leaderboard.
 

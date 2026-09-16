@@ -18,6 +18,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test:core
+      - run: pnpm web:build
 
   validation:
     # The population targets in DESIGN.md are asserted by
