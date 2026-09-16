@@ -178,3 +178,35 @@ describe('a human career', () => {
     expect(career.log.some((e) => e.type === 'season.end')).toBe(true)
   })
 })
+
+describe('the inbox', () => {
+  it('renders every week of a scripted career from templates with nothing left unresolved', async () => {
+    const { inbox } = await import('../src/play/inbox.js')
+    const world = createCareer(1, { name: 'Test Player', background: 'coach' })
+    const player = me(world)
+    const froms = new Set<string>()
+    let items = 0
+    for (let week = 0; week < 3 * T.SEASON_WEEKS && player.status.kind !== 'retired'; week++) {
+      const answers: Record<number, string> = {}
+      for (const d of pendingDecisions(world)) answers[d.id] = d.kind === 'offer' ? 'top-half:2' : d.options[0]!.key
+      const apply = openVacancies(world)
+        .filter((v) => v.post.kind === 'home' && qualifies(world, player, v) && !v.applicants.includes(player.id))
+        .map((v) => v.id)
+      advanceWeek(world, { apply, answers })
+      for (const item of inbox(world, world.week - 1, world.week)) {
+        items++
+        froms.add(item.from)
+        expect(item.text, item.text).not.toMatch(/\{\w+\}/)
+        expect(item.text, item.text).not.toMatch(/^\[\w+\.\w+\]/)
+        expect(item.text.length).toBeGreaterThan(10)
+      }
+    }
+    expect(items).toBeGreaterThan(100)
+    expect(froms.has('agent')).toBe(true)
+    expect(froms.has('news')).toBe(true)
+    if (player.history.spellIds.length > 0) {
+      expect(froms.has('match')).toBe(true)
+      expect(froms.has('board')).toBe(true)
+    }
+  })
+})

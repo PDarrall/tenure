@@ -1,9 +1,30 @@
 import matchTemplates from './match.json'
+import boardTemplates from './board.json'
+import pressTemplates from './press.json'
+import agentTemplates from './agent.json'
+import staffTemplates from './staff.json'
+import newsTemplates from './news.json'
 import type { Event, World } from '../types.js'
 
 type Templates = Record<string, string[]>
 
 const templates: Templates = matchTemplates
+
+export type Bank = 'board' | 'press' | 'agent' | 'staff' | 'news'
+const banks: Record<Bank, Templates> = {
+  board: boardTemplates,
+  press: pressTemplates,
+  agent: agentTemplates,
+  staff: staffTemplates,
+  news: newsTemplates,
+}
+
+/** Render a template from a bank; the variant is a function of `salt`, never of the RNG. */
+export function renderText(bank: Bank, key: string, vars: Record<string, string | number>, salt: number): string {
+  const options = banks[bank][key]
+  if (!options || options.length === 0) return `[${bank}.${key}]`
+  return fill(options[Math.abs(salt) % options.length] as string, vars)
+}
 
 export function matchTemplateKey(homeGoals: number, awayGoals: number, shootout: boolean): string {
   if (shootout) return 'shootout'

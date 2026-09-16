@@ -59,6 +59,7 @@ export function afterMatches(world: World, rng: Rng, played: PlayedFixture[]): v
   const spell = spellOf(world, player)
   if (!spell || spell.post.kind !== 'home') return
   const own = played.filter((p) => p.fixture.homeId === spell.post.clubId || p.fixture.awayId === spell.post.clubId)
+  for (const p of own) p.event.payload['positionAfter'] = positionOf(world, spell.post.clubId)
   const last = own[own.length - 1]
   if (!last || hasPending(world, 'press')) return
   if (rng.chance(T.PRESS_QUESTION_P)) {

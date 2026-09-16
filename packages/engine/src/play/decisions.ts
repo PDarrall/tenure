@@ -17,6 +17,7 @@ import { resolveFallout } from '../tenure/shocks.js'
 import { salaryForYears } from '../market/vacancies.js'
 import { acceptApproach, declineApproach, hire } from '../market/hiring.js'
 import { setActivity } from '../market/unemployment.js'
+import { renderText } from '../text/render.js'
 
 export function human(world: World): Manager {
   if (!world.human) throw new Error('no human in this world')
@@ -197,11 +198,13 @@ export function queueWindow(world: World, summer: boolean, budget: number): Deci
 }
 
 export function queuePress(world: World, spell: Spell, templateKey: string): Decision {
+  const club = spell.post.kind === 'home' ? clubById(world, spell.post.clubId).name : 'the club'
+  const body = renderText('press', templateKey.split(':')[0] ?? 'draw', { club, defeats: spell.consecutiveDefeats }, world.week)
   return queueDecision(world, {
     kind: 'press',
     from: 'press',
     title: 'The press want a word',
-    body: templateKey,
+    body,
     options: [
       { key: 'confident', label: 'Confident' },
       { key: 'measured', label: 'Measured' },
