@@ -9,6 +9,7 @@ import { endSpell, remainingValue, salaryFor, startSpell } from '../tenure/spell
 import { addCredit } from '../tenure/credit.js'
 import type { Manager, Promise, Spell, Vacancy, World } from '../types.js'
 import { salaryForYears } from './vacancies.js'
+import { poachable } from './shortlist.js'
 import { assignTag } from './tags.js'
 import { hasPending, queueApproach, queueOffer } from '../play/decisions.js'
 
@@ -149,8 +150,8 @@ export function tryToFill(world: World, rng: Rng, vacancy: Vacancy): FillOutcome
       return 'waiting'
     }
     if (manager.status.kind === 'employed') {
-      // Only the chosen target is called; anyone hired elsewhere since the draw is simply gone.
-      if (manager.id !== vacancy.poachTargetId) continue
+      // Only the chosen target is called, and only if still poachable: a target who moved since the draw is gone.
+      if (manager.id !== vacancy.poachTargetId || !poachable(world, manager, vacancy)) continue
       if (approach(world, rng, manager, vacancy) !== 'accepted') continue
       return 'filled'
     }
