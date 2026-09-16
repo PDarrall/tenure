@@ -42,7 +42,8 @@ single branch, so they live here instead.
 - A season is 40 match weeks plus 6 summer weeks. Every tier shares the
   weeks; tier 1 plays 38 rounds with two blank weeks, tiers 2–5 play 46
   rounds with six double weeks, and cup ties land on top, so a club can
-  play two or three matches in a week.
+  play two or three matches in a week. (DESIGN.md v0.2 § Turn structure
+  makes each of those matches its own turn; see Match layer below.)
 - Three up, three down at every tier boundary, no play-offs. Nothing is
   relegated out of tier 5.
 - Cups are single-leg knockouts with random draws and byes in the first
@@ -56,9 +57,14 @@ single branch, so they live here instead.
 - Goals are Poisson from an expected-goals figure driven by the strength
   gap, form, morale and tactical ability; expected points come from the
   same distribution, so credit is judged against the model's own odds.
+  (Stands until phase 3(c): DESIGN.md § Match replaces it with the minute
+  engine and a fast path calibrated from it.)
 - Attack and defend mentalities scale both sides' expected goals up or
   down (variance only); the AI attacks weaker sides and defends against
-  stronger ones. Each manager has a fixed preferred shape.
+  stronger ones. Each manager has a fixed preferred shape. (Settled from
+  phase 3(b): DESIGN.md § Formations gives every AI manager a preferred
+  formation and a fallback, and has mentality shift the bands and the
+  pressure lean.)
 - Summer: academy gains from last summer are released, the squad ages a
   year, ageing squads lose 3–5 and young ones gain 1, strength gravitates
   toward the wealth target, then the window spends the whole budget with
@@ -142,7 +148,11 @@ single branch, so they live here instead.
 - Careers end after 24 months without a shortlist (also for entrants who
   never had a job, who are excluded from validation), at 72, on a scandal
   (0.05% a month), or when an AI manager over 60 chooses to retire
-  (5% + 3% a year over 60, doubled when unemployed).
+  (5% + 3% a year over 60, doubled when unemployed). (The cap is settled:
+  DESIGN.md § Age makes the season a manager turns 72 their last. The
+  AI retirement odds remain an assumption; § Age's shortlist penalty,
+  shorter contracts with age and the agent's prompt from 65 are not yet
+  in the code.)
 - Tags are reviewed at season end from season records with the windows
   in DESIGN.md; each expires a fixed number of seasons after it was last
   earned (see TAG_RULES). "Loyal" counts declined approaches as a season.
