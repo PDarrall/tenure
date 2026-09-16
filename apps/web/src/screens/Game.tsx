@@ -1,19 +1,22 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import {
   boardMood,
   careerSummary,
   clubNameOf,
   competitionName,
-  inbox,
+  inboxSince,
+  nextFixture,
   openVacancies,
   ordinal,
   pendingDecisions,
   qualifies,
+  seasonFixtures,
   seasonWeek,
   spellOf,
   tableFor,
   tunables,
   type Decision,
+  type FixtureView,
   type Manager,
   type Mentality,
   type Shape,
@@ -26,6 +29,7 @@ import {
   blockingUnanswered,
   canAdvance,
   isApplying,
+  markFor,
   withActivity,
   withAnswer,
   withApply,
@@ -37,12 +41,12 @@ import {
   type Session,
 } from '../controller.js'
 
-type Tab = 'inbox' | 'vacancies' | 'table' | 'career'
+type Tab = 'inbox' | 'fixtures' | 'vacancies' | 'career'
 
 interface Props {
   session: Session
   onChange: (s: Session) => void
-  onNextWeek: () => void
+  onContinue: () => void
   onExport: () => void
   onImport: (file: File) => void
   onReset: () => void
@@ -70,15 +74,19 @@ function vacancyWhere(world: World, v: Vacancy): string {
   return v.post.kind === 'home' ? `tier ${world.clubs[v.post.clubId - 1]?.tier ?? '?'}` : `${v.post.league} league abroad`
 }
 
-export function Game({ session, onChange, onNextWeek, onExport, onImport, onReset, saveNote }: Props) {
+function weekLabel(sw: number): string {
+  return sw < tunables.MATCH_WEEKS ? `week ${sw + 1}` : `summer week ${sw - tunables.MATCH_WEEKS + 1}`
+}
+
+export function Game({ session, onChange, onContinue, onExport, onImport, onReset, saveNote }: Props) {
   const [tab, setTab] = useState<Tab>('inbox')
-  const [weeksBack, setWeeksBack] = useState(0)
+  const [turnsBack, setTurnsBack] = useState(0)
   const [confirm, setConfirm] = useState<'resign' | 'retire' | 'reset' | null>(null)
-  // Week-scoped state: a half-finished confirm or an unrolled inbox belongs to the week it was made in.
+  // Turn-scoped state: a half-finished confirm or an unrolled inbox belongs to the turn it was made in.
   const [seenTurn, setSeenTurn] = useState(session.turn)
   if (seenTurn !== session.turn) {
     setSeenTurn(session.turn)
-    setWeeksBack(0)
+    setTurnsBack(0)
     setConfirm(null)
   }
   const world = session.world
@@ -91,15 +99,17 @@ export function Game({ session, onChange, onNextWeek, onExport, onImport, onRese
     <main>
       <Header session={session} />
 
-      <section aria-label="This week">
+      <NextFixtureCard world={world} />
+
+      <section aria-label="This turn">
         <p>
-          <button className="primary" disabled={!canAdvance(session)} onClick={onNextWeek}>
-            Next week
+          <button className="primary" disabled={!canAdvance(session)} onClick={onContinue}>
+            Continue
           </button>
-          {session.inputs.resign && <span className="notice">You will resign this week.</span>}
-          {session.inputs.retire && <span className="notice">You will retire this week and the career will end.</span>}
+          {session.inputs.resign && <span className="notice">You will resign this turn.</span>}
+          {session.inputs.retire && <span className="notice">You will retire this turn and the career will end.</span>}
         </p>
-        {blocked.length > 0 && <p className="notice">Answer the starred decision{blocked.length > 1 ? 's' : ''} below before the week can move.</p>}
+        {blocked.length > 0 && <p className="notice">Answer the starred decision{blocked.length > 1 ? 's' : ''} below before the game can move.</p>}
         {saveNote && <p className="muted">{saveNote}</p>}
       </section>
 
@@ -115,21 +125,26 @@ export function Game({ session, onChange, onNextWeek, onExport, onImport, onRese
       <Controls session={session} onChange={onChange} confirm={confirm} setConfirm={setConfirm} />
 
       <nav className="tabs" aria-label="Sections">
-        {(['inbox', 'vacancies', 'table', 'career'] as Tab[]).map((t) => (
+        {(['inbox', 'fixtures', 'vacancies', 'career'] as Tab[]).map((t) => (
           <button key={t} className={tab === t ? 'selected' : ''} onClick={() => setTab(t)} aria-pressed={tab === t}>
-            <span>{t === 'inbox' ? 'Inbox' : t === 'vacancies' ? `Vacancies (${openVacancies(world).length})` : t === 'table' ? 'Table' : 'Career'}</span>
+            <span>{t === 'inbox' ? 'Inbox' : t === 'fixtures' ? 'Fixtures & table' : t === 'vacancies' ? `Vacancies (${openVacancies(world).length})` : 'Career'}</span>
           </button>
         ))}
       </nav>
 
-      {tab === 'inbox' && <Inbox session={session} weeksBack={weeksBack} onEarlier={() => setWeeksBack(weeksBack + 1)} />}
+      {tab === 'inbox' && <Inbox session={session} turnsBack={turnsBack} onEarlier={() => setTurnsBack(turnsBack + 1)} />}
+      {tab === 'fixtures' && (
+        <>
+          <Fixtures world={world} />
+          <Table world={world} me={me} />
+        </>
+      )}
       {tab === 'vacancies' && <Vacancies session={session} onChange={onChange} />}
-      {tab === 'table' && <Table world={world} me={me} />}
       {tab === 'career' && <Career world={world} />}
 
       <section aria-label="Save">
         <h2>Save</h2>
-        <p className="muted">The game saves itself on this device every week. Export a file to keep it or move it.</p>
+        <p className="muted">The game saves itself on this device every turn. Export a file to keep it or move it.</p>
         <div className="row">
           <button onClick={onExport}>Export save</button>
           <label style={{ display: 'inline', margin: 0 }}>
@@ -165,7 +180,6 @@ function Header({ session }: { session: Session }) {
   const world = session.world
   const me = player(world)
   const sw = seasonWeek(world.week)
-  const phase = sw < tunables.MATCH_WEEKS ? `week ${sw + 1} of ${tunables.MATCH_WEEKS}` : `summer week ${sw - tunables.MATCH_WEEKS + 1}`
   const score = careerSummary(world).score
   const spell = spellOf(world, me)
   let line: string
@@ -188,13 +202,65 @@ function Header({ session }: { session: Session }) {
         {me.name}, {me.age}
       </h1>
       <p>
-        Season {world.season}, {phase}.
+        Season {world.season}, {weekLabel(sw)}.
       </p>
       <p>
         <strong>{score.games}</strong> games · <strong>£{score.earnings}m</strong> · <strong>{score.trophyPoints}</strong> trophy points · Legacy <strong>{score.legacy}</strong>
       </p>
       <p>{line}</p>
     </header>
+  )
+}
+
+function formText(form: readonly string[]): string {
+  return form.length ? form.join(' ') : 'no games yet'
+}
+
+/** Always on screen: what Continue plays next (DESIGN.md "Fixtures"). */
+function NextFixtureCard({ world }: { world: World }) {
+  const me = player(world)
+  const sw = seasonWeek(world.week)
+  let body: ReactNode
+  if (me.status.kind === 'unemployed') {
+    body = <p>No fixture: you are out of work. Continue passes a week.</p>
+  } else if (me.status.kind === 'employed' && me.status.post.kind === 'abroad') {
+    body = <p>Abroad the season is settled at its end. Continue passes a week.</p>
+  } else if (me.status.kind === 'retired') {
+    body = <p>The career is over.</p>
+  } else {
+    const next = nextFixture(world)
+    if (!next) {
+      body = <p>{sw >= tunables.MATCH_WEEKS ? 'The summer. Continue passes a week; the fixtures come out with the new season.' : 'No more fixtures this season.'}</p>
+    } else if (next.kind === 'draw') {
+      body = (
+        <p>
+          <strong>{next.competitionLabel}</strong>, round {next.round}, {weekLabel(next.seasonWeek)}: the draw is still to be made.
+        </p>
+      )
+    } else {
+      const where = next.opponentAbroad ? `${next.opponentAbroad}` : `${next.opponentPosition !== null ? ordinal(next.opponentPosition) : '?'} in tier ${next.opponentTier}`
+      const when = next.seasonWeek === sw ? 'this week' : `${weekLabel(next.seasonWeek)}`
+      body = (
+        <>
+          <p>
+            <strong>
+              {next.opponent} ({next.home ? 'H' : 'A'})
+            </strong>{' '}
+            · {next.competitionLabel}
+            {next.competition === 'league' ? '' : `, round ${next.round}`} · {when}
+          </p>
+          <p className="muted">
+            {next.opponent}: {where}. Form: {formText(next.opponentForm)}.
+          </p>
+        </>
+      )
+    }
+  }
+  return (
+    <section aria-label="Next fixture" className="decision">
+      <p className="from">Next fixture</p>
+      {body}
+    </section>
   )
 }
 
@@ -256,7 +322,7 @@ function Controls({ session, onChange, confirm, setConfirm }: { session: Session
               </button>
             ))}
           </div>
-          <p className="muted">Shape A beats B, B beats C, C beats A. Attack and defend change how open the game is.</p>
+          <p className="muted">Shape A beats B, B beats C, C beats A. Attack and defend change how open the game is. Both apply from the next match.</p>
         </>
       )}
       {me.status.kind === 'unemployed' && (
@@ -276,7 +342,7 @@ function Controls({ session, onChange, confirm, setConfirm }: { session: Session
         {employed &&
           (confirm === 'resign' ? (
             <>
-              <button onClick={() => { onChange(withResign(session, true)); setConfirm(null) }}>Yes, resign this week</button>
+              <button onClick={() => { onChange(withResign(session, true)); setConfirm(null) }}>Yes, resign now</button>
               <button onClick={() => setConfirm(null)}>Stay</button>
             </>
           ) : session.inputs.resign ? (
@@ -299,26 +365,70 @@ function Controls({ session, onChange, confirm, setConfirm }: { session: Session
   )
 }
 
-function Inbox({ session, weeksBack, onEarlier }: { session: Session; weeksBack: number; onEarlier: () => void }) {
+function Inbox({ session, turnsBack, onEarlier }: { session: Session; turnsBack: number; onEarlier: () => void }) {
   const world = session.world
-  const from = Math.max(0, session.shownFromWeek - weeksBack)
-  const items = inbox(world, from, world.week)
+  const items = inboxSince(world, markFor(session, turnsBack))
   return (
     <section aria-label="Inbox">
-      {items.length === 0 && <p className="muted">Nothing this week.</p>}
+      {items.length === 0 && <p className="muted">Nothing new.</p>}
       {[...items].reverse().map((item, i) => (
         <div className="item" key={`${item.week}-${i}`}>
           <div className="from">
-            {item.from} · week {seasonWeek(item.week) + 1}
+            {item.from} · {weekLabel(seasonWeek(item.week))}
           </div>
           <div>{item.text}</div>
         </div>
       ))}
-      {from > 0 && (
+      {turnsBack < session.earlier.length && (
         <p>
-          <button onClick={onEarlier}>Earlier weeks</button>
+          <button onClick={onEarlier}>Earlier</button>
         </p>
       )}
+    </section>
+  )
+}
+
+function scoreText(f: FixtureView): string {
+  if (!f.played) return `${weekLabel(f.seasonWeek)}`
+  const pens = f.shootoutWon === null ? '' : f.shootoutWon ? ', won on penalties' : ', lost on penalties'
+  return `${f.result} ${f.goalsFor}-${f.goalsAgainst}${pens}`
+}
+
+/** The season's fixtures and results by competition (DESIGN.md "Fixtures"). */
+function Fixtures({ world }: { world: World }) {
+  const me = player(world)
+  if (me.status.kind !== 'employed' || me.status.post.kind !== 'home') {
+    return (
+      <section aria-label="Fixtures">
+        <p className="muted">No club, no fixtures.</p>
+      </section>
+    )
+  }
+  const groups = seasonFixtures(world)
+  return (
+    <section aria-label="Fixtures">
+      {groups.map((g) => (
+        <div key={g.competition}>
+          <h3>
+            {g.label}
+            {g.status ? <span className="muted"> · {g.status}</span> : ''}
+          </h3>
+          {g.fixtures.length === 0 && <p className="muted">No ties yet.</p>}
+          <table>
+            <tbody>
+              {g.fixtures.map((f) => (
+                <tr key={`${f.competition}-${f.round}-${f.opponentId}-${f.home ? 'h' : 'a'}`} className={f.played ? '' : 'muted'}>
+                  <td>{f.seasonWeek + 1}</td>
+                  <td className="name">
+                    {f.opponent} ({f.home ? 'H' : 'A'}){f.competition === 'league' ? '' : `, round ${f.round}`}
+                  </td>
+                  <td>{scoreText(f)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
     </section>
   )
 }

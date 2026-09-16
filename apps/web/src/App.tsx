@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Background } from '@tenure/engine'
 import './styles.css'
-import { newSession, nextWeek, parseSave, serialize, sessionFromWorld, type Session } from './controller.js'
+import { newSession, nextTurn, parseSave, serialize, sessionFromWorld, type Session } from './controller.js'
 import { clearSave, downloadText, loadSave, storeSave } from './storage.js'
 import { NewCareer, type SaveState } from './screens/NewCareer.js'
 import { Game } from './screens/Game.js'
@@ -119,7 +119,7 @@ export function App() {
 
   const me = screen.session.world.managers[screen.session.world.human!.managerId - 1]!
   if (me.status.kind === 'retired') {
-    return <CareerOver world={screen.session.world} fromWeek={screen.session.shownFromWeek} onExport={exportSave} onNewCareer={reset} />
+    return <CareerOver world={screen.session.world} from={screen.session.shownFrom} onExport={exportSave} onNewCareer={reset} />
   }
 
   const careerKey = screen.careerKey
@@ -128,7 +128,7 @@ export function App() {
       key={careerKey}
       session={screen.session}
       onChange={(session) => setScreen({ kind: 'game', session, careerKey })}
-      onNextWeek={() => setScreen({ kind: 'game', session: nextWeek(screen.session), careerKey })}
+      onContinue={() => setScreen({ kind: 'game', session: nextTurn(screen.session), careerKey })}
       onExport={exportSave}
       onImport={(file) => void importSave(file)}
       onReset={reset}
