@@ -255,15 +255,19 @@ export const T = {
   // every credit-based target: median first spell, 30% inside a season.
   // ---------------------------------------------------------------------------
 
-  /** Expected goals for two equal sides: home and away. */
-  GOALS_BASE_HOME: 1.5,
-  GOALS_BASE_AWAY: 1.15,
+  /** Expected goals for the away side of two equal sides. The home side gets HOME_ADVANTAGE_GOALS on top. */
+  GOALS_BASE: 1.15,
+
+  /**
+   * Home advantage in the one-shot model: a pre-match lean of this many extra
+   * expected goals for the home side against an equal opponent. Serves: home
+   * win / draw / away win ≈ 45 / 26 / 29 (to verify). Phase 3(c) replaces it
+   * with the minute engine's pressure lean.
+   */
+  HOME_ADVANTAGE_GOALS: 0.35,
 
   /** Expected goals scale by exp(± sensitivity × strength difference). */
   GOAL_SENSITIVITY: 0.032,
-
-  /** Strength points added to the home side. */
-  HOME_ADV: 0,
 
   /** Results kept for form. DESIGN: last six. */
   FORM_WINDOW: 6,

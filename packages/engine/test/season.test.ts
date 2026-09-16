@@ -89,6 +89,46 @@ describe('match model', () => {
     expect(shootouts).toBeGreaterThan(30)
   })
 
+  it('gives the home side of two equal teams the tunable lean, and nothing else', () => {
+    const odds = matchOdds(side(), side({ id: 2 }))
+    expect(odds.lambdaHome).toBeCloseTo(T.GOALS_BASE + T.HOME_ADVANTAGE_GOALS, 12)
+    expect(odds.lambdaAway).toBeCloseTo(T.GOALS_BASE, 12)
+    // Home win / draw / away win for equal sides. DESIGN target ≈ 45 / 26 / 29, to verify.
+    expect(odds.pHome).toBeGreaterThan(0.4)
+    expect(odds.pHome).toBeLessThan(0.52)
+    expect(odds.pDraw).toBeGreaterThan(0.2)
+    expect(odds.pDraw).toBeLessThan(0.32)
+    expect(odds.pAway).toBeGreaterThan(0.22)
+    expect(odds.pAway).toBeLessThan(0.34)
+  })
+
+  it('a simulated season lands near the goals-per-game and result-split targets (to verify)', () => {
+    const world = createWorld(3)
+    runSeasons(world, 1)
+    const league = world.log.filter((e) => e.type === 'match.played' && e.payload['competition'] === 'league')
+    let goals = 0
+    let home = 0
+    let draw = 0
+    for (const e of league) {
+      const hg = e.payload['homeGoals'] as number
+      const ag = e.payload['awayGoals'] as number
+      goals += hg + ag
+      if (hg > ag) home++
+      else if (hg === ag) draw++
+    }
+    const n = league.length
+    expect(n).toBeGreaterThan(2000)
+    // The one-shot model reads about 3.1 goals a game and 47 / 19 / 34 across a
+    // season: strength gaps inflate goals and thin out draws. Phase 3(c)
+    // calibrates against 2.7 and 45 / 26 / 29; these bands only catch a break.
+    expect(goals / n).toBeGreaterThan(2.3)
+    expect(goals / n).toBeLessThan(3.4)
+    expect(home / n).toBeGreaterThan(0.38)
+    expect(home / n).toBeLessThan(0.54)
+    expect(draw / n).toBeGreaterThan(0.14)
+    expect(draw / n).toBeLessThan(0.32)
+  })
+
   it('poisson pmf is normalised', () => {
     const pmf = poissonPmf(1.4, T.MAX_GOALS)
     expect(pmf.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 9)
