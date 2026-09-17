@@ -7,6 +7,7 @@ import type { Club, Manager, Player, Result, Tier, World } from '../types.js'
 import { anchorSquad, forgetPlayer, makePlayer, releasePlayer, squadSizeFor, valueFor } from '../players/gen.js'
 import { clubFormation, squadOf, autoPick } from '../players/select.js'
 import { slotsOf } from '../players/formations.js'
+import { wageDemand as contractWageDemand } from '../players/contracts.js'
 
 export function managerOf(world: World, club: Club): Manager | undefined {
   return managerAt(world, club)
@@ -235,10 +236,14 @@ export function summerPlayers(world: World, rng: Rng, club: Club): void {
     }
     p.contract.years = Math.max(0, p.contract.years - 1)
     if (p.contract.years === 0) {
-      // Out of contract: the club keeps anyone near its level, and lets the rest go.
-      if (p.rating >= club.squad.strength - T.RELEASE_BELOW_STRENGTH) {
-        p.contract = { years: rng.int(T.PLAYER_CONTRACT_YEARS[0], T.PLAYER_CONTRACT_YEARS[1]), wage: wageDemand(p) }
-        emit(world, 'player.renewed', { playerId: p.id, clubId: club.id, name: p.name, years: p.contract.years, wage: p.contract.wage, season: world.season })
+      const choice = world.human && club.managerId === world.human.managerId ? world.human.contractChoices[p.id] : undefined
+      if (choice !== undefined) delete world.human!.contractChoices[p.id]
+      // Out of contract: the human's answer, else the club keeps anyone near its level and lets the rest go.
+      const keep = choice === undefined ? p.rating >= club.squad.strength - T.RELEASE_BELOW_STRENGTH : choice !== 'release'
+      if (keep) {
+        if (choice !== undefined && choice !== 'release') p.contract = { years: choice.years, wage: choice.wage }
+        else p.contract = { years: rng.int(T.PLAYER_CONTRACT_YEARS[0], T.PLAYER_CONTRACT_YEARS[1]), wage: wageDemand(p) }
+        emit(world, 'player.renewed', { playerId: p.id, clubId: club.id, managerId: club.managerId, name: p.name, years: p.contract.years, wage: p.contract.wage, season: world.season })
       } else {
         releasePlayer(world, p, club)
         emit(world, 'player.left', { playerId: p.id, clubId: club.id, name: p.name, rating: p.rating, fee: 0, reason: 'released', season: world.season })
@@ -275,11 +280,9 @@ export function topUpSquad(world: World, rng: Rng, club: Club): void {
   }
 }
 
-/** What a player asks for a week: rating and age, less for the loyal with a bond (players/contracts.ts owns the bond rule). */
-export function wageDemand(p: Player): number {
-  const base = T.WAGE_BASE_K * Math.exp(T.WAGE_RATING_EXP * p.rating)
-  const ageFactor = p.age >= T.WAGE_VETERAN_AGE ? T.WAGE_VETERAN_SHARE : 1
-  return Math.max(T.WAGE_MIN_K, Math.round(base * ageFactor))
+/** What a player asks for a week (players/contracts.ts owns the rule, the loyal one included). */
+function wageDemand(p: Player): number {
+  return contractWageDemand(p, null)
 }
 
 export function tierOf(club: Club): Tier {

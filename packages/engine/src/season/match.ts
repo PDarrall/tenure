@@ -80,12 +80,13 @@ export function poissonPmf(lambda: number, max: number): number[] {
 function structureFactor(us: Participant, them: Participant): number {
   const midEdge = us.bands.midfield - them.bands.midfield
   let f = 1 + T.MID_EDGE_K * midEdge
-  const ratio = them.bands.defence > 0 ? us.bands.attack / them.bands.defence : T.ATTACK_DEFENCE_STANDARD
+  // A band is a count weighted by quality; a side of nobodies still has a back line, so the ratio is floored.
+  const ratio = us.bands.attack / Math.max(T.BAND_FLOOR, them.bands.defence)
   f *= 1 + T.ATTACK_DEFENCE_K * (ratio - T.ATTACK_DEFENCE_STANDARD)
   if (them.bands.defenceWidth < T.NARROW_DEFENCE_WIDTH && us.bands.width >= 4) f *= 1 + T.WIDTH_EDGE
   const overload = Math.max(0, Math.round(them.bands.defence / Math.max(0.01, them.bands.strength / 100)) - 1 - 4)
   if (overload > 0) f *= 1 - T.OVERLOAD_K * overload
-  return Math.max(0.5, f)
+  return Math.min(T.STRUCTURE_FACTOR_MAX, Math.max(T.STRUCTURE_FACTOR_MIN, f))
 }
 
 /** Style, one rule each (DESIGN.md "Formations and tactics"): returns multipliers on our goals and on theirs. */
@@ -115,8 +116,8 @@ export function matchOdds(home: Participant, away: Participant): MatchOdds {
   lambdaHome *= sh.own * sa.concede
   lambdaAway *= sa.own * sh.concede
   const variance = mentalityFactor(home.mentality) * mentalityFactor(away.mentality) * sh.variance * sa.variance
-  lambdaHome *= variance
-  lambdaAway *= variance
+  lambdaHome = Math.min(T.LAMBDA_MAX, lambdaHome * variance)
+  lambdaAway = Math.min(T.LAMBDA_MAX, lambdaAway * variance)
   const ph = poissonPmf(lambdaHome, T.MAX_GOALS)
   const pa = poissonPmf(lambdaAway, T.MAX_GOALS)
   let pHome = 0

@@ -28,18 +28,18 @@ export interface TraitRule {
 }
 
 export const TRAIT_RULES: Readonly<Record<Trait, TraitRule>> = {
-  poacher: { rule: 'Raises the chance a goal is his: he is weighted up when a scorer is drawn.', readBy: 'pending' },
-  playmaker: { rule: 'Raises the chance an assist is his: he is weighted up when an assister is drawn.', readBy: 'pending' },
+  poacher: { rule: 'Raises the chance a goal is his: he is weighted up when a scorer is drawn.', readBy: 'match/aftermath.ts scorerWeight' },
+  playmaker: { rule: 'Raises the chance an assist is his: he is weighted up when an assister is drawn.', readBy: 'match/aftermath.ts assisterWeight' },
   pace: { rule: 'The direct style creates more with him: each pace or aerial player in the XI adds to expected goals under direct.', readBy: 'season/match.ts styleFactors' },
   aerial: { rule: 'The direct style creates more with him: each pace or aerial player in the XI adds to expected goals under direct.', readBy: 'season/match.ts styleFactors' },
-  'tough tackler': { rule: 'Raises his yellow-card rate.', readBy: 'pending' },
-  leader: { rule: 'Lifts the morale of every team-mate in the XI after a match he plays.', readBy: 'pending' },
+  'tough tackler': { rule: 'Raises his yellow-card rate.', readBy: 'match/aftermath.ts cardChance' },
+  leader: { rule: 'Lifts the morale of every team-mate in the XI after a match he plays.', readBy: 'match/aftermath.ts moraleAfterMatch' },
   'big-game': { rule: 'Plays above his rating in cup ties and derbies.', readBy: 'players/select.ts effectiveRating' },
-  consistent: { rule: 'No per-match rating noise: he plays to his number every week.', readBy: 'pending' },
+  consistent: { rule: 'No per-match rating noise: he plays to his number every week.', readBy: 'match/aftermath.ts matchRating' },
   versatile: { rule: 'Halves positional penalties when played out of position.', readBy: 'players/select.ts positionPenalty' },
-  loyal: { rule: 'Asks less to stay with, or follow, the manager he is bonded to.', readBy: 'pending' },
-  'injury-prone': { rule: 'Raises his injury risk.', readBy: 'pending' },
-  'hot-headed': { rule: 'Raises his yellow- and red-card rates.', readBy: 'pending' },
+  loyal: { rule: 'Asks less to stay with, or follow, the manager he is bonded to.', readBy: 'players/contracts.ts wageDemand' },
+  'injury-prone': { rule: 'Raises his injury risk.', readBy: 'match/aftermath.ts injuryChance' },
+  'hot-headed': { rule: 'Raises his yellow- and red-card rates.', readBy: 'match/aftermath.ts cardChance' },
 }
 
 export function hasTrait(player: Player, trait: Trait): boolean {

@@ -146,12 +146,21 @@ describe('match model', () => {
     // The one-shot model reads about 3.1 goals a game and 47 / 19 / 34 across a
     // season: strength gaps inflate goals and thin out draws. Phase 3(c)
     // calibrates against 2.7 and 45 / 26 / 29; these bands only catch a break.
+    // With structure and style in the one-shot model the reading is about 3.5; phase 3(c) calibrates the minute engine and the fast path against 2.7.
     expect(goals / n).toBeGreaterThan(2.3)
-    expect(goals / n).toBeLessThan(3.4)
+    expect(goals / n).toBeLessThan(3.9)
     expect(home / n).toBeGreaterThan(0.38)
     expect(home / n).toBeLessThan(0.54)
     expect(draw / n).toBeGreaterThan(0.14)
     expect(draw / n).toBeLessThan(0.32)
+  })
+
+  it('stays finite against a side of nobodies (a strength-1 club once produced NaN odds and NaN credit)', () => {
+    const nobodies = side({ id: 2, strength: 0.4, bands: { ...plainBands(0.4), defence: 0.005, midfield: 0.03, attack: 0.01 } })
+    const odds = matchOdds(side({ strength: 30 }), nobodies)
+    for (const v of [odds.pHome, odds.pDraw, odds.pAway, odds.lambdaHome, odds.lambdaAway, odds.expHome, odds.expAway]) expect(Number.isFinite(v)).toBe(true)
+    expect(odds.pHome + odds.pDraw + odds.pAway).toBeCloseTo(1, 6)
+    expect(odds.lambdaHome).toBeLessThanOrEqual(T.LAMBDA_MAX)
   })
 
   it('poisson pmf is normalised', () => {

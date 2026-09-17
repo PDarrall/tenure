@@ -572,6 +572,9 @@ export type DecisionKind =
   | 'press'
   | 'board'
   | 'activity'
+  | 'playerContract'
+  | 'newDeal'
+  | 'wantsAway'
 
 export interface DecisionOption {
   key: string
@@ -618,6 +621,8 @@ export interface HumanState {
   declinedVacancies: VacancyId[]
   /** Plan for the next window, set by a decision. */
   windowChoice: WindowChoice | null
+  /** Answers to this summer's expiring contracts, read when the summer settles them. */
+  contractChoices: Record<number, 'release' | { years: number; wage: number }>
 }
 
 export interface HumanInputs {

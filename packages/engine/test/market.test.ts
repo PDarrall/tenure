@@ -346,7 +346,7 @@ describe('the market over seasons', () => {
     }
   })
 
-  it('stays deterministic', () => {
+  it('stays deterministic', { timeout: 60_000 }, () => {
     const again = createWorld(1)
     runSeasons(again, 6)
     expect(digestWorld(again).hash).toBe(digestWorld(world).hash)

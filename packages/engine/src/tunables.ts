@@ -297,6 +297,12 @@ export const T = {
   NARROW_DEFENCE_WIDTH: 2,
   /** Each defender beyond four cuts chances conceded by this share. */
   OVERLOAD_K: 0.05,
+  /** Bounds that keep a side of nobodies from breaking the arithmetic: the least a band counts for, the most structure can lean expected goals. */
+  BAND_FLOOR: 1,
+  STRUCTURE_FACTOR_MIN: 0.6,
+  STRUCTURE_FACTOR_MAX: 1.6,
+  /** Expected goals for a side are capped here, so the Poisson table always has mass. */
+  LAMBDA_MAX: 6,
   /** Style, one rule each. */
   STYLE_EFFECTS: {
     /** More pressure with a higher-rated XI (× on own goals when better), fewer but better chances (variance). */
@@ -426,6 +432,82 @@ export const T = {
   VALUE_MIN_M: 0.1,
   /** Contract years at generation, uniform. */
   PLAYER_CONTRACT_YEARS: [1, 4] as readonly [number, number],
+  // Match aftermath (DESIGN.md "Players": condition, injuries, suspensions,
+  // morale, ratings out of ten). Serves: yellows ≈ 3–4 a match, reds ≈ 0.2,
+  // match ratings average ≈ 6.9 with a spread of about 0.6.
+  MATCH_MINUTES: 90,
+  /** Condition lost over ninety minutes and won back each week of rest. */
+  CONDITION_DRAIN_PER_90: 22,
+  CONDITION_RECOVERY_PER_WEEK: 16,
+  /** Injuries per player per match; low condition and the injury-prone multiply it. DESIGN: 1–20 weeks. */
+  INJURY_P_PER_MATCH: 0.012,
+  INJURY_LOW_CONDITION_MULT: 1.6,
+  INJURY_PRONE_MULT: 2,
+  INJURY_MIN_WEEKS: 1,
+  INJURY_MAX_WEEKS: 20,
+  /** Cards per outfield player per match. Serves: ≈ 3–4 yellows and ≈ 0.2 reds a match (to verify). */
+  YELLOW_P: 0.16,
+  RED_P: 0.01,
+  GK_CARD_SHARE: 0.15,
+  TOUGH_TACKLER_CARD_MULT: 1.5,
+  HOT_HEADED_CARD_MULT: 1.5,
+  HOT_HEADED_RED_MULT: 2.5,
+  /** Bans: five yellows one match, ten two; a red one to three. */
+  YELLOW_BANS: { '5': 1, '10': 2 } as Readonly<Record<string, number>>,
+  RED_BAN: [1, 3] as readonly [number, number],
+  /** Scorers and assisters are drawn by position, then by trait. */
+  SCORER_POSITION_WEIGHTS: { GK: 0.01, D: 0.6, M: 2, F: 6 } as Readonly<Record<'GK' | 'D' | 'M' | 'F', number>>,
+  ASSIST_POSITION_WEIGHTS: { GK: 0.05, D: 1, M: 3, F: 2 } as Readonly<Record<'GK' | 'D' | 'M' | 'F', number>>,
+  POACHER_SCORER_MULT: 1.6,
+  PLAYMAKER_ASSIST_MULT: 1.6,
+  ASSIST_P: 0.7,
+  /** Match ratings out of ten: base, the result, level against the XI, events, noise. Serves: mean ≈ 6.9, spread ≈ 0.6. */
+  RATING_BASE: 6.6,
+  RATING_WIN: 0.5,
+  RATING_DRAW: 0.1,
+  RATING_LOSS: -0.35,
+  RATING_PER_POINT: 25,
+  RATING_PER_GOAL: 0.8,
+  RATING_PER_ASSIST: 0.4,
+  RATING_CLEAN_SHEET: 0.4,
+  RATING_PER_GOAL_CONCEDED: 0.12,
+  RATING_NOISE_SD: 0.35,
+  RATING_MIN: 3,
+  RATING_MAX: 10,
+  /** Player morale: the result (scaled by the manager's motivation like the team's), playing time, a leader, weekly settling. */
+  PLAYER_MORALE_WIN: 3,
+  PLAYER_MORALE_LOSS: -4,
+  PLAYER_MORALE_STARTED: 1,
+  PLAYER_MORALE_LEFT_OUT: -1,
+  LEADER_MORALE_LIFT: 2,
+  PLAYER_MORALE_DECAY: 0.08,
+
+  // Contracts and requests (DESIGN.md "Players": renew or release, new-deal and leave requests).
+  /** A player asks for a new deal when his demand tops his wage by this share. */
+  NEW_DEAL_GAP: 0.3,
+  NEW_DEAL_YEARS: 3,
+  NEW_DEAL_MORALE_GAIN: 8,
+  /** A starter-level player (within this of club strength) starting under this share of the club's games asks to leave. */
+  WANTS_AWAY_RATING_BELOW: 5,
+  WANTS_AWAY_START_SHARE: 0.3,
+  WANTS_AWAY_MIN_GAMES: 8,
+  /** Monthly chance a player with a grievance raises it. Serves: most months zero or one decision. */
+  REQUEST_P: 0.5,
+  /** Refusing a request: morale lost, bond lost; the refusal counts toward "difficult" as a fallout. */
+  REFUSAL_MORALE_LOSS: 15,
+  BOND_REFUSAL_LOSS: 3,
+  /** Years on a renewal the assistant recommends. */
+  RENEW_YEARS_PLAYER: 2,
+  /** The loyal rule: bonded above this, a loyal player asks this share of his wage. */
+  BOND_LOYAL_THRESHOLD: 10,
+  LOYAL_WAGE_SHARE: 0.8,
+  /** Bond moves (DESIGN.md "Your players"): a start, a debut, a promotion, a renewal, a decision that backed him. */
+  BOND_START: 1,
+  BOND_DEBUT: 5,
+  BOND_PROMOTION: 5,
+  BOND_RENEWAL: 3,
+  BOND_BACKED: 5,
+
   /** Anchoring tolerance the tests allow after rounding to one decimal; below the minimum strength the rating floor gets in the way. */
   ANCHOR_TOLERANCE: 0.15,
   ANCHOR_MIN_STRENGTH: 10,

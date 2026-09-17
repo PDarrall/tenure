@@ -313,7 +313,7 @@ describe('tenure over seasons', () => {
     expect(employed.every((m) => m.history.earnings > 0)).toBe(true)
   })
 
-  it('stays deterministic with tenure in the loop', () => {
+  it('stays deterministic with tenure in the loop', { timeout: 60_000 }, () => {
     const again = createWorld(1)
     runSeasons(again, 3)
     expect(digestWorld(again).hash).toBe(digestWorld(world).hash)

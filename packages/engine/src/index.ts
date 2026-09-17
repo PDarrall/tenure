@@ -18,6 +18,8 @@ export { FORMATIONS, FORMATION_NAMES, slotsOf, structureOf } from './players/for
 export { TRAITS, TRAIT_RULES, hasTrait } from './players/traits.js'
 export { autoPick, enforceSelection, effectiveRating, positionPenalty, xiBands, bestXiMean, squadOf, available, clubFormation } from './players/select.js'
 export { generateSquad, anchorSquad, wageFor, valueFor, positionMix, makePlayer } from './players/gen.js'
+export { wageDemand, wantsNewDeal, wantsAway } from './players/contracts.js'
+export { averageRating, attributeGoals, cardChance, injuryChance, matchRating } from './match/aftermath.js'
 export { tableFor, positionOf } from './season/table.js'
 export { renderMatch } from './text/render.js'
 export { clubById, homeClub, managerById, spellById, spellOf, managerAt, foreignClubById, playerById } from './lookup.js'

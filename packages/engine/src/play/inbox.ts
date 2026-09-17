@@ -108,9 +108,44 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
         if (p['homeManagerId'] !== me && p['awayManagerId'] !== me) break
         const position = typeof p['positionAfter'] === 'number' && p['competition'] === 'league' ? ` You are ${ordinal(p['positionAfter'])}.` : ''
         const comp = p['competition'] === 'league' ? '' : ` (${competitionName(p['competition'])}, round ${p['round']})`
-        push(e, 'match', `${renderMatch(world, e)}${comp}${position}`)
+        const scorers = (p['homeManagerId'] === me ? p['homeScorers'] : p['awayScorers']) as { name: string; assist: string | null }[] | undefined
+        const goals = scorers && scorers.length ? ` Goals: ${scorers.map((g) => (g.assist ? `${g.name} (${g.assist})` : g.name)).join(', ')}.` : ''
+        push(e, 'match', `${renderMatch(world, e)}${comp}${position}${goals}`)
         break
       }
+      case 'player.injured':
+        if (myClub(e)) push(e, 'staff', renderText('staff', 'injured', { name: String(p['name']), weeks: p['weeks'] as number, plural: p['weeks'] === 1 ? '' : 's' }, e.week))
+        break
+      case 'player.suspended':
+        if (myClub(e)) push(e, 'staff', renderText('staff', 'suspended', { name: String(p['name']), matches: p['matches'] as number, matchPlural: p['matches'] === 1 ? '' : 'es', reason: p['reason'] === 'red' ? 'sent off' : `${String(p['yellows'])} yellows` }, e.week))
+        break
+      case 'selection.enforced':
+        if (mine(e)) push(e, 'staff', renderText('staff', 'enforced', { names: (p['names'] as string[]).join(', ') }, e.week))
+        break
+      case 'player.refused':
+        if (mine(e)) push(e, 'staff', renderText('staff', 'refused', { name: String(p['name']) }, e.week))
+        break
+      case 'player.renewed':
+        if (myClub(e)) push(e, 'staff', renderText('staff', 'renewed_player', { name: String(p['name']), years: p['years'] as number, plural: p['years'] === 1 ? '' : 's', wage: p['wage'] as number }, e.week))
+        break
+      case 'player.signed':
+        if (myClub(e)) {
+          const pl = world.players[(p['playerId'] as number) - 1]
+          push(e, 'staff', renderText('staff', 'signed_player', { name: String(p['name']), position: pl ? pl.position : '', age: pl ? pl.age : '', rating: Math.round(p['rating'] as number) }, e.week))
+        }
+        break
+      case 'player.promoted':
+        if (myClub(e)) {
+          const pl = world.players[(p['playerId'] as number) - 1]
+          push(e, 'staff', renderText('staff', 'promoted_player', { name: String(p['name']), position: pl ? pl.position : '', age: pl ? pl.age : '' }, e.week))
+        }
+        break
+      case 'player.left':
+        if (myClub(e)) {
+          if (p['reason'] === 'sold' && p['managerId'] === me) push(e, 'staff', renderText('staff', 'sold_request', { name: String(p['name']), fee: p['fee'] as number }, e.week))
+          else if (p['reason'] === 'released') push(e, 'staff', renderText('staff', 'released_player', { name: String(p['name']) }, e.week))
+        }
+        break
       case 'cup.tie': {
         if (!myClub(e) && p['homeId'] !== myClubId && p['awayId'] !== myClubId) break
         if (myClubId === null) break
