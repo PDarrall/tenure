@@ -4,19 +4,23 @@ import pressTemplates from './press.json'
 import agentTemplates from './agent.json'
 import staffTemplates from './staff.json'
 import newsTemplates from './news.json'
+import playerTemplates from './players.json'
+import commentaryTemplates from './commentary.json'
 import type { Event, World } from '../types.js'
 
 type Templates = Record<string, string[]>
 
 const templates: Templates = matchTemplates
 
-export type Bank = 'board' | 'press' | 'agent' | 'staff' | 'news'
+export type Bank = 'board' | 'press' | 'agent' | 'staff' | 'news' | 'players' | 'commentary'
 const banks: Record<Bank, Templates> = {
   board: boardTemplates,
   press: pressTemplates,
   agent: agentTemplates,
   staff: staffTemplates,
   news: newsTemplates,
+  players: playerTemplates,
+  commentary: commentaryTemplates,
 }
 
 /** 1 → 1st, 2 → 2nd, 11 → 11th, 23 → 23rd. */

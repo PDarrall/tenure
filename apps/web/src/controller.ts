@@ -5,15 +5,26 @@
 import {
   advanceTurn,
   createCareer,
+  discardWatched,
   inboxMark,
   pendingDecisions,
+  runToEnd,
+  setMentality,
+  substitute,
+  tick,
   type Background,
   type Decision,
   type HumanInputs,
   type InboxMark,
+  type Formation,
+  type MatchEvent,
+  type MatchState,
   type Mentality,
-  type Shape,
+  type PlayerId,
+  type Selection,
+  type Style,
   type UnemployedActivity,
+  type WatchedWeek,
   type World,
 } from '@tenure/engine'
 
@@ -63,12 +74,26 @@ export function withWithdraw(s: Session, vacancyId: number): Session {
   return bump(s, { ...s.inputs, apply, withdraw })
 }
 
-export function withShape(s: Session, shape: Shape): Session {
-  return bump(s, { ...s.inputs, shape })
+export function withFormation(s: Session, formation: Formation): Session {
+  return bump(s, { ...s.inputs, tactic: { ...(s.inputs.tactic ?? {}), formation } })
+}
+
+export function withStyle(s: Session, style: Style): Session {
+  return bump(s, { ...s.inputs, tactic: { ...(s.inputs.tactic ?? {}), style } })
 }
 
 export function withMentality(s: Session, mentality: Mentality): Session {
-  return bump(s, { ...s.inputs, mentality })
+  return bump(s, { ...s.inputs, tactic: { ...(s.inputs.tactic ?? {}), mentality } })
+}
+
+export function withSelection(s: Session, selection: Partial<Selection>): Session {
+  return bump(s, { ...s.inputs, selection: { ...(s.inputs.selection ?? {}), ...selection } })
+}
+
+/** Talk terms with one of your players: a contract decision arrives next turn. */
+export function withContractOffer(s: Session, playerId: PlayerId): Session {
+  const contractOffers = [...(s.inputs.contractOffers ?? []).filter((id) => id !== playerId), playerId]
+  return bump(s, { ...s.inputs, contractOffers })
 }
 
 export function withActivity(s: Session, activity: UnemployedActivity): Session {
@@ -101,10 +126,10 @@ export function canAdvance(s: Session): boolean {
   return blockingUnanswered(s).length === 0
 }
 
-/** Continue: play the next fixture, or take the next step, with the queued inputs. */
+/** Continue: play the next fixture, or take the next step, with the queued inputs. A fixture of the human's stops first for the match view. */
 export function nextTurn(s: Session): Session {
   const mark = inboxMark(s.world)
-  advanceTurn(s.world, s.inputs)
+  advanceTurn(s.world, s.inputs, { watch: true })
   return {
     world: s.world,
     inputs: { answers: {} },
@@ -112,6 +137,65 @@ export function nextTurn(s: Session): Session {
     earlier: [s.shownFrom, ...s.earlier].slice(0, EARLIER_KEPT),
     turn: s.turn + 1,
   }
+}
+
+// --- The match view: a watched week lives in the world, so a save mid-match resumes at the same minute.
+
+export function watched(s: Session): WatchedWeek | null {
+  return s.world.human?.watched ?? null
+}
+
+/** The human's match, first in the watched week. */
+export function humanMatch(s: Session): MatchState | null {
+  return watched(s)?.matches[0] ?? null
+}
+
+/** Which side the human's club is on in the watched match. */
+export function humanSide(s: Session): 'home' | 'away' {
+  const m = humanMatch(s)
+  const clubId = humanClubOf(s.world)
+  return m && m.away.clubId === clubId ? 'away' : 'home'
+}
+
+function humanClubOf(world: World): number | null {
+  const me = world.human ? world.managers[world.human.managerId - 1] : undefined
+  if (!me || me.status.kind !== 'employed' || me.status.post.kind !== 'home') return null
+  return me.status.post.clubId
+}
+
+/** One minute for every match in the watched week, in step. Returns the human match's new events. */
+export function tickWatched(s: Session): MatchEvent[] {
+  const w = watched(s)
+  if (!w) return []
+  let mine: MatchEvent[] = []
+  w.matches.forEach((m, i) => {
+    const events = tick(m)
+    if (i === 0) mine = events
+  })
+  return mine
+}
+
+/** Straight to full time for every match in the week. */
+export function skipWatched(s: Session): void {
+  const w = watched(s)
+  if (!w) return
+  for (const m of w.matches) runToEnd(m)
+}
+
+export function substituteWatched(s: Session, offId: PlayerId, onId: PlayerId): boolean {
+  const m = humanMatch(s)
+  return m ? substitute(m, humanSide(s), offId, onId) : false
+}
+
+export function mentalityWatched(s: Session, mentality: Mentality): void {
+  const m = humanMatch(s)
+  if (m) setMentality(m, humanSide(s), mentality)
+}
+
+/** Back to the tactics screen: the prepared week is forgotten and read again on the next Continue. */
+export function backFromPreMatch(s: Session): Session {
+  discardWatched(s.world)
+  return { ...s, turn: s.turn + 1 }
 }
 
 /** The mark to read from when the player has stepped back `turnsBack` turns. */

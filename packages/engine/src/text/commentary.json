@@ -1,0 +1,29 @@
+{
+  "kickoff": ["{home} against {away}. Under way.", "The referee gets us started: {home} v {away}."],
+  "halftime": ["Half time: {home} {hg}-{ag} {away}.", "The whistle goes for the break. {home} {hg}, {away} {ag}."],
+  "secondhalf": ["The second half begins.", "Back out for the second half."],
+  "fulltime": ["Full time: {home} {hg}-{ag} {away}.", "That is that. {home} {hg}-{ag} {away}."],
+  "goal": [
+    "GOAL! {player} scores for {club}. {home} {hg}-{ag} {away}.",
+    "{player} finishes it! {club} lead the way: {home} {hg}-{ag} {away}.",
+    "It is in. {player}, for {club}. {home} {hg}-{ag} {away}."
+  ],
+  "goal_assist": [
+    "GOAL! {assist} plays it in and {player} finishes for {club}. {home} {hg}-{ag} {away}.",
+    "{assist} to {player}, and it is a goal for {club}. {home} {hg}-{ag} {away}."
+  ],
+  "save": ["{player} shoots and {keeper} saves.", "{keeper} keeps out {player}.", "A chance for {player}; {keeper} is equal to it."],
+  "miss": ["{player} shoots wide.", "{player} gets it away but it clears the bar.", "{player} should do better; the chance goes begging."],
+  "block": ["{player} shoots; blocked by {defender}.", "{defender} throws himself in front of {player}'s shot."],
+  "chance": ["{club} build through the middle.", "{club} are pressing now."],
+  "foul": ["Foul by {player}.", "{player} goes in late."],
+  "yellow": ["{player} is booked.", "A yellow card for {player}."],
+  "red": ["{player} is sent off! {club} are down to ten.", "Red card! {player} goes, and {club} play on with ten."],
+  "second_yellow": ["A second yellow for {player}, and he is off."],
+  "injury": ["{player} is down, and he is not getting up. {club} will have to change it.", "{player} pulls up. That looks like the end of his afternoon."],
+  "sub": ["{club} make a change: {on} comes on for {off}.", "Substitution for {club}: {off} off, {on} on."],
+  "mentality": ["{club} change their approach: {mentality} now."],
+  "shootout": ["Level after ninety. To penalties, and {winner} hold their nerve.", "Penalties. {winner} go through."],
+  "pressure_home": ["{home} have the upper hand.", "{home} are camped in the {away} half."],
+  "pressure_away": ["{away} are on top here.", "{away} have {home} pinned back."]
+}

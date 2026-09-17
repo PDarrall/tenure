@@ -10,6 +10,9 @@ import { resign } from '../tenure/exits.js'
 import { endCareer } from '../market/retirement.js'
 import { setActivity } from '../market/unemployment.js'
 import { human, humanState, resolveDecisions } from './decisions.js'
+import { queueContract } from '../players/contracts.js'
+import { playerById } from '../lookup.js'
+import { humanClubId } from '../sim/turn.js'
 
 export function applyInputs(world: World, rng: Rng, inputs: HumanInputs): void {
   const state = humanState(world)
@@ -17,8 +20,8 @@ export function applyInputs(world: World, rng: Rng, inputs: HumanInputs): void {
   if (player.status.kind === 'retired') return
   emit(world, 'human.input', { ...inputs, week: world.week })
 
-  if (inputs.shape) state.shape = inputs.shape
-  if (inputs.mentality) state.mentality = inputs.mentality
+  if (inputs.tactic) state.tactic = { ...state.tactic, ...inputs.tactic }
+  if (inputs.selection) state.selection = { ...state.selection, ...inputs.selection }
 
   for (const id of inputs.withdraw ?? []) {
     const vacancy = world.vacancies[id - 1]
@@ -34,6 +37,15 @@ export function applyInputs(world: World, rng: Rng, inputs: HumanInputs): void {
   }
 
   resolveDecisions(world, rng, inputs.answers ?? {})
+
+  // Talking terms with a player of your own: the assistant puts his demand on the desk as a decision.
+  const clubId = humanClubId(world)
+  for (const id of inputs.contractOffers ?? []) {
+    const p = playerById(world, id)
+    if (!p || p.retired || clubId === null || p.clubId !== clubId) continue
+    if (state.pending.some((d) => d.kind === 'playerContract' && d.payload['playerId'] === id)) continue
+    queueContract(world, p, player.id)
+  }
 
   if (inputs.activity && player.status.kind === 'unemployed') setActivity(world, player, inputs.activity)
 

@@ -21,6 +21,7 @@ export function endCareer(world: World, manager: Manager, reason: RetirementReas
     games: manager.history.games,
     earnings: Math.round(manager.history.earnings * 100) / 100,
     trophyPoints: manager.history.trophyPoints,
+    playersMade: manager.history.playersMade,
     spells: manager.history.spellIds.length,
     season: world.season,
   })

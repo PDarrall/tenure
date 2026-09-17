@@ -1,0 +1,12 @@
+{
+  "tagged_debut": ["{name} ({position}, {age}) made his debut today. He is one of yours now.", "A first-team debut for {name}, {age}. Whatever happens next, you gave it to him."],
+  "tagged_promoted": ["{name} ({position}, {age}) steps up from the academy. One of yours."],
+  "tagged_signed": ["{name} ({position}, {age}, rated {rating}) is your signing, and stays yours."],
+  "grew": ["{name} has come on {growth} this season under you. Rated {rating} now."],
+  "milestone_tierAbove": ["{name}, who you made at {madeAt}, is playing a tier above the one he started in.", "{name} has gone up in the world: tier {tier} football, from the boy you started at {madeAt}."],
+  "milestone_transfer": ["{name}, who you made at {madeAt}, has moved for £{fee}m.", "£{fee}m for {name}. He was yours first, at {madeAt}."],
+  "milestone_title": ["{name}, one of yours from {madeAt}, has won a title with {club}."],
+  "milestone_promotion": ["{name}, one of yours from {madeAt}, has been promoted with {club}."],
+  "milestone_cupFinal": ["{name}, one of yours from {madeAt}, is in a cup final with {club}."],
+  "milestone_retired": ["{name} has retired at {age}. You made him at {madeAt}."]
+}

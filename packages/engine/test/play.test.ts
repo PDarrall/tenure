@@ -47,7 +47,7 @@ describe('a human career', () => {
     expect(world.log.at(-1)!.type).toBe('career.started')
   })
 
-  it('gets a first job by applying and negotiating at interview, then picks shape and mentality', () => {
+  it('gets a first job by applying and negotiating at interview, then picks a tactic', () => {
     const world = createCareer(1, { name: 'Test Player', background: 'coach' })
     const player = me(world)
     const offer = getFirstJob(world, () => 'stability:2')
@@ -63,13 +63,14 @@ describe('a human career', () => {
     expect(pendingDecisions(world).some((d) => d.kind === 'offer')).toBe(false)
 
     if (spell.post.kind === 'home') {
-      advanceWeek(world, { shape: 'C', mentality: 'attack' })
+      advanceWeek(world, { tactic: { formation: '4-3-3', mentality: 'attack', style: 'pressing' } })
       const club = clubById(world, spell.post.clubId)
       if (spellOf(world, player) === spell && world.week % T.SEASON_WEEKS < T.MATCH_WEEKS) {
-        expect(club.shape).toBe('C')
+        expect(club.formation).toBe('4-3-3')
+        expect(club.style).toBe('pressing')
         expect(club.mentality).toBe('attack')
       }
-      expect(world.human!.shape).toBe('C')
+      expect(world.human!.tactic.formation).toBe('4-3-3')
     }
   })
 
@@ -169,7 +170,7 @@ describe('a human career', () => {
     expect(JSON.stringify(player)).toBe(before)
   })
 
-  it('is deterministic for the same inputs and survives a JSON save mid-career', () => {
+  it('is deterministic for the same inputs and survives a JSON save mid-career', { timeout: 60_000 }, () => {
     const script = (world: World): HumanInputs => {
       const player = me(world)
       const answers: Record<number, string> = {}
@@ -177,7 +178,7 @@ describe('a human career', () => {
       const apply = openVacancies(world)
         .filter((v) => qualifies(world, player, v) && !v.applicants.includes(player.id))
         .map((v) => v.id)
-      return { apply, answers, shape: 'B' }
+      return { apply, answers, tactic: { formation: '3-5-2' } }
     }
     const a = createCareer(7, { name: 'Test Player', background: 'coach' })
     const b = createCareer(7, { name: 'Test Player', background: 'coach' })

@@ -251,23 +251,10 @@ export const T = {
   BOTTOM_ZONE: 4,
 
   // ---------------------------------------------------------------------------
-  // Match model (DESIGN.md "Season and match"). Drives result variance and so
-  // every credit-based target: median first spell, 30% inside a season.
+  // Match model (DESIGN.md "Match"): what both paths read before kick-off.
+  // Drives result variance and so every credit-based target: median first
+  // spell, 30% inside a season.
   // ---------------------------------------------------------------------------
-
-  /** Expected goals for the away side of two equal sides. The home side gets HOME_ADVANTAGE_GOALS on top. */
-  GOALS_BASE: 1.15,
-
-  /**
-   * Home advantage in the one-shot model: a pre-match lean of this many extra
-   * expected goals for the home side against an equal opponent. Serves: home
-   * win / draw / away win ≈ 45 / 26 / 29 (to verify). Phase 3(c) replaces it
-   * with the minute engine's pressure lean.
-   */
-  HOME_ADVANTAGE_GOALS: 0.35,
-
-  /** Expected goals scale by exp(± sensitivity × strength difference). */
-  GOAL_SENSITIVITY: 0.032,
 
   /** Results kept for form. DESIGN: last six. */
   FORM_WINDOW: 6,
@@ -281,11 +268,17 @@ export const T = {
   /** Strength swing from squad morale: ±this at 100 / 0. */
   MORALE_WEIGHT: 3,
 
-  /** Shape matchup: winner's expected goals × (1 + this), loser's × (1 − this). DESIGN: ±5%. */
-  TACTIC_RPS: 0.05,
-
-  /** Mentality: attack scales both sides' expected goals up, defend down, by this. */
-  MENTALITY_VARIANCE: 0.2,
+  /** Bands are sums of effective rating ÷ 100, a quality-weighted count; a side of nobodies still has a back line, so the ratio is floored. Serves: no formation or style beats the mean points per game by more than 10%. */
+  BAND_FLOOR: 1,
+  /** Expected goals for a side are bounded here, so the scoreline table always has mass. */
+  LAMBDA_MIN: 0.02,
+  LAMBDA_MAX: 6,
+  /** The pressing style: faster condition drain, more fouls (its other effects are the minute engine's). */
+  STYLE_EFFECTS: {
+    pressing: { drain: 1.3, fouls: 1.3 },
+  } as const,
+  /** The big-game trait: effective rating in a cup tie, derby or against a top side. */
+  BIG_GAME_BONUS: 3,
 
   /** AI picks attack when the opponent is weaker by this many points, defend when stronger. */
   AI_MENTALITY_GAP: 12,
@@ -316,6 +309,315 @@ export const T = {
 
   /** Cup ties level after normal time go to a shoot-out; better side wins with base + this × strength gap share. */
   SHOOTOUT_STRENGTH_EDGE: 0.2,
+
+  // ---------------------------------------------------------------------------
+  // Players (DESIGN.md "Players"). Club strength stays the master number:
+  // squads are generated and re-anchored to it. Serves: every population
+  // target through the anchoring rule; the best XI averages club strength.
+  // ---------------------------------------------------------------------------
+
+  /** Squad size by tier, index 0 = tier 1. DESIGN: 22 in tiers 1–2, 20 in 3–4, 18 in 5. */
+  SQUAD_SIZE_BY_TIER: [22, 22, 20, 20, 18] as readonly number[],
+  FOREIGN_SQUAD_SIZE: 22,
+  /** Keepers in every squad; the outfield splits by these shares. DESIGN: for a 22, about 2 GK, 7 D, 8 M, 4–5 F. */
+  SQUAD_KEEPERS: 2,
+  SQUAD_OUTFIELD_MIX: { D: 0.35, M: 0.4 } as const,
+  /** Side draw for outfield players: left, centre, right, either. */
+  SIDE_WEIGHTS: [0.2, 0.5, 0.2, 0.1] as readonly number[],
+  /** Ages at generation, uniform. */
+  PLAYER_AGE_RANGE: [18, 33] as readonly [number, number],
+  /** Starters are drawn around club strength, backups below it. */
+  STARTER_RATING_SD: 4,
+  BACKUP_RATING_GAP: 7,
+  BACKUP_RATING_SD: 4,
+  /** Potential = rating + years to 24 × this + noise. Hidden. */
+  POTENTIAL_GAIN_PER_YEAR: 2,
+  POTENTIAL_NOISE_SD: 3,
+  /** Under this age a player still grows toward potential. DESIGN: under 24. */
+  YOUTH_AGE: 24,
+  /** Zero, one or two traits per player. */
+  TRAIT_COUNT_WEIGHTS: [0.45, 0.4, 0.15] as readonly number[],
+  /** Trait draw weights by position (1 where unlisted). */
+  TRAIT_POSITION_WEIGHTS: {
+    poacher: { GK: 0, D: 0.1, M: 0.4, F: 3 },
+    playmaker: { GK: 0, D: 0.3, M: 3, F: 0.8 },
+    pace: { GK: 0, D: 1, M: 1.2, F: 1.5 },
+    aerial: { GK: 0.3, D: 2, M: 0.6, F: 1.5 },
+    'tough tackler': { GK: 0, D: 2.5, M: 1.5, F: 0.2 },
+    leader: { GK: 1.5, D: 1.5, M: 1, F: 0.8 },
+    'big-game': { GK: 1, D: 1, M: 1, F: 1 },
+    consistent: { GK: 1.5, D: 1, M: 1, F: 1 },
+    versatile: { GK: 0, D: 1.5, M: 1.5, F: 1 },
+    loyal: { GK: 1, D: 1, M: 1, F: 1 },
+    'injury-prone': { GK: 0.5, D: 1, M: 1, F: 1 },
+    'hot-headed': { GK: 0.3, D: 1.5, M: 1.2, F: 1 },
+  } as Readonly<Record<string, Readonly<Record<'GK' | 'D' | 'M' | 'F', number>>>>,
+  /** Positional penalties. DESIGN: adjacent −15, distant −30, wrong side −5; versatile halves them. */
+  POSITION_PENALTY_ADJACENT: 15,
+  POSITION_PENALTY_DISTANT: 30,
+  SIDE_PENALTY: 5,
+  VERSATILE_PENALTY_SHARE: 0.5,
+  /** Condition (0–100). DESIGN: below 80 it costs rating, below 70 it raises injury risk. */
+  CONDITION_MAX: 100,
+  CONDITION_RATING_FROM: 80,
+  CONDITION_RATING_PER_POINT: 0.25,
+  CONDITION_INJURY_FROM: 70,
+  /** Player morale swings effective rating by ± this at 100 / 0. */
+  PLAYER_MORALE_RATING_SWING: 3,
+  /** The assistant's youth-first lean: selection bonus for under-24s. */
+  YOUTH_LEAN_SELECTION_BONUS: 4,
+  /** Share of AI managers who lean youth-first. */
+  AI_YOUTH_FIRST_SHARE: 0.3,
+  /** Bench size. DESIGN: five. */
+  BENCH_SIZE: 5,
+  /** The formation a club falls back on. */
+  DEFAULT_FORMATION: '4-4-2' as const,
+  /** AI preferred formations, weights in FORMATION_NAMES order. */
+  FORMATION_WEIGHTS: [3, 1, 2, 1.5, 0.5, 1, 1, 1.5, 0.8, 1, 0.8, 0.5] as readonly number[],
+  /** AI styles, weights for possession, direct, counter, pressing. */
+  STYLE_WEIGHTS: [1, 1, 1, 1] as readonly number[],
+  /** Wage in £k a week = base × e^(exp × rating), veterans discounted. */
+  WAGE_BASE_K: 0.5,
+  WAGE_RATING_EXP: 0.055,
+  WAGE_MIN_K: 1,
+  WAGE_VETERAN_AGE: 32,
+  WAGE_VETERAN_SHARE: 0.8,
+  /** Value in £m = base × (rating/100)^power, discounted per year from the peak age. */
+  VALUE_BASE_M: 40,
+  VALUE_RATING_POWER: 3,
+  VALUE_PEAK_AGE: 27,
+  VALUE_AGE_DECAY: 0.08,
+  VALUE_AGE_FLOOR: 0.2,
+  /** No player is worth less than this, £m. */
+  VALUE_MIN_M: 0.1,
+  /** Contract years at generation, uniform. */
+  PLAYER_CONTRACT_YEARS: [1, 4] as readonly [number, number],
+  // Match aftermath (DESIGN.md "Players": condition, injuries, suspensions,
+  // morale, ratings out of ten). Serves: yellows ≈ 3–4 a match, reds ≈ 0.2,
+  // match ratings average ≈ 6.9 with a spread of about 0.6.
+  MATCH_MINUTES: 90,
+  /** Condition lost over ninety minutes and won back each week of rest: a weekly starter is fresh, a midweek game leaves him short. */
+  CONDITION_DRAIN_PER_90: 22,
+  CONDITION_RECOVERY_PER_WEEK: 24,
+  /** Injuries per player per match; low condition and the injury-prone multiply it. DESIGN: 1–20 weeks. */
+  INJURY_P_PER_MATCH: 0.012,
+  INJURY_LOW_CONDITION_MULT: 1.6,
+  INJURY_PRONE_MULT: 2,
+  INJURY_MIN_WEEKS: 1,
+  INJURY_MAX_WEEKS: 20,
+  /** Cards per outfield player per match. Serves: ≈ 3–4 yellows and ≈ 0.2 reds a match (to verify). */
+  YELLOW_P: 0.16,
+  RED_P: 0.01,
+  GK_CARD_SHARE: 0.15,
+  TOUGH_TACKLER_CARD_MULT: 1.5,
+  HOT_HEADED_CARD_MULT: 1.5,
+  HOT_HEADED_RED_MULT: 2.5,
+  /** Bans: five yellows one match, ten two; a red one to three. */
+  YELLOW_BANS: { '5': 1, '10': 2 } as Readonly<Record<string, number>>,
+  RED_BAN: [1, 3] as readonly [number, number],
+  /** Scorers and assisters are drawn by position, then by trait. */
+  SCORER_POSITION_WEIGHTS: { GK: 0.01, D: 0.6, M: 2, F: 6 } as Readonly<Record<'GK' | 'D' | 'M' | 'F', number>>,
+  ASSIST_POSITION_WEIGHTS: { GK: 0.05, D: 1, M: 3, F: 2 } as Readonly<Record<'GK' | 'D' | 'M' | 'F', number>>,
+  POACHER_SCORER_MULT: 1.6,
+  PLAYMAKER_ASSIST_MULT: 1.6,
+  ASSIST_P: 0.7,
+  /** The one-shot model's stand-in shot counts for the record: base plus per goal. */
+  ONE_SHOT_SHOTS_BASE: 9,
+  ONE_SHOT_SHOTS_PER_GOAL: 1.5,
+  ONE_SHOT_ON_TARGET_SHARE: 0.35,
+  ONE_SHOT_CORNERS: 4.5,
+  ONE_SHOT_FOULS: 11,
+  /** Match ratings out of ten: base, the result, level against the XI, events, noise. Serves: mean ≈ 6.9, spread ≈ 0.6. */
+  RATING_BASE: 6.6,
+  RATING_WIN: 0.5,
+  RATING_DRAW: 0.1,
+  RATING_LOSS: -0.35,
+  RATING_PER_POINT: 25,
+  RATING_PER_GOAL: 0.8,
+  RATING_PER_ASSIST: 0.4,
+  RATING_CLEAN_SHEET: 0.4,
+  RATING_PER_GOAL_CONCEDED: 0.12,
+  RATING_NOISE_SD: 0.35,
+  RATING_MIN: 3,
+  RATING_MAX: 10,
+  /** Player morale: the result (scaled by the manager's motivation like the team's), playing time, a leader, weekly settling. */
+  PLAYER_MORALE_WIN: 3,
+  PLAYER_MORALE_LOSS: -4,
+  PLAYER_MORALE_STARTED: 1,
+  PLAYER_MORALE_LEFT_OUT: -1,
+  LEADER_MORALE_LIFT: 2,
+  PLAYER_MORALE_DECAY: 0.08,
+
+  // Contracts and requests (DESIGN.md "Players": renew or release, new-deal and leave requests).
+  /** A player asks for a new deal when his demand tops his wage by this share. */
+  NEW_DEAL_GAP: 0.3,
+  NEW_DEAL_YEARS: 3,
+  NEW_DEAL_MORALE_GAIN: 8,
+  /** A starter-level player (within this of club strength) starting under this share of the club's games asks to leave. */
+  WANTS_AWAY_RATING_BELOW: 5,
+  WANTS_AWAY_START_SHARE: 0.3,
+  WANTS_AWAY_MIN_GAMES: 8,
+  /** Monthly chance a player with a grievance raises it. Serves: most months zero or one decision. */
+  REQUEST_P: 0.5,
+  /** Refusing a request: morale lost, bond lost; the refusal counts toward "difficult" as a fallout. */
+  REFUSAL_MORALE_LOSS: 15,
+  BOND_REFUSAL_LOSS: 3,
+  /** Years on a renewal the assistant recommends. */
+  RENEW_YEARS_PLAYER: 2,
+  /** The loyal rule: bonded above this, a loyal player asks this share of his wage. */
+  BOND_LOYAL_THRESHOLD: 10,
+  LOYAL_WAGE_SHARE: 0.8,
+  /** Bond moves (DESIGN.md "Your players"): a start, a debut, a promotion, a renewal, a decision that backed him. */
+  BOND_START: 1,
+  BOND_DEBUT: 5,
+  BOND_PROMOTION: 5,
+  BOND_RENEWAL: 3,
+  BOND_BACKED: 5,
+
+  // Your players (DESIGN.md "Your players"). Serves: a starter gains at
+  // least three times a bench player over a season; buying finished players
+  // yields under 10% of players-made points; the best maker's Legacy within
+  // 20% of the best trophy-winner's.
+  /** A full season of starts moves an under-24 this far toward potential. */
+  GROWTH_PER_SEASON: 4,
+  EXPECTED_STARTS: 46,
+  /** Growth × (base + slope × development ÷ 100). */
+  DEV_FACTOR_BASE: 0.6,
+  DEV_FACTOR_SLOPE: 0.8,
+  /** Players-made points per rating point of growth under the manager. */
+  GROWTH_POINTS_PER_RATING: 3,
+  /** Tag weights: debut and promotion in full, a signing less; a finished player (bought at this rating or above) almost nothing. */
+  TAG_WEIGHTS: { debut: 1, promoted: 1, signed: 0.5 } as Readonly<Record<'debut' | 'promoted' | 'signed', number>>,
+  BOUGHT_FINISHED_RATING: 70,
+  BOUGHT_FINISHED_WEIGHT: 0.05,
+  /** Milestone points: a tier above the one he was made in, a transfer above the fee threshold, a top-tier or European title. */
+  MILESTONE_POINTS: { tierAbove: 8, transfer: 10, title: 20, promotion: 0, cupFinal: 0, retired: 0 } as Readonly<Record<string, number>>,
+  /** £m: a transfer at or above this is a milestone. */
+  TRANSFER_MILESTONE_FEE: 3,
+  /** A tagged player who leaves waits as a free agent for a club within this many strength points of his rating. */
+  MOVE_ON_STRENGTH_WINDOW: 10,
+  /** A generated player older than this has debuted somewhere already. */
+  DEBUT_AGE_LIMIT: 19,
+  /** Seasons a free agent waits before retiring. */
+  FREE_AGENT_MAX_SEASONS: 1,
+
+  // ---------------------------------------------------------------------------
+  // The minute engine (DESIGN.md "Match"). Serves: goals per game ≈ 2.7,
+  // home / draw / away ≈ 45 / 26 / 29, yellows ≈ 3–4, reds ≈ 0.2 (to verify);
+  // a match in about a minute at full speed.
+  // ---------------------------------------------------------------------------
+
+  /** Pressure target per point of effective XI difference, and per midfielder of presence (a quality-weighted count). */
+  PRESSURE_PER_POINT: 1.0,
+  PRESSURE_PER_MID: 3,
+  /** Home advantage as a pressure lean. DESIGN names 8; 12 nets out to the home-win target once a leading side sits deep. To verify against real home-win rates. */
+  HOME_PRESSURE_LEAN: 12,
+  /** Mentality (DESIGN: shifts every band's weight and the pressure lean): the lean, the tempo of the whole match per attacking side (− per defending side), and the share moved between a side's attack and defence bands. */
+  MENTALITY_LEAN: 6,
+  MENTALITY_TEMPO: 0.15,
+  MENTALITY_BAND_SHIFT: 0.1,
+  /** A leading side sits deeper by this unless attacking. */
+  LEAD_SIT_DEEP: 16,
+  /** Style leans on pressure: possession with a better XI, pressing, counter sits back. */
+  STYLE_PRESSURE: { possessionBetter: 6, pressing: 7, counter: -5 } as const,
+  /** Pressure moves this share of the way to its target each minute, with noise. */
+  PRESSURE_DRIFT: 0.3,
+  PRESSURE_NOISE_SD: 6,
+  /** A goal swings momentum by this for the scorers; momentum fades by this share each minute. */
+  MOMENTUM_GOAL: 6,
+  MOMENTUM_DECAY: 0.9,
+  /** The home share of chances is a logistic in pressure with this scale: the lean of 8 gives ≈ 58%. Serves: home / draw / away ≈ 45 / 26 / 29. */
+  CHANCE_SHARE_SCALE: 25,
+  /** Chances per minute at level pressure, and the extra share at full pressure. Serves: ≈ 24 shots a match (to verify). */
+  CHANCE_BASE: 0.36,
+  CHANCE_PRESSURE: 0.2,
+  /** Chance probability scales with the square root of openness (our attack over their defence, against the standard), within bounds. */
+  OPENNESS_MIN: 0.7,
+  OPENNESS_MAX: 1.4,
+  /** Style, one rule each, on chances: fewer but better; more of lower quality; on the break; more of them. */
+  STYLE_CHANCE: {
+    possession: { chance: 0.85, quality: 1.15 },
+    direct: { perTrait: 0.03, quality: 0.9 },
+    counter: { onBreak: 1.25, notOnBreak: 0.9, quality: 1.1 },
+    pressing: { chance: 1.08 },
+  } as const,
+  /** Openness counts a midfielder as this much of an attacker and this much of a defender; the standard is a 4-4-2 against a 4-4-2 (3.4 ÷ 7). DESIGN: 4-5-1 wins the midfield against 4-4-2 but creates less. */
+  MID_ATTACK_SHARE: 0.35,
+  MID_DEFENCE_SHARE: 0.5,
+  OPENNESS_STANDARD: 3.4 / 7,
+  /** Width against a narrow back line (fewer wide defenders than this, from a shape this wide or more), and the overload of a back line this long, on chance frequency. */
+  WIDTH_CHANCE: 1.06,
+  NARROW_DEFENCE_WIDTH: 2,
+  WIDE_ATTACK_WIDTH: 4,
+  OVERLOAD_CHANCE: 0.9,
+  OVERLOAD_BACK_LINE: 5,
+  /** Conversion: P(goal) = base × e^(sens × edge), edge from attacker against keeper and defenders in rating points ÷ EDGE_SCALE, plus ln(quality). Serves: goals per game ≈ 2.7. */
+  GOAL_BASE_P: 0.11,
+  GOAL_SENS: 0.12,
+  GOAL_P_MAX: 0.5,
+  EDGE_SCALE: 10,
+  QUALITY_FLOOR: 0.2,
+  /** Keeper and defence shares of the stop, and an outfielder in goal's penalty. */
+  KEEPER_SHARE: 0.6,
+  DEFENCE_SHARE: 0.4,
+  NO_KEEPER_PENALTY: 30,
+  /** A chance that is not a goal: save, miss or block. Serves: about a third of shots on target (to verify). */
+  SAVE_SHARE: 0.3,
+  MISS_SHARE: 0.45,
+  /** Share of chances that are not goals that go for a corner. Serves: ≈ 9 corners a match (to verify). */
+  CORNER_SHARE: 0.4,
+  /** Fouls per minute and the card odds per foul. Serves: ≈ 3–4 yellows and ≈ 0.2 reds a match. */
+  FOUL_BASE: 0.22,
+  YELLOW_PER_FOUL: 0.15,
+  RED_PER_FOUL: 0.003,
+  /** A booked player fouls this share as often: second yellows are rare. */
+  BOOKED_CAUTION: 0.3,
+  /** Injuries per side per minute, drawn by the injury rule. */
+  INJURY_MINUTE_P: 0.0014,
+  /** Substitutions by rule: from this minute for tiredness, chasing from this one, holding from this one; tired below this condition; at least this many minutes between a side's own changes. */
+  SUB_TIRED_FROM: 55,
+  SUB_TIRED_BELOW: 60,
+  SUB_CHASE_FROM: 65,
+  SUB_HOLD_FROM: 78,
+  SUBS_MAX: 3,
+  SUB_MIN_GAP: 8,
+  /** Added time per half, uniform. */
+  STOPPAGE_FIRST: [0, 3] as readonly [number, number],
+  STOPPAGE_SECOND: [1, 5] as readonly [number, number],
+  /** Possession moves this much per point of the share of minutes a side spent on top (cosmetic; to verify against ≈ 53% at home). */
+  POSSESSION_SWING: 0.6,
+  /** Live rating moves in the match view: a save, a card; a short cameo counts a little less. */
+  LIVE_RATING_START: 6,
+  LIVE_RATING_SAVE: 0.05,
+  LIVE_RATING_YELLOW: -0.3,
+  LIVE_RATING_RED: -1,
+  LIVE_RATING_CAMEO: -0.2,
+  /** Headless full match must finish under this many milliseconds. */
+  MATCH_HEADLESS_MS: 50,
+
+  /** Anchoring tolerance the tests allow after rounding to one decimal; below the minimum strength the rating floor gets in the way. */
+  ANCHOR_TOLERANCE: 0.15,
+  ANCHOR_MIN_STRENGTH: 10,
+  /** Anchoring passes, and the residue below which it stops. */
+  ANCHOR_PASSES: 4,
+  ANCHOR_RESIDUE: 0.02,
+  /** The age curve. DESIGN: peak 26–30, decline from 31, keepers from 33. */
+  PEAK_AGE_PLAYER: [26, 30] as readonly [number, number],
+  DECLINE_FROM: 31,
+  GK_DECLINE_FROM: 33,
+  /** Rating lost per summer from the decline age, growing by this share each further year. */
+  DECLINE_PER_YEAR: 1.5,
+  DECLINE_ACCELERATION: 0.25,
+  /** Players may retire from this age, and do at this one. */
+  PLAYER_RETIRE_FROM: 33,
+  PLAYER_RETIRE_P: 0.3,
+  PLAYER_RETIRE_AT: 37,
+  /** Out of contract and this far below club strength: released. */
+  RELEASE_BELOW_STRENGTH: 12,
+  /** Academy promotions: age, rating below club strength, extra hidden potential. */
+  ACADEMY_AGE_RANGE: [17, 19] as readonly [number, number],
+  ACADEMY_RATING_GAP: 15,
+  ACADEMY_POTENTIAL_BONUS: 12,
 
   // ---------------------------------------------------------------------------
   // Squad (DESIGN.md "Squad"). Serves: ceiling resets (turnover), ownership
@@ -491,8 +793,8 @@ export const T = {
   SACK_ROLL_BASE: 0.04,
   SACK_ROLL_PER_YEAR: 0.2,
   SACK_ROLL_FLOOR: 0.03,
-  /** Credit at or below this: sacked at once, and counted as deserved. DESIGN started at 5. */
-  CREDIT_INSTANT_SACK: 8,
+  /** Credit at or below this: sacked at once, and counted as deserved. DESIGN started at 5; 9 since the fast path (phase 3c), whose draw-heavier results had stretched the median first spell to the top of its band. */
+  CREDIT_INSTANT_SACK: 9,
   /** A sacking is "deserved" after this many consecutive weeks below threshold. */
   DESERVED_WEEKS: 8,
   REP_SACKED_DESERVED: -8,
@@ -526,6 +828,8 @@ export const T = {
   FALLOUT_OWNERSHIP_GAIN: 1 / 11,
   /** AI sells the player when its motivation ability is below this. */
   AI_FALLOUT_SELL_BELOW_MOTIVATION: 50,
+  /** The player who turns is the best outfielder at least this old. */
+  FALLOUT_SENIOR_AGE: 27,
   /** Board rows: monthly roll while credit is within the margin above threshold. */
   BOARD_ROW_P: 0.05,
   BOARD_ROW_MARGIN: 10,
@@ -759,8 +1063,8 @@ export const T = {
     foreign: { big: 80, mid: 40, small: 20 },
   } as const,
 
-  /** Legacy = games × a + earnings(£m) × b + trophy points × c. */
-  LEGACY_WEIGHTS: { games: 0.2, earnings: 2, trophyPoints: 0.15 } as const,
+  /** Legacy = games × a + earnings(£m) × b + trophy points × c + players made × d. */
+  LEGACY_WEIGHTS: { games: 0.2, earnings: 2, trophyPoints: 0.15, playersMade: 0.045 } as const,
 
   /** Bonuses as a share of the season's salary: for a trophy, for a promotion. Serves: earnings mix. */
   TROPHY_BONUS_SHARE: 0.25,
@@ -768,8 +1072,10 @@ export const T = {
 
   /** Reference careers the Legacy weights are checked against (DESIGN: within ~20%). */
   LEGACY_ARCHETYPES: {
-    midTableThirtyYears: { games: 1260, earnings: 35, trophyPoints: 30 },
-    trophyLadenTwelveYears: { games: 600, earnings: 45, trophyPoints: 900 },
+    midTableThirtyYears: { games: 1260, earnings: 35, trophyPoints: 30, playersMade: 120 },
+    trophyLadenTwelveYears: { games: 600, earnings: 45, trophyPoints: 900, playersMade: 40 },
+    /** Thirty years making players at small clubs: little money, few trophies, the fourth line (the population's 30-season makers read about 2,000). */
+    makerThirtyYears: { games: 1260, earnings: 12, trophyPoints: 15, playersMade: 2000 },
     tolerance: 0.2,
   } as const,
 
@@ -798,8 +1104,29 @@ export const T = {
     topTierLongTenures: { target: 3, min: 2, max: 4 },
     /** Unjust sackings ≈ 20–30% of all sackings. To verify. */
     unjustSackingShare: { target: 0.25, min: 0.2, max: 0.3 },
+    /** Match ratings average ≈ 6.9 with a spread of about 0.6. To verify. */
+    ratingMean: { target: 6.9, min: 6.6, max: 7.2 },
+    ratingSpread: { target: 0.6, min: 0.35, max: 0.85 },
+    /** No formation or style beats the mean points per game by more than 10%. */
+    formationEdge: { target: 0, min: 0, max: 0.1 },
+    styleEdge: { target: 0, min: 0, max: 0.1 },
+    /** The best maker's Legacy lands within 20% of the best trophy-winner's: the best career among the ten with most players made against the best among the ten with most trophy points. */
+    makerLegacyRatio: { target: 1, min: 0.8, max: 1.25 },
+    /** Buying finished players yields under 10% of players-made points. */
+    boughtFinishedShare: { target: 0.05, min: 0, max: 0.1 },
+    /** Match: goals per game ≈ 2.7; home / draw / away ≈ 45 / 26 / 29; yellows ≈ 3–4; reds ≈ 0.2. All to verify against real league averages. */
+    goalsPerGame: { target: 2.7, min: 2.4, max: 3.0 },
+    homeWinShare: { target: 0.45, min: 0.4, max: 0.5 },
+    drawShare: { target: 0.26, min: 0.22, max: 0.3 },
+    awayWinShare: { target: 0.29, min: 0.24, max: 0.34 },
+    yellowsPerGame: { target: 3.5, min: 2.8, max: 4.2 },
+    redsPerGame: { target: 0.2, min: 0.1, max: 0.3 },
   } as const,
 
+  /** How many of each kind the maker-to-winner comparison takes: the ten biggest makers against the ten biggest trophy-winners. */
+  MAKER_WINNER_TOP_N: 10,
+  /** Games a formation or style needs in the log before its points per game count toward the edge targets; fewer is noise. */
+  EDGE_MIN_GAMES: 600,
   /** Seasons skipped before sampling "at any moment" figures, so genesis spells can age. */
   VALIDATION_WARM_UP_SEASONS: 8,
   /** A "long" top-tier tenure in seasons. */

@@ -29,15 +29,17 @@ export function promotionPointsFrom(tier: Tier): number {
   return T.TROPHY_POINTS.promotionFromTier[tier - 2] ?? 0
 }
 
-export function legacy(games: number, earnings: number, trophyPoints: number): number {
+export function legacy(games: number, earnings: number, trophyPoints: number, playersMade = 0): number {
   const w = T.LEGACY_WEIGHTS
-  return round1(games * w.games + earnings * w.earnings + trophyPoints * w.trophyPoints)
+  return round1(games * w.games + earnings * w.earnings + trophyPoints * w.trophyPoints + playersMade * w.playersMade)
 }
 
 export interface Score {
   games: number
   earnings: number
   trophyPoints: number
+  /** The fourth line (DESIGN.md "Your players"). */
+  playersMade: number
   legacy: number
 }
 
@@ -45,7 +47,8 @@ export function careerScore(manager: Manager): Score {
   const games = manager.history.games
   const earnings = round1(manager.history.earnings)
   const trophyPoints = manager.history.trophyPoints
-  return { games, earnings, trophyPoints, legacy: legacy(games, earnings, trophyPoints) }
+  const playersMade = Math.round(manager.history.playersMade * 10) / 10
+  return { games, earnings, trophyPoints, playersMade, legacy: legacy(games, earnings, trophyPoints, playersMade) }
 }
 
 function bonus(world: World, manager: Manager, share: number, reason: string): void {

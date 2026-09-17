@@ -1,22 +1,18 @@
 /**
- * The abstract match model (DESIGN.md "Season and match"). Each side's
- * effective strength feeds an expected-goals figure; goals are Poisson. The
- * same distribution gives the win/draw/loss probabilities used for expected
- * points, so credit is judged against the odds the model itself produced.
+ * The fast path as the season reads it (DESIGN.md "Match"): a participant is
+ * a side before kick-off; odds come from the calibrated table; a match nobody
+ * watches is one scoreline drawn from those odds. The same distribution gives
+ * the win/draw/loss probabilities used for expected points, so credit is
+ * judged against the odds the model itself produced.
  */
 import type { Rng } from '../rng.js'
 import { T } from '../tunables.js'
-import type { Mentality, Result, Shape } from '../types.js'
+import type { XiBands } from '../players/select.js'
+import { sideRating, type SideView } from '../match/model.js'
+import { fastOdds, sampleScoreline } from '../match/fastpath.js'
 
-export interface Participant {
+export interface Participant extends SideView {
   id: number
-  strength: number
-  /** Manager's tactical ability, 0–100. */
-  tactical: number
-  form: readonly Result[]
-  morale: number
-  shape: Shape
-  mentality: Mentality
 }
 
 export interface MatchOdds {
@@ -25,9 +21,13 @@ export interface MatchOdds {
   pAway: number
   lambdaHome: number
   lambdaAway: number
+  /** The pre-match pressure lean, home perspective, for the opposition report. */
+  lean: number
   /** Expected league points for each side (3 × win + draw). */
   expHome: number
   expAway: number
+  /** The scoreline distribution the numbers above are summed from. */
+  pmf: number[][]
 }
 
 export interface MatchOutcome {
@@ -38,100 +38,38 @@ export interface MatchOutcome {
   odds: MatchOdds
 }
 
-const BEATS: Record<Shape, Shape> = { A: 'B', B: 'C', C: 'A' }
+export { formScore, sideRating } from '../match/model.js'
+export { poissonPmf } from '../match/fastpath.js'
 
-export function formScore(form: readonly Result[]): number {
-  if (form.length === 0) return 0
-  let points = 0
-  for (const r of form) points += r === 'W' ? 3 : r === 'D' ? 1 : 0
-  return (points / (3 * form.length) - 0.5) * 2
-}
-
+/** The side's rating on the day; kept under its old name for the tenure model. */
 export function effectiveStrength(p: Participant): number {
-  return (
-    p.strength +
-    T.FORM_WEIGHT * formScore(p.form) +
-    (T.ABILITY_WEIGHT * (p.tactical - T.SCALE_MIDPOINT)) / T.SCALE_MIDPOINT +
-    (T.MORALE_WEIGHT * (p.morale - T.SCALE_MIDPOINT)) / T.SCALE_MIDPOINT
-  )
-}
-
-function mentalityFactor(m: Mentality): number {
-  return m === 'attack' ? 1 + T.MENTALITY_VARIANCE : m === 'defend' ? 1 - T.MENTALITY_VARIANCE : 1
-}
-
-export function poissonPmf(lambda: number, max: number): number[] {
-  const pmf: number[] = []
-  let p = Math.exp(-lambda)
-  let total = 0
-  for (let k = 0; k <= max; k++) {
-    if (k > 0) p = (p * lambda) / k
-    pmf.push(p)
-    total += p
-  }
-  return pmf.map((x) => x / total)
+  return sideRating(p)
 }
 
 export function matchOdds(home: Participant, away: Participant): MatchOdds {
-  const diff = effectiveStrength(home) - effectiveStrength(away)
-  // Home advantage is the only asymmetry between the sides before strength is read.
-  let lambdaHome = (T.GOALS_BASE + T.HOME_ADVANTAGE_GOALS) * Math.exp(T.GOAL_SENSITIVITY * diff)
-  let lambdaAway = T.GOALS_BASE * Math.exp(-T.GOAL_SENSITIVITY * diff)
-  if (BEATS[home.shape] === away.shape) {
-    lambdaHome *= 1 + T.TACTIC_RPS
-    lambdaAway *= 1 - T.TACTIC_RPS
-  } else if (BEATS[away.shape] === home.shape) {
-    lambdaHome *= 1 - T.TACTIC_RPS
-    lambdaAway *= 1 + T.TACTIC_RPS
-  }
-  const variance = mentalityFactor(home.mentality) * mentalityFactor(away.mentality)
-  lambdaHome *= variance
-  lambdaAway *= variance
-  const ph = poissonPmf(lambdaHome, T.MAX_GOALS)
-  const pa = poissonPmf(lambdaAway, T.MAX_GOALS)
-  let pHome = 0
-  let pDraw = 0
-  let pAway = 0
-  for (let h = 0; h <= T.MAX_GOALS; h++) {
-    for (let a = 0; a <= T.MAX_GOALS; a++) {
-      const p = (ph[h] as number) * (pa[a] as number)
-      if (h > a) pHome += p
-      else if (h === a) pDraw += p
-      else pAway += p
-    }
-  }
+  const o = fastOdds(home, away)
   return {
-    pHome,
-    pDraw,
-    pAway,
-    lambdaHome,
-    lambdaAway,
-    expHome: T.POINTS_WIN * pHome + T.POINTS_DRAW * pDraw,
-    expAway: T.POINTS_WIN * pAway + T.POINTS_DRAW * pDraw,
+    pHome: o.pHome,
+    pDraw: o.pDraw,
+    pAway: o.pAway,
+    lambdaHome: o.lambdaHome,
+    lambdaAway: o.lambdaAway,
+    lean: o.lean,
+    expHome: T.POINTS_WIN * o.pHome + T.POINTS_DRAW * o.pDraw,
+    expAway: T.POINTS_WIN * o.pAway + T.POINTS_DRAW * o.pDraw,
+    pmf: o.pmf,
   }
 }
 
-function samplePoisson(rng: Rng, lambda: number): number {
-  const pmf = poissonPmf(lambda, T.MAX_GOALS)
-  let r = rng.float()
-  for (let k = 0; k <= T.MAX_GOALS; k++) {
-    r -= pmf[k] as number
-    if (r < 0) return k
-  }
-  return T.MAX_GOALS
-}
-
-/** Probability the home side wins a shoot-out, from the strength gap. */
 export function shootoutHomeChance(home: Participant, away: Participant): number {
-  const gap = (effectiveStrength(home) - effectiveStrength(away)) / 50
+  const gap = (sideRating(home) - sideRating(away)) / 50
   const edge = Math.max(-1, Math.min(1, gap)) * T.SHOOTOUT_STRENGTH_EDGE
   return 0.5 + edge
 }
 
 export function playMatch(rng: Rng, home: Participant, away: Participant, knockout: boolean): MatchOutcome {
   const odds = matchOdds(home, away)
-  const homeGoals = samplePoisson(rng, odds.lambdaHome)
-  const awayGoals = samplePoisson(rng, odds.lambdaAway)
+  const { homeGoals, awayGoals } = sampleScoreline(rng.float(), odds.pmf)
   const outcome: MatchOutcome = { homeGoals, awayGoals, odds }
   if (knockout && homeGoals === awayGoals) {
     outcome.shootoutWinnerId = rng.chance(shootoutHomeChance(home, away)) ? home.id : away.id
@@ -145,5 +83,25 @@ export function knockoutExpected(odds: MatchOdds, home: Participant, away: Parti
   return {
     home: T.POINTS_WIN * (odds.pHome + odds.pDraw * ph),
     away: T.POINTS_WIN * (odds.pAway + odds.pDraw * (1 - ph)),
+  }
+}
+
+/** A plain participant for tests and the abstract sides: eleven equal players in a 4-4-2. */
+export function plainBands(strength: number, formation: { defence: number; midfield: number; attack: number; width: number; defenceWidth: number } = { defence: 4, midfield: 4, attack: 2, width: 4, defenceWidth: 2 }): XiBands {
+  const s = strength / 100
+  return {
+    strength,
+    defence: (formation.defence + 1) * s,
+    midfield: formation.midfield * s,
+    attack: formation.attack * s,
+    width: formation.width,
+    defenceWidth: formation.defenceWidth,
+    pace: 0,
+    aerial: 0,
+    leaders: 0,
+    attackerEff: strength,
+    keeperEff: strength,
+    defenderEff: strength,
+    backLine: formation.defence,
   }
 }

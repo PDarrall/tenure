@@ -7,7 +7,6 @@ import type {
   ForeignLeague,
   ForeignLeagueKind,
   OwnerType,
-  Shape,
   Tier,
   World,
 } from '../types.js'
@@ -15,6 +14,7 @@ import { clubName, ForeignNamer, foreignLeagueName, TownNamer } from './names.js
 import { createManagers } from '../managers/gen.js'
 import { seatIncumbents } from '../tenure/spell.js'
 import { resetTables } from '../season/table.js'
+import { generateHomeSquads } from '../players/gen.js'
 
 export function clamp(x: number, lo: number, hi: number): number {
   return x < lo ? lo : x > hi ? hi : x
@@ -40,7 +40,6 @@ function makeClub(rng: Rng, id: number, tier: Tier, town: string): Club {
   const prestige = rng.int(prestigeRange[0], prestigeRange[1])
   const wealth = Math.round(clamp(prestige + rng.normal(0, T.WEALTH_NOISE_SD), 0, 100))
   const strength = round1(clamp(gravityTarget(wealth) + rng.normal(0, T.STRENGTH_INITIAL_NOISE_SD), 1, 100))
-  const shapes: Shape[] = ['A', 'B', 'C']
   return {
     id,
     name: clubName(rng, town, T.CLUB_PLAIN_NAME_SHARE),
@@ -67,8 +66,10 @@ function makeClub(rng: Rng, id: number, tier: Tier, town: string): Club {
     rivals: [],
     managerId: null,
     form: [],
-    shape: rng.pick(shapes),
+    formation: T.DEFAULT_FORMATION,
+    style: 'possession',
     mentality: 'balanced',
+    playerIds: [],
     netSpendThisSeason: 0,
     thisSeason: { cupFinals: 0, inBottomZone: false, academyPromoted: 0 },
     lastRelegatedSeason: null,
@@ -112,6 +113,7 @@ function makeForeign(rng: Rng, namer: ForeignNamer, nextId: { value: number }): 
         prestige: Math.round(clamp(spec.prestige + rng.normal(0, T.FOREIGN_CLUB_NOISE_SD), 0, 100)),
         strength: round1(clamp(spec.strength + rng.normal(0, T.FOREIGN_CLUB_NOISE_SD), 1, 100)),
         managerId: null,
+        playerIds: [],
       })
     }
     return {
@@ -143,6 +145,8 @@ export function createWorld(seed: number): World {
     vacancies: [],
     nextVacancyId: 1,
     nextManagerId: 1,
+    players: [],
+    nextPlayerId: 1,
     human: null,
     logPolicy: 'full',
     log: [],
@@ -165,6 +169,7 @@ export function createWorld(seed: number): World {
   const assignments = createManagers(world, rng)
   world.nextManagerId = world.managers.length + 1
   seatIncumbents(world, rng, assignments)
+  generateHomeSquads(world, rng)
   emit(world, 'managers.created', {
     total: world.managers.length,
     employed: world.managers.filter((m) => m.status.kind === 'employed').length,

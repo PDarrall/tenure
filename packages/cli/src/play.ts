@@ -22,13 +22,15 @@ import {
   spellOf,
   tableFor,
   tunables,
+  FORMATION_NAMES,
   type Background,
   type Decision,
   type HumanInputs,
   type InboxMark,
   type Manager,
+  type Formation,
   type Mentality,
-  type Shape,
+  type Style,
   type Tier,
   type UnemployedActivity,
   type World,
@@ -72,14 +74,14 @@ function header(world: World): string {
   const phase = sw < tunables.MATCH_WEEKS ? `week ${sw + 1} of ${tunables.MATCH_WEEKS}` : `summer week ${sw - tunables.MATCH_WEEKS + 1}`
   const score = careerSummary(world).score
   const lines: string[] = []
-  lines.push(`Season ${world.season}, ${phase}.  ${me.name}, ${me.age}.  Games ${score.games} · £${score.earnings}m · Trophy points ${score.trophyPoints} · Legacy ${score.legacy}`)
+  lines.push(`Season ${world.season}, ${phase}.  ${me.name}, ${me.age}.  Games ${score.games} · £${score.earnings}m · Trophy points ${score.trophyPoints} · Players made ${score.playersMade} · Legacy ${score.legacy}`)
   if (me.status.kind === 'employed') {
     const spell = spellOf(world, me)!
     if (spell.post.kind === 'home') {
       const club = world.clubs[spell.post.clubId - 1]!
       const table = tableFor(world, club.tier)
       const pos = table.findIndex((r) => r.clubId === club.id) + 1
-      lines.push(`${club.name} (tier ${club.tier}), ${ordinal(pos)} of ${table.length}.  Target ${ordinal(spell.expectation)}.  Board: ${boardMood(spell)}.  Shape ${world.human!.shape}, ${world.human!.mentality}.  Contract to season ${Math.floor(spell.contract.endWeek / tunables.SEASON_WEEKS) + 1}.`)
+      lines.push(`${club.name} (tier ${club.tier}), ${ordinal(pos)} of ${table.length}.  Target ${ordinal(spell.expectation)}.  Board: ${boardMood(spell)}.  ${world.human!.tactic.formation}, ${world.human!.tactic.style}, ${world.human!.tactic.mentality}.  Contract to season ${Math.floor(spell.contract.endWeek / tunables.SEASON_WEEKS) + 1}.`)
       lines.push(nextFixtureLine(world))
     } else {
       lines.push(`Abroad in the ${spell.post.league} league.  Target ${ordinal(spell.expectation)}.  Board: ${boardMood(spell)}.`)
@@ -178,7 +180,8 @@ function showTable(world: World): void {
 function showCareer(world: World): void {
   const s = careerSummary(world)
   console.log(`  ${s.name}, ${s.age}, ${s.background}. ${s.status}. Reputation ${s.reputation} (${bandName(s.reputation)}).`)
-  console.log(`  Games ${s.score.games} · Earnings £${s.score.earnings}m · Trophy points ${s.score.trophyPoints} · Legacy ${s.score.legacy} · Seasons managed ${s.seasonsManaged}`)
+  console.log(`  Games ${s.score.games} · Earnings £${s.score.earnings}m · Trophy points ${s.score.trophyPoints} · Players made ${s.score.playersMade} · Legacy ${s.score.legacy} · Seasons managed ${s.seasonsManaged}`)
+  for (const m of s.playersMade.slice(0, 10)) console.log(`    ${m.name} (${m.position}) ${m.circumstance} at ${m.club}, S${m.season}: ${Math.round(m.ratingThen)} → ${Math.round(m.ratingNow)}, ${m.points} pts, ${m.now}`)
   for (const sp of s.spells) {
     console.log(`  ${sp.club} (${sp.where}), season ${sp.fromSeason}${sp.toSeason !== null ? `–${sp.toSeason}` : '–'}, ${sp.seasons} seasons${sp.endReason ? `, ${sp.endReason}` : ''}${sp.finishes.length ? `, finishes ${sp.finishes.join(', ')}` : ''}`)
   }
@@ -190,7 +193,8 @@ function help(): void {
   console.log(`  enter          continue: play the next fixture, or take the next step
   1 b            answer decision 1 with option b
   a <id>         apply for vacancy    w <id>         withdraw an application
-  s A|B|C        shape                m attack|balanced|defend   mentality
+  form <name>    formation (e.g. form 4-4-2)   style possession|direct|counter|pressing
+  m attack|balanced|defend   mentality
   act <what>     wait|punditry|assistant|abroad       v   vacancies   f   fixtures   t   table   c   career page
   resign         resign now           retire         end the career and bank the score
   save [file]    save                 q              quit (autosaves if --save given)   h   help`)
@@ -294,11 +298,14 @@ async function main(): Promise<void> {
         console.log(`  Applying for #${arg}.`)
       } else if (cmd === 'w' && /^\d+$/.test(arg)) {
         inputs.withdraw = [...(inputs.withdraw ?? []), Number(arg)]
-      } else if (cmd === 's' && ['A', 'B', 'C'].includes(arg.toUpperCase())) {
-        inputs.shape = arg.toUpperCase() as Shape
-        console.log(`  Shape ${inputs.shape} from the next match.`)
+      } else if (cmd === 'form' && (FORMATION_NAMES as string[]).includes(arg)) {
+        inputs.tactic = { ...(inputs.tactic ?? {}), formation: arg as Formation }
+        console.log(`  ${arg} from the next match.`)
+      } else if (cmd === 'style' && ['possession', 'direct', 'counter', 'pressing'].includes(arg)) {
+        inputs.tactic = { ...(inputs.tactic ?? {}), style: arg as Style }
+        console.log(`  ${arg} from the next match.`)
       } else if (cmd === 'm' && ['attack', 'balanced', 'defend'].includes(arg)) {
-        inputs.mentality = arg as Mentality
+        inputs.tactic = { ...(inputs.tactic ?? {}), mentality: arg as Mentality }
         console.log(`  Mentality ${arg} from the next match.`)
       } else if (cmd === 'act' && ['wait', 'punditry', 'assistant', 'abroad'].includes(arg)) {
         inputs.activity = arg as UnemployedActivity

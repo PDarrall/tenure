@@ -66,7 +66,7 @@ describe('scoring in the world', () => {
     const score = careerScore(best)
     expect(score.trophyPoints).toBe(best.history.trophyPoints)
     expect(score.games).toBe(best.history.games)
-    expect(score.legacy).toBeCloseTo(legacy(score.games, score.earnings, score.trophyPoints), 5)
+    expect(score.legacy).toBeCloseTo(legacy(score.games, score.earnings, score.trophyPoints, score.playersMade), 5)
     expect(score.legacy).toBeGreaterThan(0)
   })
 })

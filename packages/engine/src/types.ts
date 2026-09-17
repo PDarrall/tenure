@@ -1,3 +1,5 @@
+import type { MatchState } from './match/minute.js'
+import type { PreparedFixture } from './season/season.js'
 /**
  * State shapes. Everything here is plain, JSON-serialisable data. A saved
  * game is a `World` and nothing else.
@@ -14,10 +16,153 @@ export type Tier = 1 | 2 | 3 | 4 | 5
 
 export type OwnerType = 'patient' | 'normal' | 'impatient' | 'erratic'
 
-/** Three tactical shapes in a rock-paper-scissors loop: A beats B beats C beats A. */
-export type Shape = 'A' | 'B' | 'C'
 export type Mentality = 'attack' | 'balanced' | 'defend'
 export type Result = 'W' | 'D' | 'L'
+
+// ---------------------------------------------------------------------------
+// Players and tactics (DESIGN.md "Players", "Formations and tactics")
+// ---------------------------------------------------------------------------
+
+export type PlayerId = number
+export type Position = 'GK' | 'D' | 'M' | 'F'
+export type Side = 'L' | 'C' | 'R' | 'any'
+
+/** The twelve traits. Each is exactly one rule in the engine (players/traits.ts). */
+export type Trait =
+  | 'poacher'
+  | 'playmaker'
+  | 'pace'
+  | 'aerial'
+  | 'tough tackler'
+  | 'leader'
+  | 'big-game'
+  | 'consistent'
+  | 'versatile'
+  | 'loyal'
+  | 'injury-prone'
+  | 'hot-headed'
+
+/** The CM 01/02 set (to verify against the game's default list). */
+export type Formation =
+  | '4-4-2'
+  | '4-4-2 diamond'
+  | '4-3-3'
+  | '4-5-1'
+  | '4-2-4'
+  | '4-1-3-2'
+  | '4-3-1-2'
+  | '3-5-2'
+  | '3-4-3'
+  | '5-3-2'
+  | '5-4-1'
+  | '5-3-2 sweeper'
+
+export type Style = 'possession' | 'direct' | 'counter' | 'pressing'
+
+/** Part of an AI manager's identity: whether selection leans toward under-24s. */
+export type YouthLean = 'youth-first' | 'results-first'
+
+export interface FormationSlot {
+  position: Position
+  side: Side
+}
+
+/** A tactic is three choices. */
+export interface Tactic {
+  formation: Formation
+  mentality: Mentality
+  style: Style
+}
+
+/** The human's picked side. autoPick lets the assistant choose. */
+export interface Selection {
+  xi: PlayerId[]
+  bench: PlayerId[]
+  captain: PlayerId | null
+  autoPick: boolean
+}
+
+export interface PlayerSeasonStats {
+  season: number
+  clubId: ClubId
+  tier: Tier | null
+  apps: number
+  starts: number
+  minutes: number
+  goals: number
+  assists: number
+  yellows: number
+  reds: number
+  /** Sum of match ratings and how many were given, for the average. */
+  ratingSum: number
+  rated: number
+  /** Rating gained from minutes this season (Your players). */
+  growth: number
+  /** Rating when the season's record opened, for the squad screen's change this season. */
+  ratingAtStart: number
+}
+
+export type MadeCircumstance = 'signed' | 'debut' | 'promoted'
+
+/** A permanent tag: this manager made this player theirs (DESIGN.md "Your players"). */
+export interface MadeBy {
+  managerId: ManagerId
+  clubId: ClubId
+  week: number
+  circumstance: MadeCircumstance
+  /** Rating on the day. */
+  rating: number
+  /** Grows with starts, a debut, a promotion, a renewal, a decision that backed him. */
+  bond: number
+  /** Rating gained from minutes while with this manager. */
+  growth: number
+  /** Tier of the club on the day, for the "tier above" milestone. */
+  tier: Tier | null
+  /** The tier-above milestone is paid once. */
+  tierAboveDone?: boolean
+}
+
+export interface Player {
+  id: PlayerId
+  name: string
+  nationality: Nationality
+  age: number
+  position: Position
+  side: Side
+  /** 1–100, one decimal. The number. */
+  rating: number
+  /** Hidden; scouts give a range. */
+  potential: number
+  /** 0–100. Drops with minutes, recovers with rest. */
+  condition: number
+  /** 0–100. */
+  morale: number
+  /** Weeks still out. */
+  injuryWeeks: number
+  /** Matches still banned. */
+  suspension: number
+  /** Yellow cards this season. */
+  yellows: number
+  /** Wage in £k a week; years left on the deal. */
+  contract: { years: number; wage: number }
+  /** £m. */
+  value: number
+  traits: Trait[]
+  /** Current club, home or foreign id; 0 when a free agent. */
+  clubId: ClubId
+  /** Season he became a free agent, while he is one. */
+  freeSince?: number | null
+  /** The club he left last, for the transfer record. */
+  lastClubId?: ClubId
+  /** Came through the academy of the club that promoted him. */
+  academy: boolean
+  /** Has played a first-team match. */
+  debuted: boolean
+  retired: boolean
+  season: PlayerSeasonStats
+  history: PlayerSeasonStats[]
+  madeBy: MadeBy[]
+}
 
 export type Competition =
   | 'league'
@@ -79,8 +224,12 @@ export interface Club {
   managerId: ManagerId | null
   /** Last results, newest last, capped at FORM_WINDOW. */
   form: Result[]
-  shape: Shape
+  /** The tactic the club last played with; AI clubs take it from their manager. */
+  formation: Formation
+  style: Style
   mentality: Mentality
+  /** The squad, ids into world.players. */
+  playerIds: PlayerId[]
   /** £m, reset each summer. Ranked within the division for the big-spender tag. */
   netSpendThisSeason: number
   /** Per-season counters, reset at season start. */
@@ -101,6 +250,8 @@ export interface ForeignClub {
   prestige: number
   strength: number
   managerId: ManagerId | null
+  /** Generated on demand, seeded, when the club meets a home club. */
+  playerIds: PlayerId[]
 }
 
 export interface ForeignLeague {
@@ -142,6 +293,9 @@ export interface World {
   vacancies: Vacancy[]
   nextVacancyId: VacancyId
   nextManagerId: ManagerId
+  /** Every player, by id − 1; a slot is null once a player has gone and nobody keeps his record. */
+  players: (Player | null)[]
+  nextPlayerId: PlayerId
   /** The human player, if this world is a career rather than a simulation. */
   human: HumanState | null
   /** 'career' keeps only events that concern the human plus season-level news. */
@@ -228,6 +382,8 @@ export interface ManagerHistory {
   earnings: number
   games: number
   trophyPoints: number
+  /** The fourth score line (DESIGN.md "Your players"), mirrored from players.made events. */
+  playersMade: number
   walkouts: number
   /** The −5 for stepping down to an assistant role is charged once per career. */
   steppedDown: boolean
@@ -251,7 +407,10 @@ export interface Manager {
   ability: Ability
   /** 0–100 each. */
   trust: { players: number; board: number }
-  preferredShape: Shape
+  /** Part of the manager's identity (DESIGN.md "Formations and tactics"). */
+  preferredFormation: Formation
+  style: Style
+  youthLean: YouthLean
   history: ManagerHistory
   status: ManagerStatus
   /** Season the manager entered the population; 0 for genesis. */
@@ -368,6 +527,8 @@ export interface Spell {
   takeover: { week: number; replaceWeek: number } | null
   /** Set when a fallout has already been rolled for the current losing run. */
   falloutRolled: boolean
+  /** The senior player behind an open fallout, if any. */
+  falloutPlayerId?: number | null
   season: SpellSeasonTally
   /** £m paid on the way out. */
   payout: number
@@ -423,6 +584,9 @@ export type DecisionKind =
   | 'press'
   | 'board'
   | 'activity'
+  | 'playerContract'
+  | 'newDeal'
+  | 'wantsAway'
 
 export interface DecisionOption {
   key: string
@@ -463,17 +627,47 @@ export interface HumanState {
   pending: Decision[]
   nextDecisionId: number
   /** Sticky per-match choices. */
-  shape: Shape
-  mentality: Mentality
+  tactic: Tactic
+  selection: Selection
   /** Vacancies the human turned down; the club moves on. */
   declinedVacancies: VacancyId[]
   /** Plan for the next window, set by a decision. */
   windowChoice: WindowChoice | null
+  /** Answers to this summer's expiring contracts, read when the summer settles them. */
+  contractChoices: Record<number, 'release' | { years: number; wage: number }>
+  /** A match week stopped before kick-off so the human can watch it (phase 3d); null between matches. */
+  watched: WatchedWeek | null
+}
+
+/** Enough of a fixture to find it again in world.fixtures. */
+export interface FixtureKey {
+  competition: Competition
+  round: number
+  homeId: ClubId
+  awayId: ClubId
+}
+
+/**
+ * A slot of a match week read before kick-off and held for the match view:
+ * the human's division (or the human's cup tie) runs in the minute engine,
+ * everything else in the slot waits for the fast path at commit. Plain data,
+ * so a save taken mid-match resumes at the same minute.
+ */
+export interface WatchedWeek {
+  seasonWeek: number
+  slot: { kind: 'league' } | { kind: 'cup'; competition: 'nationalCup' | 'leagueCup' | 'european' }
+  /** The fixtures played in the minute engine, the human's first. */
+  prepared: PreparedFixture[]
+  matches: MatchState[]
+  /** The rest of the slot, played on the fast path when the watched matches are committed. */
+  others: FixtureKey[]
 }
 
 export interface HumanInputs {
-  shape?: Shape
-  mentality?: Mentality
+  tactic?: Partial<Tactic>
+  selection?: Partial<Selection>
+  /** Players the human wants to talk terms with: a contract decision is queued for each. */
+  contractOffers?: PlayerId[]
   /** Vacancies to put the human's name forward for. */
   apply?: VacancyId[]
   withdraw?: VacancyId[]

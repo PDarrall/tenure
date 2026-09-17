@@ -3,12 +3,48 @@
     "Window closed: £{spend}m spent, the squad is up {gain} points, {turnoverPct}% of the XI is new{youthNote}.",
     "The window is done. Spend £{spend}m, gain {gain}, turnover {turnoverPct}%{youthNote}."
   ],
-  "window_sold": ["You sold {sold} senior player{soldPlural} for £{cash}m. The squad is thinner, and more yours."],
+  "window_sold": [
+    "You sold {sold} senior player{soldPlural} for £{cash}m. The squad is thinner, and more yours."
+  ],
   "summer": [
     "Pre-season report: the squad aged a year ({ageing} for age), drifted {gravity} toward its natural level, and the academy added {youthReleased}. Strength now {strength}.",
     "Pre-season: age {ageing}, gravity {gravity}, academy {youthReleased}. Squad strength {strength}."
   ],
-  "fallout": ["A senior player has gone to the press about you. The dressing room is watching how you respond."],
-  "fallout_sold": ["He is gone. The squad is weaker and quieter, and more yours."],
-  "fallout_backed_down": ["You backed down. The squad noticed."]
+  "fallout": [
+    "A senior player has gone to the press about you. The dressing room is watching how you respond."
+  ],
+  "fallout_sold": [
+    "He is gone. The squad is weaker and quieter, and more yours."
+  ],
+  "fallout_backed_down": [
+    "You backed down. The squad noticed."
+  ],
+  "injured": [
+    "{name} is injured: {weeks} week{plural} out.",
+    "Bad news from the physio: {name} is out for {weeks} week{plural}."
+  ],
+  "suspended": [
+    "{name} is banned for {matches} match{matchPlural}: {reason}."
+  ],
+  "enforced": [
+    "The assistant had to change the side: {names} came in."
+  ],
+  "refused": [
+    "{name} did not take the refusal well. The dressing room noticed."
+  ],
+  "sold_request": [
+    "{name} has gone for £{fee}m, as he wanted."
+  ],
+  "renewed_player": [
+    "{name} has signed for {years} more year{plural} at £{wage}k a week."
+  ],
+  "released_player": [
+    "{name} has left at the end of his contract."
+  ],
+  "signed_player": [
+    "{name} ({position}, {age}) has signed. Rated {rating}."
+  ],
+  "promoted_player": [
+    "{name} ({position}, {age}) steps up from the academy."
+  ]
 }

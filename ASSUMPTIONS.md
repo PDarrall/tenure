@@ -61,15 +61,17 @@ single branch, so they live here instead.
   engine and a fast path calibrated from it.)
 - Attack and defend mentalities scale both sides' expected goals up or
   down (variance only); the AI attacks weaker sides and defends against
-  stronger ones. Each manager has a fixed preferred shape. (Settled from
-  phase 3(b): DESIGN.md § Formations gives every AI manager a preferred
-  formation and a fallback, and has mentality shift the bands and the
-  pressure lean.)
+  stronger ones. Each manager has a fixed preferred shape. (Settled by
+  DESIGN.md v0.5 § Formations and tactics, built in phase 3(b): a tactic
+  is a formation, a mentality and a style; every AI manager has a
+  preferred formation and style; shapes are gone.)
 - Summer: academy gains from last summer are released, the squad ages a
   year, ageing squads lose 3–5 and young ones gain 1, strength gravitates
   toward the wealth target, then the window spends the whole budget with
   diminishing returns and churns the first XI. The winter pot is 30% of
   the normal budget. Net spend is ranked within the division as played.
+  (DESIGN.md v0.5 § Players keeps the window abstract until phase 4 and
+  makes club strength the master number that squads are anchored to.)
 - Match summaries are stored as a template key on the event and rendered
   on demand from text/match.json; rendering never draws from the RNG.
 
@@ -305,6 +307,8 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   restated as one tunable). The model reads about 3.1 goals a game and
   47 / 19 / 34 home / draw / away over a season; DESIGN's 2.7 and
   45 / 26 / 29 (to verify) are phase 3(c)'s calibration targets.
+  (DESIGN.md v0.5 § Match settles the replacement: a pressure lean of 8
+  in the minute engine, with the fast path calibrated from it.)
 - The round-robin's venues were keyed on round plus pair index, which
   sat every rotating club at one ground for half a season; venues now
   alternate, at most two rounds running at one ground. This shifts the
@@ -313,3 +317,154 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
 - A season in post at tier 5 is about 55 turns: 47 matches and 8
   non-match steps (six summer weeks and a couple of pre-match stops),
   measured on seeds 1 to 3.
+
+## Players and tactics (phase 3b)
+
+- A player is one rating out of 100 anchored to his club: the best XI
+  in the club's preferred formation averages club strength, and the
+  whole squad shifts together whenever strength changes (generation,
+  windows, summer, strength shocks, an appointment). Below strength 10
+  the rating floor of 1 gets in the way, so the anchoring test skips
+  those clubs.
+- Position is one of GK, D, M, F with a side (L, C, R or any). Playing
+  an adjacent role costs 15, a distant one 30, the wrong side 5;
+  versatile halves the penalty. Condition below 80 costs a quarter of a
+  point per point; morale swings ±3; the big-game trait adds 3 in a cup
+  tie, a derby or against a top side. An effective rating floors at 0.
+- Each trait is exactly one rule and names its reader in
+  `players/traits.ts`; a test fails on any trait no engine code reads.
+- Formations are the CM 01/02 twelve, each eleven slots, read in three
+  bands and a width. A midfielder counts 0.35 of an attacker and 0.5 of
+  a defender in openness, so 4-5-1 wins the midfield against 4-4-2 but
+  creates less, as DESIGN says.
+- AI managers carry a preferred formation, a style and a youth-first or
+  results-first lean; the assistant's auto-pick takes the best available
+  player slot by slot, with a +4 nudge for under-24s under youth-first.
+  A human pick that is no longer legal (injury, suspension) is repaired
+  slot by slot and the change is in the inbox.
+- Contract renewals, new-deal requests (a wage more than 30% short of
+  demand) and requests to leave (little football, low morale, or the
+  club well below him) arrive as decisions; a refusal costs morale and
+  bond and counts as a fallout. Loyal players bonded to the manager ask
+  20% less.
+- Squads sign and top up by positional need (the position furthest
+  below its share of the squad), not by list order.
+- A generated senior (over 19, not from the academy) has already made
+  his debut; a debut is the first first-team match of an academy player
+  or a generated teenager. Tagging happens once per manager: on that
+  debut, on promotion from the academy, or on signing; a player bought
+  finished (rating 70 or more on signing) counts 5% of a debut.
+- Growth: an under-24 moves toward his potential by minutes played,
+  scaled by the manager's development ability; a season of starts is
+  worth at least three times a season on the bench (tested).
+- A made player who leaves a club waits in a free-agent pool for a
+  season and is signed by a club within 10 points of his rating, or
+  retires; untagged leavers are forgotten so saves stay small.
+- Milestones for made players (a tier above, a transfer of £3m or more,
+  a title, a promotion, a cup final, retirement) reach the inbox of every
+  manager who made him, weighted by how he was made.
+- The fourth Legacy weight is 0.045 per players-made point; the maker
+  archetype (30 years, 2,000 points) lands within 10% of the other
+  three. The maker-versus-winner target compares the best Legacy among
+  the ten managers with most players made against the best among the
+  ten with most trophy points.
+- The fallout shock names the club's best senior outfielder (27 or
+  over); selling him moves him on, backing down bonds him.
+
+## Match engine and fast path (phase 3c)
+
+- The minute engine runs 0 to 90 plus stoppage (0–3 and 1–5 minutes,
+  drawn per half). Each minute: pressure drifts 30% of the way to its
+  target with noise; a chance arises with probability 0.36 per minute
+  at level pressure, goes to the home side by a logistic share of
+  pressure (scale 25), and passes a gate from openness and style; it
+  converts at 0.11 × e^(0.12 × edge), the edge being the attacker
+  against 0.6 of the keeper and 0.4 of the back line in rating points
+  ÷ 10, plus ln(quality). Not a goal: 30% saved, 45% wide, the rest
+  blocked; 40% of those go for a corner.
+- The home lean is 12 rather than DESIGN's 8: with a leading side
+  sitting deep (16) and the trailing AI side attacking from 65 minutes,
+  12 is what nets out to the home-win target. To verify with the rest.
+- AI managers by rule: chasing from 65 minutes goes to attack and swaps
+  the weakest defender for a forward; holding from 78 minutes (a lead,
+  or a point against a better side) goes to defend; a player under 60
+  condition comes off from 55 minutes; injuries are replaced at once;
+  voluntary changes are at least 8 minutes apart; three substitutions.
+- Fouls at 0.22 a minute (pressing sides 1.3×); a yellow at 0.15 and a
+  straight red at 0.003 per foul, scaled by the card rule; a booked
+  player fouls 30% as often. Injuries at 0.0014 per side per minute,
+  drawn by the injury rule.
+- Condition recovers 24 a week (a full match's drain), so a weekly
+  starter is fresh and a midweek game leaves him short; the tired rule
+  then bites in congested weeks. Ratings are computed on kick-off
+  condition, not on how tired a player finished.
+- The fast path samples a scoreline from a table calibrated by
+  `pnpm calibrate:fast-path`: a 16 × 16 grid over the pre-match model's
+  expected goals for each side (ln scale), carrying the minute engine's
+  mean goals per cell from ~72,000 matches across six worlds at four
+  ages, blended toward a smooth fit where cells are sparse, plus a
+  low-score correlation (ρ = −0.2) that reproduces the draw share. Odds
+  before a match are the same distribution.
+- Every match nobody watches, and the whole population sim, uses the
+  fast path; a watched match runs the minute engine and commits its
+  facts through the same settlement as the fast path.
+- A match rating's spread is measured on season averages (the
+  population test); per-match ratings spread wider (about 0.85).
+- Possession is cosmetic: 50 plus 0.6 per point of the share of minutes
+  a side spent on top.
+- Shots, corners and fouls on the fast path are sketched to the minute
+  engine's averages, since the fast path never sees them.
+- The fast path's draw-heavier results stretched the median first spell
+  to the top of its band, so instant sackings now fire at credit 9
+  rather than 8 (CREDIT_INSTANT_SACK); the tenure model is otherwise
+  untouched and reads results exactly as before.
+- Anchoring passes up to four times: rounding to a decimal and the
+  rating floor can leave a residue after one pass. A club never signs
+  back from the pool a player it released in the same window.
+- The formation and style edge targets count only formations and styles
+  with at least 600 logged games; a rarely chosen shape with a handful
+  of games is noise, not an edge.
+
+## Screens and the match view (phase 3d)
+
+- A fixture of the human's stops the turn before kick-off with the slot
+  read: the human's division (or the human's cup tie) sits in the minute
+  engine inside the save (`world.human.watched`), the rest of the slot
+  waits for the fast path. Continue after the whistle commits the lot
+  and runs the week on as before; a Continue mid-match runs the match
+  to the end headless first. "Change the side" forgets the prepared slot
+  and reads it again at the next Continue, consuming a few more random
+  draws, so a career that goes back is a different career from one that
+  does not; each is deterministic on its own.
+- Other matches in the division run in the same engine at the same
+  minute and show in the latest-scores panel; cup ties from other
+  divisions and other tiers' league matches are fast-path results at
+  full time. The table at full time is the standings with the day's
+  results applied, shown in the match view before the commit.
+- Full speed is 640 ms a match minute, so ninety minutes and stoppage
+  take about a minute of wall time; hold-to-run and the space bar run
+  the match while held, Run/Pause runs it until the next automatic
+  pause, To full time finishes it at once. Substitutions and mentality
+  changes are made while paused, including the pauses the match makes
+  itself (goals, red cards, injuries, half time).
+- An injured player on the human's side leaves the pitch and waits for
+  a change: the view says so and pauses; if the human runs on without
+  one, the side plays short, as an AI side does once its changes are
+  used.
+- The squad screen marks a player as yours (★) when the human's tag is
+  on him; the rating change shown is against the rating when the
+  season's record opened (`ratingAtStart`), which includes anchoring
+  shifts in windows.
+- Potential shows as a range only for your own club's players under 24
+  (the assistant knows them; scouting levels are phase 5): from the
+  rating to the hidden potential ± 4, whole numbers.
+- "Talk terms" on a player's profile queues the same contract decision
+  an expiring deal raises; the assistant's demand is his wage demand.
+- Tap-to-swap on the tactics screen exchanges two players' places (a
+  slot, a bench seat or the stands); taking over the sheet turns the
+  assistant's pick off; injured and banned players left in are replaced
+  at kick-off and reported in the inbox. The captain is a mark for the
+  team sheet with no rule reading it yet.
+- The Playwright smoke runs Chromium at an iPad viewport (WebKit is not
+  on the runner); tap targets are asserted at 32px or more on the
+  buttons, with the stylesheet setting 44px minimum height for controls.

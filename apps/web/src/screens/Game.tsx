@@ -18,30 +18,34 @@ import {
   type Decision,
   type FixtureView,
   type Manager,
-  type Mentality,
-  type Shape,
   type Tier,
   type UnemployedActivity,
   type Vacancy,
   type World,
 } from '@tenure/engine'
 import {
+  backFromPreMatch,
   blockingUnanswered,
   canAdvance,
+  humanMatch,
   isApplying,
   markFor,
+  watched,
   withActivity,
   withAnswer,
   withApply,
-  withMentality,
   withResign,
   withRetire,
-  withShape,
   withWithdraw,
   type Session,
 } from '../controller.js'
+import { Squad } from './Squad.js'
+import { PlayerProfile } from './PlayerProfile.js'
+import { Tactics } from './Tactics.js'
+import { PreMatch } from './PreMatch.js'
+import { MatchView } from './MatchView.js'
 
-type Tab = 'inbox' | 'fixtures' | 'vacancies' | 'career'
+type Tab = 'inbox' | 'squad' | 'tactics' | 'fixtures' | 'vacancies' | 'career'
 
 interface Props {
   session: Session
@@ -82,18 +86,44 @@ export function Game({ session, onChange, onContinue, onExport, onImport, onRese
   const [tab, setTab] = useState<Tab>('inbox')
   const [turnsBack, setTurnsBack] = useState(0)
   const [confirm, setConfirm] = useState<'resign' | 'retire' | 'reset' | null>(null)
+  const [openPlayer, setOpenPlayer] = useState<number | null>(null)
+  const [kickedOff, setKickedOff] = useState(false)
   // Turn-scoped state: a half-finished confirm or an unrolled inbox belongs to the turn it was made in.
   const [seenTurn, setSeenTurn] = useState(session.turn)
   if (seenTurn !== session.turn) {
     setSeenTurn(session.turn)
     setTurnsBack(0)
     setConfirm(null)
+    setKickedOff(false)
   }
   const world = session.world
   const me = player(world)
   const decisions = pendingDecisions(world)
   const blocked = blockingUnanswered(session)
   const answers = session.inputs.answers ?? {}
+
+  // A match week stopped before kick-off: the pre-match screen, then the match view, then Continue.
+  const match = humanMatch(session)
+  if (watched(session) && match) {
+    const started = kickedOff || match.played > 0 || match.over
+    return (
+      <main>
+        <Header session={session} />
+        {started ? (
+          <MatchView session={session} onContinue={onContinue} />
+        ) : (
+          <PreMatch
+            session={session}
+            onKickOff={() => setKickedOff(true)}
+            onBack={() => {
+              onChange(backFromPreMatch(session))
+              setTab('tactics')
+            }}
+          />
+        )}
+      </main>
+    )
+  }
 
   return (
     <main>
@@ -103,7 +133,7 @@ export function Game({ session, onChange, onContinue, onExport, onImport, onRese
 
       <section aria-label="This turn">
         <p>
-          <button className="primary" disabled={!canAdvance(session)} onClick={onContinue}>
+          <button className="primary" disabled={!canAdvance(session)} onClick={onContinue} data-testid="continue">
             Continue
           </button>
           {session.inputs.resign && <span className="notice">You will resign this turn.</span>}
@@ -125,14 +155,26 @@ export function Game({ session, onChange, onContinue, onExport, onImport, onRese
       <Controls session={session} onChange={onChange} confirm={confirm} setConfirm={setConfirm} />
 
       <nav className="tabs" aria-label="Sections">
-        {(['inbox', 'fixtures', 'vacancies', 'career'] as Tab[]).map((t) => (
-          <button key={t} className={tab === t ? 'selected' : ''} onClick={() => setTab(t)} aria-pressed={tab === t}>
-            <span>{t === 'inbox' ? 'Inbox' : t === 'fixtures' ? 'Fixtures & table' : t === 'vacancies' ? `Vacancies (${openVacancies(world).length})` : 'Career'}</span>
+        {(['inbox', 'squad', 'tactics', 'fixtures', 'vacancies', 'career'] as Tab[]).map((t) => (
+          <button
+            key={t}
+            className={tab === t ? 'selected' : ''}
+            onClick={() => {
+              setTab(t)
+              setOpenPlayer(null)
+            }}
+            aria-pressed={tab === t}
+            data-testid={`tab-${t}`}
+          >
+            <span>{t === 'inbox' ? 'Inbox' : t === 'squad' ? 'Squad' : t === 'tactics' ? 'Tactics' : t === 'fixtures' ? 'Fixtures & table' : t === 'vacancies' ? `Vacancies (${openVacancies(world).length})` : 'Career'}</span>
           </button>
         ))}
       </nav>
 
       {tab === 'inbox' && <Inbox session={session} turnsBack={turnsBack} onEarlier={() => setTurnsBack(turnsBack + 1)} />}
+      {tab === 'squad' && openPlayer === null && <Squad world={world} onOpen={(id) => setOpenPlayer(id)} />}
+      {tab === 'squad' && openPlayer !== null && <PlayerProfile session={session} playerId={openPlayer} onChange={onChange} onBack={() => setOpenPlayer(null)} />}
+      {tab === 'tactics' && <Tactics session={session} onChange={onChange} />}
       {tab === 'fixtures' && (
         <>
           <Fixtures world={world} />
@@ -205,7 +247,7 @@ function Header({ session }: { session: Session }) {
         Season {world.season}, {weekLabel(sw)}.
       </p>
       <p>
-        <strong>{score.games}</strong> games · <strong>£{score.earnings}m</strong> · <strong>{score.trophyPoints}</strong> trophy points · Legacy <strong>{score.legacy}</strong>
+        <strong>{score.games}</strong> games · <strong>£{score.earnings}m</strong> · <strong>{score.trophyPoints}</strong> trophy points · <strong>{score.playersMade}</strong> players made · Legacy <strong>{score.legacy}</strong>
       </p>
       <p>{line}</p>
     </header>
@@ -295,8 +337,6 @@ function Controls({ session, onChange, confirm, setConfirm }: { session: Session
   const world = session.world
   const me = player(world)
   const employed = me.status.kind === 'employed'
-  const shape = session.inputs.shape ?? world.human!.shape
-  const mentality = session.inputs.mentality ?? world.human!.mentality
   // When the monthly card is pending the buttons answer it, so the two controls never disagree.
   const activityCard = pendingDecisions(world).find((d) => d.kind === 'activity')
   const cardAnswer = activityCard ? (session.inputs.answers ?? {})[activityCard.id] : undefined
@@ -304,27 +344,6 @@ function Controls({ session, onChange, confirm, setConfirm }: { session: Session
   const chooseActivity = (a: UnemployedActivity) => onChange(activityCard ? withAnswer(session, activityCard.id, a) : withActivity(session, a))
   return (
     <section aria-label="Controls">
-      {employed && (
-        <>
-          <h3>Shape</h3>
-          <div className="row">
-            {(['A', 'B', 'C'] as Shape[]).map((s) => (
-              <button key={s} className={shape === s ? 'selected' : ''} onClick={() => onChange(withShape(session, s))} aria-pressed={shape === s}>
-                <span>Shape {s}</span>
-              </button>
-            ))}
-          </div>
-          <h3>Mentality</h3>
-          <div className="row">
-            {(['attack', 'balanced', 'defend'] as Mentality[]).map((m) => (
-              <button key={m} className={mentality === m ? 'selected' : ''} onClick={() => onChange(withMentality(session, m))} aria-pressed={mentality === m}>
-                <span>{m}</span>
-              </button>
-            ))}
-          </div>
-          <p className="muted">Shape A beats B, B beats C, C beats A. Attack and defend change how open the game is. Both apply from the next match.</p>
-        </>
-      )}
       {me.status.kind === 'unemployed' && (
         <>
           <h3>This month</h3>
@@ -515,7 +534,7 @@ export function Career({ world }: { world: World }) {
         {s.name}, {s.age}, {s.background}. {s.status}. Reputation {s.reputation} ({bandName(s.reputation)}).
       </p>
       <p>
-        {s.score.games} games · £{s.score.earnings}m · {s.score.trophyPoints} trophy points · Legacy {s.score.legacy} · {s.seasonsManaged} seasons managed
+        {s.score.games} games · £{s.score.earnings}m · {s.score.trophyPoints} trophy points · {s.score.playersMade} players made · Legacy {s.score.legacy} · {s.seasonsManaged} seasons managed
       </p>
       {s.spells.length === 0 && <p className="muted">No clubs yet.</p>}
       {s.spells.map((sp) => (
@@ -527,6 +546,13 @@ export function Career({ world }: { world: World }) {
       ))}
       {s.honours.length > 0 && <p>Honours: {s.honours.map((h) => `${competitionName(h.competition)} (season ${h.season})`).join(', ')}</p>}
       {s.tags.length > 0 && <p>Tags: {s.tags.map((t) => t.tag).join(', ')}</p>}
+      <h3>Players made</h3>
+      {s.playersMade.length === 0 && <p className="muted">Nobody yet. Sign, debut or promote a player and he is yours for good.</p>}
+      {s.playersMade.map((m) => (
+        <div className="item" key={m.playerId}>
+          <strong>{m.name}</strong> ({m.position}) · {m.circumstance} at {m.club}, season {m.season} · rated {Math.round(m.ratingThen)} then, {Math.round(m.ratingNow)} now · {m.points} points · {m.now}
+        </div>
+      ))}
     </section>
   )
 }

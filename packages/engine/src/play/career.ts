@@ -12,6 +12,7 @@ import { spellById } from '../lookup.js'
 import { careerScore, type Score } from '../scoring/score.js'
 import type { Background, Honour, ManagerTag, Nationality, Spell, World } from '../types.js'
 import { human } from './decisions.js'
+import { madePlayers, type MadePlayerSummary } from '../players/made.js'
 
 export interface CareerOptions {
   name: string
@@ -32,10 +33,12 @@ export function createCareer(seed: number, options: CareerOptions): World {
     managerId: player.id,
     pending: [],
     nextDecisionId: 1,
-    shape: player.preferredShape,
-    mentality: 'balanced',
+    tactic: { formation: player.preferredFormation, mentality: 'balanced', style: player.style },
+    selection: { xi: [], bench: [], captain: null, autoPick: true },
     declinedVacancies: [],
     windowChoice: null,
+    contractChoices: {},
+    watched: null,
   }
   world.logPolicy = 'career'
   emit(world, 'career.started', { managerId: player.id, name: player.name, background: player.background, age: player.age, reputation: player.reputation, seed })
@@ -64,6 +67,8 @@ export interface CareerSummary {
   honours: Honour[]
   tags: ManagerTag[]
   seasonsManaged: number
+  /** Players made, ordered by points under the manager, with what became of each. */
+  playersMade: MadePlayerSummary[]
 }
 
 function postLabel(world: World, spell: Spell): { club: string; where: string } {
@@ -112,5 +117,6 @@ export function careerSummary(world: World): CareerSummary {
     honours: player.history.honours,
     tags: player.tags,
     seasonsManaged: Math.round(spells.reduce((s, sp) => s + sp.seasons, 0) * 10) / 10,
+    playersMade: madePlayers(world, player.id),
   }
 }

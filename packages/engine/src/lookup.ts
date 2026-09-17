@@ -1,4 +1,4 @@
-import type { Club, ClubId, ForeignClub, Manager, ManagerId, Post, Spell, SpellId, World } from './types.js'
+import type { Club, ClubId, ForeignClub, Manager, ManagerId, Player, Post, Spell, SpellId, World } from './types.js'
 
 /** Ids are sequential from 1 and never removed, so position is id − 1. */
 export function clubById(world: World, id: ClubId): Club {
@@ -57,4 +57,10 @@ export function postClubName(world: World, post: Post): string {
 
 export function samePost(a: Post, b: Post): boolean {
   return a.kind === b.kind && a.clubId === b.clubId
+}
+
+/** A player by id, or undefined once his record has been dropped. */
+export function playerById(world: World, id: number): Player | undefined {
+  const p = world.players[id - 1]
+  return p ?? undefined
 }

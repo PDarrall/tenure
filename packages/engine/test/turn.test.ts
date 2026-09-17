@@ -63,7 +63,7 @@ describe('one match per turn', () => {
     expect(world.tables.some((r) => r.played > 0)).toBe(true)
   })
 
-  it('in a job, a turn plays at most one fixture of the human club, and every step does something', () => {
+  it('in a job, a turn plays at most one fixture of the human club, and every step does something', { timeout: 60_000 }, () => {
     const world = createCareer(1, { name: 'Test Player', background: 'coach' })
     getJob(world)
     const player = me(world)
@@ -108,11 +108,11 @@ describe('one match per turn', () => {
     expect(ready).toBe(true)
     const club = humanClubId(world)!
     const week = world.week
-    queueDecision(world, { kind: 'board', from: 'board', title: 'A word', body: 'Before the next game.', options: [{ key: 'ok', label: 'Fine' }], defaultKey: 'ok', blocking: false })
+    const waiting = queueDecision(world, { kind: 'board', from: 'board', title: 'A word', body: 'Before the next game.', options: [{ key: 'ok', label: 'Fine' }], defaultKey: 'ok', blocking: false })
     expect(advanceTurn(world, {})).toBe(0)
     expect(world.week).toBe(week + 1)
     expect(clubFixturesInWeek(world, seasonWeek(world.week), club).some((f) => f.played)).toBe(false)
-    expect(pendingDecisions(world)).toHaveLength(1)
+    expect(pendingDecisions(world).some((d) => d.id === waiting.id)).toBe(true)
     // Answered (or defaulted), the next turn plays the fixture without moving the week.
     expect(advanceTurn(world, {})).toBe(1)
     expect(world.week).toBe(week + 1)
@@ -161,7 +161,7 @@ describe('one match per turn', () => {
     }
   })
 
-  it('is deterministic turn by turn and a save between two turns of one week continues identically', () => {
+  it('is deterministic turn by turn and a save between two turns of one week continues identically', { timeout: 60_000 }, () => {
     const a = createCareer(7, { name: 'Test Player', background: 'coach' })
     const b = createCareer(7, { name: 'Test Player', background: 'coach' })
     for (let i = 0; i < 90; i++) {

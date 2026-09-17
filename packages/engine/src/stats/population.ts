@@ -5,7 +5,9 @@
  */
 import { T } from '../tunables.js'
 import { spellById } from '../lookup.js'
-import type { Manager, ManagerId, Spell, World } from '../types.js'
+import type { Manager, ManagerId, Player, Spell, World } from '../types.js'
+import { careerScore } from '../scoring/score.js'
+import { averageRating } from '../match/aftermath.js'
 
 export interface Band {
   target: number
@@ -115,6 +117,65 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     const band = targets[key]
     return { key, label, value, band, pass: value >= band.min && value <= band.max, format }
   }
+
+  // Players and tactics (DESIGN.md v0.5): ratings, the structural fairness of formations and styles, the makers.
+  const ratingAverages: number[] = []
+  for (const p of world.players) {
+    if (!p) continue
+    for (const rec of [...p.history, p.season]) {
+      const a = averageRating(rec)
+      if (a !== null && rec.rated >= 10) ratingAverages.push(a)
+    }
+  }
+  const ratingMean = ratingAverages.length ? ratingAverages.reduce((a, b) => a + b, 0) / ratingAverages.length : 0
+  const ratingSpread = ratingAverages.length ? Math.sqrt(ratingAverages.reduce((a, b) => a + (b - ratingMean) ** 2, 0) / ratingAverages.length) : 0
+  const ppg = (key: 'homeFormation' | 'awayFormation' | 'homeStyle' | 'awayStyle', pointsFor: (e: { payload: Record<string, unknown> }, home: boolean) => number) => {
+    const totals = new Map<string, { points: number; games: number }>()
+    for (const e of world.log) {
+      if (e.type !== 'match.played' || e.payload['competition'] !== 'league') continue
+      for (const home of [true, false]) {
+        const k = String(e.payload[home ? key.replace('away', 'home') as typeof key : key.replace('home', 'away') as typeof key] ?? '')
+        if (!k) continue
+        const t = totals.get(k) ?? { points: 0, games: 0 }
+        t.points += pointsFor(e, home)
+        t.games++
+        totals.set(k, t)
+      }
+    }
+    const rates = [...totals.values()].filter((t) => t.games >= T.EDGE_MIN_GAMES).map((t) => t.points / t.games)
+    if (rates.length === 0) return 0
+    const mean = rates.reduce((a, b) => a + b, 0) / rates.length
+    return mean > 0 ? Math.max(...rates) / mean - 1 : 0
+  }
+  const pointsOf = (e: { payload: Record<string, unknown> }, home: boolean) => {
+    const hg = e.payload['homeGoals'] as number
+    const ag = e.payload['awayGoals'] as number
+    const mine = home ? hg : ag
+    const theirs = home ? ag : hg
+    return mine > theirs ? T.POINTS_WIN : mine === theirs ? T.POINTS_DRAW : 0
+  }
+  const formationEdge = ppg('homeFormation', pointsOf)
+  const styleEdge = ppg('homeStyle', pointsOf)
+  // The climber and the maker: the best career among the ten biggest trophy-winners against the best among the ten biggest makers.
+  const scored = managers.map((m) => ({ m, score: careerScore(m) }))
+  const topN = T.MAKER_WINNER_TOP_N
+  const winners = scored.filter((s) => s.score.trophyPoints > 0).sort((a, b) => b.score.trophyPoints - a.score.trophyPoints).slice(0, topN)
+  const makers = scored.filter((s) => s.score.playersMade > 0).sort((a, b) => b.score.playersMade - a.score.playersMade).slice(0, topN)
+  const bestWinner = [...winners].sort((a, b) => b.score.legacy - a.score.legacy)[0]
+  const bestMaker = [...makers].sort((a, b) => b.score.legacy - a.score.legacy)[0]
+  const makerLegacyRatio = bestWinner && bestMaker && bestWinner.score.legacy > 0 ? bestMaker.score.legacy / bestWinner.score.legacy : 0
+  let madePoints = 0
+  let boughtFinished = 0
+  for (const e of world.log) {
+    if (e.type !== 'players.made') continue
+    const pts = e.payload['points'] as number
+    madePoints += pts
+    const player = world.players[(e.payload['playerId'] as number) - 1] as Player | null
+    const tag = player ? player.madeBy.find((t) => t.managerId === e.payload['managerId']) : undefined
+    if (tag && tag.circumstance === 'signed' && tag.rating >= T.BOUGHT_FINISHED_RATING) boughtFinished += pts
+  }
+  const boughtFinishedShare = madePoints > 0 ? boughtFinished / madePoints : 0
+  const match = matchAverages(world)
   const lines: StatLine[] = [
     line('firstSpellMedianSeasons', 'Median first-spell length (seasons)', median(firstSpellLengths), 'seasons'),
     line('firstSpellInsideSeasonShare', 'First spells ending inside a season', firstSpells.length ? insideSeason / firstSpells.length : 0, 'share'),
@@ -125,6 +186,18 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     line('thousandGameCount', 'Careers past 1,000 games', thousandGames, 'count'),
     line('topTierLongTenures', 'Top-tier managers with tenure over five years (mean per season)', meanLongTenures, 'number'),
     line('unjustSackingShare', 'Unjust sackings as a share of all sackings', sackings.length ? unjust / sackings.length : 0, 'share'),
+    line('ratingMean', 'Match rating average (season averages)', ratingMean, 'number'),
+    line('ratingSpread', 'Match rating spread (sd of season averages)', ratingSpread, 'number'),
+    line('formationEdge', 'Best formation over the mean points per game', formationEdge, 'share'),
+    line('styleEdge', 'Best style over the mean points per game', styleEdge, 'share'),
+    line('makerLegacyRatio', "Best maker's Legacy over the best trophy-winner's", makerLegacyRatio, 'number'),
+    line('boughtFinishedShare', 'Players-made points from players bought finished', boughtFinishedShare, 'share'),
+    line('goalsPerGame', 'Goals per league game', match.goals, 'number'),
+    line('homeWinShare', 'Home wins (league)', match.home, 'share'),
+    line('drawShare', 'Draws (league)', match.draw, 'share'),
+    line('awayWinShare', 'Away wins (league)', match.away, 'share'),
+    line('yellowsPerGame', 'Yellow cards per match', match.yellows, 'number'),
+    line('redsPerGame', 'Red cards per match', match.reds, 'number'),
   ]
 
   const endReasons: Record<string, number> = {}
@@ -173,6 +246,18 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     'max games (tracked)': ended.length ? Math.max(...ended.map((m) => m.history.games)) : 0,
     'median earnings £m (ended)': median(ended.map((m) => Math.round(m.history.earnings * 10) / 10)),
     'median trophy points (ended)': median(ended.map((m) => m.history.trophyPoints)),
+    'median players made (ended)': median(ended.map((m) => m.history.playersMade)),
+    'best players made': bestMaker ? bestMaker.score.playersMade : 0,
+    'best maker legacy': bestMaker ? bestMaker.score.legacy : 0,
+    'best trophy winner legacy': bestWinner ? bestWinner.score.legacy : 0,
+    'best trophy points': bestWinner ? bestWinner.score.trophyPoints : 0,
+    'goals per league game': match.goals,
+    'home win share': match.home,
+    'draw share': match.draw,
+    'away win share': match.away,
+    'yellows per game': match.yellows,
+    'reds per game': match.reds,
+    'league matches': match.leagueMatches,
     'mean age at career end': ended.length ? ended.reduce((s, m) => s + m.age, 0) / ended.length : 0,
     'events logged': world.log.length,
   }
@@ -199,4 +284,37 @@ export function countLongTopTierTenures(world: World): number {
     if (world.week - spell.startWeek >= T.LONG_TENURE_SEASONS * T.SEASON_WEEKS) count++
   }
   return count
+}
+
+/** The match layer's averages from the log (DESIGN.md "Validation targets", Match). */
+export function matchAverages(world: World): { goals: number; home: number; draw: number; away: number; yellows: number; reds: number; leagueMatches: number } {
+  let league = 0
+  let goals = 0
+  let home = 0
+  let draw = 0
+  let all = 0
+  let yellows = 0
+  let reds = 0
+  for (const e of world.log) {
+    if (e.type !== 'match.played') continue
+    all++
+    yellows += (e.payload['cards'] as number) ?? 0
+    reds += (e.payload['reds'] as number) ?? 0
+    if (e.payload['competition'] !== 'league') continue
+    league++
+    const hg = e.payload['homeGoals'] as number
+    const ag = e.payload['awayGoals'] as number
+    goals += hg + ag
+    if (hg > ag) home++
+    else if (hg === ag) draw++
+  }
+  return {
+    goals: league ? goals / league : 0,
+    home: league ? home / league : 0,
+    draw: league ? draw / league : 0,
+    away: league ? (league - home - draw) / league : 0,
+    yellows: all ? yellows / all : 0,
+    reds: all ? reds / all : 0,
+    leagueMatches: league,
+  }
 }
