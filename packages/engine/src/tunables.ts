@@ -1001,7 +1001,7 @@ export const T = {
   } as const,
 
   /** Legacy = games × a + earnings(£m) × b + trophy points × c + players made × d. */
-  LEGACY_WEIGHTS: { games: 0.2, earnings: 2, trophyPoints: 0.15, playersMade: 0.12 } as const,
+  LEGACY_WEIGHTS: { games: 0.2, earnings: 2, trophyPoints: 0.15, playersMade: 0.045 } as const,
 
   /** Bonuses as a share of the season's salary: for a trophy, for a promotion. Serves: earnings mix. */
   TROPHY_BONUS_SHARE: 0.25,
@@ -1011,8 +1011,8 @@ export const T = {
   LEGACY_ARCHETYPES: {
     midTableThirtyYears: { games: 1260, earnings: 35, trophyPoints: 30, playersMade: 120 },
     trophyLadenTwelveYears: { games: 600, earnings: 45, trophyPoints: 900, playersMade: 40 },
-    /** Thirty years making players at small clubs: little money, few trophies, the fourth line. */
-    makerThirtyYears: { games: 1260, earnings: 12, trophyPoints: 15, playersMade: 900 },
+    /** Thirty years making players at small clubs: little money, few trophies, the fourth line (the population's 30-season makers read about 2,000). */
+    makerThirtyYears: { games: 1260, earnings: 12, trophyPoints: 15, playersMade: 2000 },
     tolerance: 0.2,
   } as const,
 
@@ -1047,12 +1047,14 @@ export const T = {
     /** No formation or style beats the mean points per game by more than 10%. */
     formationEdge: { target: 0, min: 0, max: 0.1 },
     styleEdge: { target: 0, min: 0, max: 0.1 },
-    /** The best maker's Legacy lands within 20% of the best trophy-winner's. */
+    /** The best maker's Legacy lands within 20% of the best trophy-winner's: the best career among the ten with most players made against the best among the ten with most trophy points. */
     makerLegacyRatio: { target: 1, min: 0.8, max: 1.25 },
     /** Buying finished players yields under 10% of players-made points. */
     boughtFinishedShare: { target: 0.05, min: 0, max: 0.1 },
   } as const,
 
+  /** How many of each kind the maker-to-winner comparison takes: the ten biggest makers against the ten biggest trophy-winners. */
+  MAKER_WINNER_TOP_N: 10,
   /** Seasons skipped before sampling "at any moment" figures, so genesis spells can age. */
   VALIDATION_WARM_UP_SEASONS: 8,
   /** A "long" top-tier tenure in seasons. */

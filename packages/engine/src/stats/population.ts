@@ -156,9 +156,13 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
   }
   const formationEdge = ppg('homeFormation', pointsOf)
   const styleEdge = ppg('homeStyle', pointsOf)
+  // The climber and the maker: the best career among the ten biggest trophy-winners against the best among the ten biggest makers.
   const scored = managers.map((m) => ({ m, score: careerScore(m) }))
-  const bestWinner = scored.filter((s) => s.score.trophyPoints > 0).sort((a, b) => b.score.trophyPoints - a.score.trophyPoints)[0]
-  const bestMaker = scored.filter((s) => s.score.playersMade > 0).sort((a, b) => b.score.playersMade - a.score.playersMade)[0]
+  const topN = T.MAKER_WINNER_TOP_N
+  const winners = scored.filter((s) => s.score.trophyPoints > 0).sort((a, b) => b.score.trophyPoints - a.score.trophyPoints).slice(0, topN)
+  const makers = scored.filter((s) => s.score.playersMade > 0).sort((a, b) => b.score.playersMade - a.score.playersMade).slice(0, topN)
+  const bestWinner = [...winners].sort((a, b) => b.score.legacy - a.score.legacy)[0]
+  const bestMaker = [...makers].sort((a, b) => b.score.legacy - a.score.legacy)[0]
   const makerLegacyRatio = bestWinner && bestMaker && bestWinner.score.legacy > 0 ? bestMaker.score.legacy / bestWinner.score.legacy : 0
   let madePoints = 0
   let boughtFinished = 0
