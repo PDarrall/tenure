@@ -61,15 +61,17 @@ single branch, so they live here instead.
   engine and a fast path calibrated from it.)
 - Attack and defend mentalities scale both sides' expected goals up or
   down (variance only); the AI attacks weaker sides and defends against
-  stronger ones. Each manager has a fixed preferred shape. (Settled from
-  phase 3(b): DESIGN.md § Formations gives every AI manager a preferred
-  formation and a fallback, and has mentality shift the bands and the
-  pressure lean.)
+  stronger ones. Each manager has a fixed preferred shape. (Settled by
+  DESIGN.md v0.5 § Formations and tactics, built in phase 3(b): a tactic
+  is a formation, a mentality and a style; every AI manager has a
+  preferred formation and style; shapes are gone.)
 - Summer: academy gains from last summer are released, the squad ages a
   year, ageing squads lose 3–5 and young ones gain 1, strength gravitates
   toward the wealth target, then the window spends the whole budget with
   diminishing returns and churns the first XI. The winter pot is 30% of
   the normal budget. Net spend is ranked within the division as played.
+  (DESIGN.md v0.5 § Players keeps the window abstract until phase 4 and
+  makes club strength the master number that squads are anchored to.)
 - Match summaries are stored as a template key on the event and rendered
   on demand from text/match.json; rendering never draws from the RNG.
 
@@ -305,6 +307,8 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   restated as one tunable). The model reads about 3.1 goals a game and
   47 / 19 / 34 home / draw / away over a season; DESIGN's 2.7 and
   45 / 26 / 29 (to verify) are phase 3(c)'s calibration targets.
+  (DESIGN.md v0.5 § Match settles the replacement: a pressure lean of 8
+  in the minute engine, with the fast path calibrated from it.)
 - The round-robin's venues were keyed on round plus pair index, which
   sat every rotating club at one ground for half a season; venues now
   alternate, at most two rounds running at one ground. This shifts the

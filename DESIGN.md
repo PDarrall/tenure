@@ -1,6 +1,7 @@
-# TENURE — design bible v0.2
+# TENURE — design bible v0.5
 
-Working title. A football management game about surviving a career.
+Working title. A football management game about surviving a career. Depth of Football Chairman Pro 2; texture of Championship Manager 01/02.
+FEATURES.md lists what that means system by system, and what is deliberately out. It is the target; this document is the rules.
 
 ## Premise
 
@@ -10,14 +11,15 @@ Success is measured three ways: how long you lasted, how much you earned, what y
 
 ## The score
 
-Three numbers, always visible:
+Four numbers, always visible:
 
 - **Years / games managed**
 - **Career earnings** — salary, bonuses, and payouts when sacked
 - **Trophy points** — see table below
+- **Players made** — see Your players
 
-Composite for leaderboards: `Legacy = a·games + b·earnings(£m) + c·trophy points`.
-Tune a, b, c so that a 30-year mid-table career and a 12-year trophy-laden career land within ~20% of each other.
+Composite for leaderboards: `Legacy = a·games + b·earnings(£m) + c·trophy points + d·players made`.
+Tune the weights so that a 30-year mid-table career, a 12-year trophy-laden career and a 30-year career making players at small clubs land within ~20% of each other. There are two legitimate careers — the climber and the maker — and the score must let either win.
 Nothing is ever deducted. Unemployment scores zero — that is the real cost of being sacked.
 Age caps a career at a little under 40 seasons (see Age), so "longest" has a ceiling and Legacy stays comparable across careers.
 
@@ -140,47 +142,87 @@ The career ends when no vacancy has shortlisted you for 24 consecutive months, a
 
 ## Fixtures
 
-The next fixture is always on screen: competition, opponent, venue, date, the opponent's form and league position. A fixtures tab lists the season's fixtures and results by competition, with the table beside it. Cup draws arrive in the inbox. AI clubs in the human's division play their matches at the same time as the human's, and their scores tick over during the match (see Match).
+The next fixture is always on screen: competition, opponent, venue, date, the opponent's form and league position. A fixtures tab lists the season's fixtures and results by competition, with the table beside it. Cup draws arrive in the inbox. AI clubs in the human's division play at the same time as the human, and their scores tick over during the match (see Match).
 
 ## Turn structure
 
-One match per turn. Continue plays the next fixture; everything due before it — board, agent, press, transfer window, cup draw, injuries and suspensions — arrives first as inbox items and decisions. Weeks with no fixture (international breaks, cup rounds you are out of, the summer) pass as single steps with their own inbox. A season is the league games plus cup ties plus around ten non-match steps.
+One match per turn. Continue plays the next fixture; everything due before it — board, agent, press, transfers, cup draw, injuries and suspensions — arrives first as inbox items and decisions. Weeks with no fixture (international breaks, cup rounds you are out of, the summer) pass as single steps with their own inbox. A season is the league games plus cup ties plus around ten non-match steps.
 Target pace: a match in about a minute at full speed; a season in under an hour; a career in a long weekend.
 
 ## Players
 
 Every home club has a squad: 22 players in tiers 1–2, 20 in tiers 3–4, 18 in tier 5. Foreign clubs get a squad generated on demand, seeded, when they meet a home club.
 
-A player: name, age, nationality, positions, ability 1–100, potential (hidden), fitness 0–100, morale, injury (weeks out), suspension (matches), yellow cards this season, contract years, wage, value.
+A player: name, age, nationality, position and side, rating 1–100, hidden potential, condition 0–100, morale, injury (weeks out), suspension (matches), yellow cards this season, contract (years, wage), value, up to two traits, season and career statistics, history.
 
-Positions are CM-style: a role — GK, SW, D, WB, DM, M, AM, F — and a side — L, C, R. A player holds one or more role/side combinations, each at a competence: natural, accomplished, competent or unconvincing. Playing outside a competence costs ability: 0 natural, −5 accomplished, −12 competent, −25 unconvincing, −40 anywhere else (tunables). Generated squads follow realistic shapes: for a 22, about 2 GK, 7 defenders, 8 midfielders, 4 forwards, with a spread of sides.
+- Rating is the number. Traits are the texture: zero to two per player from a list of twelve — poacher, playmaker, pace, aerial, tough tackler, leader, big-game, consistent, versatile, loyal, injury-prone, hot-headed. Each trait is exactly one rule in the engine (poacher raises conversion; leader lifts the XI's morale; hot-headed raises cards; injury-prone raises injury risk; versatile halves positional penalties; loyal takes less money to stay with, or follow, the manager he is bonded to — see Your players), and a test fails on any trait no rule reads.
+- Position: GK, D, M or F; side L, C, R or any. Playing an adjacent role (D at M, M at F) costs −15 rating, a distant one −30, the wrong side −5 (tunables).
+- Potential is hidden. A scout report gives it as a range whose width depends on the club's scouting level (see Club).
 
-The rule that keeps the validated world intact: **club strength stays the master number.** A squad is generated to match it — the best XI in the club's preferred formation averages the club's strength — and is re-anchored each summer, with players ageing (peak 26–30, decline from 31, goalkeepers from 33), developing toward potential under 24, and declining inside that. The human's club is the exception: match strength comes from the XI actually picked, in the formation picked, with positional penalties, fitness and morale applied. AI clubs pick their best XI by the same rule. Phase 6 reverses the direction — strength derived from the squad, named transfers against the budget.
+The rule that keeps the validated world intact until phase 4: **club strength stays the master number.** A squad is generated to match it — the best XI in the club's preferred formation averages the club's strength — and is re-anchored each summer, with players ageing (peak 26–30, decline from 31, goalkeepers from 33) and developing toward potential under 24 at a speed set by the club's coaching level. The human's club is the exception: match strength comes from the XI actually picked, with positional penalties, condition and morale applied. AI clubs pick their best XI by the same rule. Phase 4 reverses the direction: strength derived from the squad, named transfers against the budget.
 
-Fitness drops with minutes played and recovers with rest; below 80 it costs ability, below 70 it raises injury risk. Injuries come from matches (tunable rate) and last 1–20 weeks. Suspensions: five yellows is one match, ten is two; a red is one to three. Morale moves with playing time, results and events.
+Condition drops with minutes played and recovers with rest; below 80 it costs rating, below 70 it raises injury risk. Injuries come from matches and last 1–20 weeks, shortened by the medical level. Suspensions: five yellows is one match, ten is two; a red is one to three. Morale moves with playing time, results, contract state and events.
 
-Selection: a formation, an XI, and a bench of five with three substitutions, as in 2001. The assistant auto-picks in one tap and proposes changes in the pre-match step when injuries or suspensions force them.
+Every player who plays gets a match rating out of 10 from his events, his side's result and minutes; average rating to two decimals. Per season: appearances, goals, assists, cards, rating. Career history season by season, club by club.
 
-The summer window stays abstract in this phase: spending the budget raises squad strength by improving or adding generated players, and the engine picks which; named transfers arrive in phase 6.
+Selection: a formation, an XI, a captain, and a bench of five with three substitutions. The assistant auto-picks in one tap and proposes changes in the pre-match step when injuries or suspensions force them.
 
-## Formations
+Contracts: renew (wage and years) or release. A player whose rating has outgrown his wage asks for a new deal; a player short of playing time asks to leave. Both are decisions with morale consequences that feed the tenure model's fallout events. Until phase 4, the summer window stays abstract: spending the budget raises squad strength by improving or adding generated players, and the engine picks which.
 
-The basic shapes CM 01/02 offered, each defined by the positions it fields: 4-4-2, 4-4-2 diamond, 4-3-3, 4-5-1, 4-2-4, 4-1-3-2, 4-3-1-2, 3-5-2, 3-4-3, 5-3-2, 5-4-1, and 5-3-2 with a sweeper (to verify against the game's default list). Advantages come from structure, not a lookup table. Each formation is counted in three bands — defence (D, SW, WB, DM), midfield (M, AM), attack (F) — and by width (players on L or R sides). In the match model: the midfield difference drives pressure; attackers against defenders drive chance quality; width against a narrow defence adds chances from the flanks; a defensive overload reduces chances conceded. So 4-5-1 wins the midfield against 4-4-2 but creates less; 4-2-4 makes chances and concedes them; 3-5-2 is strong through the middle and open on the flanks; 5-4-1 concedes little and scores little. Mentality — attack, balanced, defend — shifts the bands' weight and the pressure lean. Every AI manager has a preferred formation and a fallback, part of their identity, and changes mentality by rule when chasing or protecting a result.
+## Your players
+
+The premise makes clubs episodes. Players are the thread that runs through a career, and the thing a manager keeps that no board can take away.
+
+- **Tagging.** A player becomes yours the moment you sign him, give him his first-team debut, or promote him from the academy. The tag is permanent and records the club, the date, the circumstance and his rating that day.
+- **Making.** Players under 24 grow toward potential only with minutes: a season of starts moves a player a full step toward his potential (tunable), a season on the bench moves him nowhere. Growth speed also follows the club's coaching level (phase 5) and the manager's development ability. Growth is visible: his match ratings rise across the season and the squad screen marks the change. This is the manager's real dilemma — the nineteen-year-old you will be remembered for costs points today, and points today are what keep you employed.
+- **They keep living.** Once tagged, a player's career keeps running after you leave, and his milestones reach your inbox wherever you are — a transfer above a fee threshold, a promotion, a cup final, a title, a retirement — each line naming the club where you made him.
+- **Players made** is the fourth line of the score. Points for growth achieved while a player was with you, weighted up for players you debuted or promoted and down to almost nothing for players bought at 70 or above (you did not make him), plus later milestones: playing in a tier above the one he debuted in, a transfer above the threshold, a top-tier or European title, a season award (phase 6). The line is normalised against the other three (see The score). Players-made points also feed reputation and the youth-developer tag, which is how a maker gets the bigger job — the way clubs with academies and small budgets hire.
+- **Following you.** Every tagged player has a bond that grows with starts, a debut, a promotion, a renewal and any decision that backed him (a fallout where you took his side). When you take a new job, up to two players with a bond above the threshold, at clubs that would sell and on wages your new club can pay, ask to follow you; the old club sets an asking price and the press notices. The loyal trait lowers the wage he asks. This is how a manager carries a nucleus through a career, and how a striker found in tier five ends up in the top flight ten years later, still yours.
+- **The career page becomes a record of people.** Beside spells, honours and earnings: players made, ordered by growth under you, each with what became of him. The obituary names the three he is most remembered for. The Hall of Fame keeps a makers' list beside the trophy list.
+
+Every AI manager runs on the same rules, with a youth-first or results-first lean as part of their identity, so the population contains makers to compare against.
+
+## Formations and tactics
+
+A tactic is three choices: a formation, a mentality and a style.
+
+- Formations, the CM 01/02 set: 4-4-2, 4-4-2 diamond, 4-3-3, 4-5-1, 4-2-4, 4-1-3-2, 4-3-1-2, 3-5-2, 3-4-3, 5-3-2, 5-4-1, and 5-3-2 with a sweeper (to verify against the game's default list). Each is counted in three bands — defence, midfield, attack — and by width. Advantages come from structure: the midfield difference drives pressure; attackers against defenders drive chance quality; width against a narrow defence adds chances from the flanks; a defensive overload reduces chances conceded. So 4-5-1 wins the midfield against 4-4-2 but creates less; 4-2-4 makes chances and concedes them; 3-5-2 is strong through the middle and open on the flanks; 5-4-1 concedes little and scores little.
+- Mentality: defend, balanced, attack. Shifts every band's weight and the pressure lean.
+- Style, one rule each: possession (more pressure with a higher-rated XI, fewer but better chances), direct (chances from pace and aerial traits, more shots of lower quality), counter (chances after sustained defending, lower own pressure), pressing (more pressure, faster condition drain, more fouls).
+
+No player instructions, arrows or set-piece takers. Every AI manager runs a preferred formation and style, part of their identity, and changes mentality by rule when chasing or protecting a result. Before each match the assistant gives an opposition report: formation, style, key players, form, absentees. The validation target: across the AI population, no formation or style beats the mean points per game by more than 10% when its squad fits it.
 
 ## Match
 
-The engine runs minute by minute, 0 to 90 plus stoppage. State: score, minute, pressure (a lean from −100 to +100), the two XIs with fitness draining, cards, injuries, substitutions used.
+The engine runs minute by minute, 0 to 90 plus stoppage. State: score, minute, pressure (a lean from −100 to +100), the two XIs with condition draining, cards, injuries, substitutions used, running stats.
 
 Each minute:
-- Pressure drifts toward a target set by effective XI strength, the midfield band difference, mentality, home advantage (a lean of 8 to the home side, tunable, to verify against real home-win rates), the score state (a leading side sits deeper unless attacking) and momentum from the last few events.
-- A chance may arise, with probability from pressure, the attack-versus-defence bands and chance-creation quality. It resolves to a goal, a save, a miss or a block from the striker against keeper and defenders. Every chance and event is a commentary line from templates naming the players.
-- Cards, injuries and substitutions happen; AI managers substitute by rule — injured, tired below 60, chasing or holding.
+- Pressure drifts toward a target set by effective XI strength by band, the midfield difference, mentality, style, home advantage (a lean of 8 to the home side, tunable, to verify against real home-win rates), the score state (a leading side sits deeper unless attacking) and momentum from the last few events.
+- A chance may arise from pressure and the attack-versus-defence bands. The players involved are drawn by position and rating, weighted by traits — poachers finish more, playmakers assist more, pace and aerial traits fit the direct style. It resolves to a goal, a save, a miss or a block from the attacker's rating against the keeper's and defenders'. Every chance and event is a commentary line from templates naming the players.
+- Fouls and cards follow the pressing style, tough-tackler and hot-headed traits and the referee; injuries follow condition and the injury-prone trait; substitutions happen, AI managers by rule — injured, condition below 60, chasing or holding.
+- Stats accumulate: shots, on target, possession, corners, fouls, cards. Pre-match odds come from the fast path's probabilities.
 
-Pace and control: the match runs at full speed — CM with the space bar held — with hold-to-run and pause available. It pauses on its own at goals, red cards, injuries that need a change, and half time. Mentality changes and substitutions are made while paused. Other matches in the human's division run in the same engine at the same minute; a latest-scores panel shows them, and the table is live at full time.
+Pace and control: the match runs at full speed — CM with the space bar held — with hold-to-run and pause. It pauses on its own at goals, red cards, injuries that need a change, and half time. Mentality changes and substitutions are made while paused. Other matches in the human's division run in the same engine at the same minute; a latest-scores panel shows them, and the table is live at full time.
 
 Fast path: every match nobody is watching, and the whole population sim, samples results from a table calibrated from the minute engine (regenerated by a script whenever match tunables change). A test asserts that the minute engine and the fast path agree on result distributions, goals per game and the size of home advantage, so the 500-career simulation stays fast and honest.
 
-The tenure model reads results exactly as before. What the player controls now: which jobs to chase and what to promise; contract terms; summer spend and rebuild timing; formation, XI, mentality and substitutions; press and board responses; whether to take the approach; when to walk.
+The tenure model reads results exactly as before. What the player controls: which jobs to chase and what to promise; contract terms; summer spend and rebuild timing; formation, mentality, style, XI and substitutions; player contracts; press and board responses; whether to take the approach; when to walk.
+
+## Transfers (phase 4)
+
+- A market: every player in the home pyramid, searchable by position, age, rating, price and availability; transfer-listed players and free agents flagged; a shortlist. A scout report on any player gives a potential range and a recommendation, with reach and accuracy set by the scouting level.
+- Buying: the selling club's asking price, then at most two rounds — offer, counter, accept or reject. Loans for a season with a wage share. Free agents sign for wages alone. A contract is a wage and a length; the player accepts if the wage meets his demand (rating, age, tier) and he expects to play. No agents, clauses or instalments.
+- Selling: list a player at an asking price and receive bids; AI clubs also bid unprompted for your best players; refuse a player three times and he is unsettled.
+- Two windows, summer and January. Nothing moves between them.
+- Budgets: transfer and wage budgets from the board by tier and wealth. The direction of strength flips here — club strength is derived from the squad — and AI clubs trade toward the level their wealth sets, so the population targets hold. That is tested.
+
+## Club (phase 5)
+
+Four levels, 1 to 5: coaching (development speed), scouting (search reach and potential accuracy), medical (injury length), academy (youth intake quality). Wealth sets them; once a season the manager can ask the board to raise one, which is a credit gamble — a refusal costs credit, and a raise granted lifts expectation. Youth players arrive each summer from the academy level. Money is the board's business, reported in the inbox: balance, income by tier, attendance and prestige, wages, transfers; attendance grows with success. No stadium building or ticket prices. Insolvency is a shock, as specified in the tenure model.
+
+## Media, awards and history (phase 6)
+
+The inbox exists. Add rumours; monthly and season awards (player, manager, team of the month; player of the year, top scorer, manager of the year), which feed reputation and tags; histories for clubs, players and managers; competition records; and the game's all-time list beside the manager's own career page.
 
 ## Validation targets
 
@@ -192,20 +234,24 @@ The model is right when the AI population looks like the real one. Simulate 500 
 - At any moment, two to four top-tier managers have tenure over five years.
 - Unjust sackings ≈ 20–30% of all sackings.
 - Age: nobody is employed past the cap; of managers still working at 60, most are out of the game by 68; the population stays stable with a new cohort each summer.
-- Match: goals per game ≈ 2.7; home win / draw / away win ≈ 45 / 26 / 29; yellow cards ≈ 3–4 a match, reds ≈ 0.2 — all to verify against real league averages. Across the AI population, no formation's points per game exceeds the mean by more than 10% when its squad fits it. The minute engine and the fast path agree within tolerance. A match plays in about a minute at full speed.
+- Match: goals per game ≈ 2.7; home win / draw / away win ≈ 45 / 26 / 29; yellow cards ≈ 3–4 a match, reds ≈ 0.2 — all to verify against real league averages. The minute engine and the fast path agree within tolerance. A match plays in about a minute at full speed.
+- Players and tactics: the best XI per club averages club strength (until phase 4); every trait is read by a rule; match ratings average ≈ 6.9 with a spread of about 0.6; no formation or style beats the mean points per game by more than 10%.
+- Your players: across the AI population, the best maker's Legacy lands within 20% of the best trophy-winner's; buying finished players yields under 10% of players-made points; follow-you moves average about one per two job changes and never exceed two per move; a player under 24 who starts a season gains at least three times the rating of one who sits it out.
+- After phase 4: the population targets still hold with strength derived from squads. After phase 5: fewer than 2% of clubs are insolvent in any season.
 
-These are starting targets from memory, to verify against the LMA's end-of-season figures before locking in. Encode them as tests.
+These are starting targets from memory, to verify against the LMA's end-of-season reports and real league statistics before locking in. Encode them as tests.
 
 ## Build phases
 
-0. This document. CLAUDE.md. Repo.
-1. Engine (TypeScript, pure, seeded): world gen, managers, tenure, career, market, season sim. CLI: `sim --careers 500` prints the validation stats. Tune until they pass.
-2. Browser play: same engine, one human manager, the inbox as plain unstyled HTML, deployed to GitHub Pages. Play it in Safari. If "one more season" doesn't happen, fix the model, not the UI.
-3. Match layer, in four PRs: (a) fixtures and one match per turn, with home advantage as an explicit tunable in the existing match model; (b) players, positions, formations and selection, with the one-shot model taking effective XI, bands and width until (c) replaces it; (c) the minute engine, the fast path and their validation; (d) the match view, squad and tactics screens, fixtures tab and latest scores — unstyled.
-4. Claude Design: match view, squad, inbox, job market, contract talks, career page, obituary. Restraint; typographic; no dashboards.
-5. Web app: the designed shell replaces the unstyled one; JSON saves, shareable career page.
-6. Transfers and depth: named transfers against the budget, strength derived from the squad, scouting, contracts, foreign leagues simulated.
-7. Meta: Hall of Fame across careers, obituary generated from the event log, shared leaderboard.
+0. This document. CLAUDE.md. Repo. (done)
+1. Engine, headless sim, validation. (done)
+2. Browser play, deployed to GitHub Pages. (done)
+3. Match layer. (a) fixtures and one match per turn (done); (b) players, traits, positions, ratings, contracts, formations and tactics, tagging, growth with minutes, milestone news, the players-made line and its career-page list, with the one-shot model taking effective XI, bands, width, mentality and style until (c) replaces it; (c) the minute engine, the fast path, their validation; (d) the screens — squad, player profile, tactics, pre-match with the opposition report, the match view with commentary, stats, latest scores and controls — unstyled.
+4. Transfers, including players who follow you.
+5. Club levels, youth, money.
+6. Media, awards, histories; the obituary's three names and the makers' list.
+7. Claude Design, then the designed web app replaces the unstyled one; JSON saves, shareable career page.
+8. Meta and world: Hall of Fame across careers, the obituary from the event log, shared leaderboard, international management, foreign leagues simulated.
 
 ## Tunables
 
