@@ -33,8 +33,8 @@ export function valueFor(rating: number, age: number): number {
   return Math.max(T.VALUE_MIN_M, round1(T.VALUE_BASE_M * Math.pow(rating / 100, T.VALUE_RATING_POWER) * ageFactor))
 }
 
-export function freshSeasonStats(season: number, clubId: number, tier: Tier | null): PlayerSeasonStats {
-  return { season, clubId, tier, apps: 0, starts: 0, minutes: 0, goals: 0, assists: 0, yellows: 0, reds: 0, ratingSum: 0, rated: 0, growth: 0 }
+export function freshSeasonStats(season: number, clubId: number, tier: Tier | null, ratingAtStart = 0): PlayerSeasonStats {
+  return { season, clubId, tier, apps: 0, starts: 0, minutes: 0, goals: 0, assists: 0, yellows: 0, reds: 0, ratingSum: 0, rated: 0, growth: 0, ratingAtStart }
 }
 
 function drawTraits(rng: Rng, position: Position): Trait[] {
@@ -94,7 +94,7 @@ export function makePlayer(world: World, rng: Rng, clubId: number, tier: Tier | 
     // A generated senior has played first-team football somewhere; academy graduates and the very young have not.
     debuted: draft.academy !== true && draft.age > T.DEBUT_AGE_LIMIT,
     retired: false,
-    season: freshSeasonStats(world.season, clubId, tier),
+    season: freshSeasonStats(world.season, clubId, tier, rating),
     history: [],
     madeBy: [],
   }

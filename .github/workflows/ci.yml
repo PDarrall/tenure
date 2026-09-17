@@ -20,6 +20,25 @@ jobs:
       - run: pnpm test:core
       - run: pnpm web:build
 
+  smoke:
+    # A season in the browser on an iPad viewport: the match view, a substitution, a mentality
+    # change, a cup tie, a contract renewal, a debut with growth; a full match at full speed is timed.
+    name: Season smoke (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm web:build
+      - run: pnpm --filter @tenure/web exec playwright install --with-deps chromium
+      - run: pnpm --filter @tenure/web e2e
+        env:
+          CI: 'true'
+
   validation:
     # The population targets in DESIGN.md are asserted by
     # packages/engine/test/population.test.ts. Until the model is tuned this

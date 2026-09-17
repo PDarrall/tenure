@@ -5,34 +5,34 @@ Tenure is a manager's career, not a chairman's club, so the board is the AI and 
 Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · ✗ deliberately out.
 
 ## Players
-- One rating out of 100, age, position and side, value, contract of wage and years — 3
-- Hidden potential, estimated by scouts as a range — 3 (range width from scouting level, 5)
-- Up to two traits per player as the texture — 3
-- Condition, morale, injuries, suspensions — 3
-- Match ratings out of 10, season and career stats, history — 3
-- Contract renewals, requests for new deals, requests to leave — 3
+- One rating out of 100, age, position and side, value, contract of wage and years — ✓
+- Hidden potential, estimated by scouts as a range — ◐ (a range for your own under-24s ✓; range width from scouting level, 5)
+- Up to two traits per player as the texture — ✓
+- Condition, morale, injuries, suspensions — ✓
+- Match ratings out of 10, season and career stats, history — ✓
+- Contract renewals, requests for new deals, requests to leave — ✓
 - Attribute sheets, player instructions, personalities — ✗
 
 ## Your players
-- Tagging on sign, debut or promotion; bond — 3
-- Growth with minutes for under-24s, visible in the squad screen — 3
-- Milestone news for your players after you leave — 3
-- Players made, the fourth score line, with its career-page list — 3
+- Tagging on sign, debut or promotion; bond — ✓
+- Growth with minutes for under-24s, visible in the squad screen — ✓
+- Milestone news for your players after you leave — ✓
+- Players made, the fourth score line, with its career-page list — ✓
 - Players who follow you to a new club — 4
 - The obituary's three names; the makers' list in the Hall of Fame — 6
 
 ## Tactics
-- Formation from the CM 01/02 list, with structural pros and cons — 3
-- Mentality and playing style — 3
-- Opposition report before each match — 3
+- Formation from the CM 01/02 list, with structural pros and cons — ✓
+- Mentality and playing style — ✓
+- Opposition report before each match — ✓
 - Player instructions, arrows, set-piece takers, saved tactic files — ✗
 
 ## Match
-- Minute-by-minute engine, commentary naming players — 3
-- Space-bar speed, automatic pauses at goals, reds, injuries, half time — 3
-- Substitutions and mentality changes while paused — 3
-- Latest scores from the division; live table at full time — 3
-- Match stats (shots, on target, possession, corners, fouls, cards); pre-match odds — 3
+- Minute-by-minute engine, commentary naming players — ✓
+- Space-bar speed, automatic pauses at goals, reds, injuries, half time — ✓
+- Substitutions and mentality changes while paused — ✓
+- Latest scores from the division; live table at full time — ✓
+- Match stats (shots, on target, possession, corners, fouls, cards); pre-match odds — ✓
 - Fixtures and results by competition; league table; cups; European competition — ✓
 
 ## Transfers

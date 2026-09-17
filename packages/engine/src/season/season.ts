@@ -34,7 +34,7 @@ export function startSeason(world: World, rng: Rng): void {
     if (!p || p.retired) continue
     if (p.season.apps > 0 || p.season.season !== world.season) {
       if (p.season.season !== world.season) p.history.push(p.season)
-      p.season = freshSeasonStats(world.season, p.clubId, tierOf.get(p.clubId) ?? null)
+      p.season = freshSeasonStats(world.season, p.clubId, tierOf.get(p.clubId) ?? null, p.rating)
     }
   }
   tierAboveMilestones(world)
@@ -175,10 +175,9 @@ export interface PreparedFixture {
   knockout: boolean
   homeSide: { lineup: Lineup; participant: Participant }
   awaySide: { lineup: Lineup; participant: Participant }
-  homeClub: Club | undefined
-  awayClub: Club | undefined
-  homeManager: Manager | undefined
-  awayManager: Manager | undefined
+  /** Managers in post at kick-off; plain ids, so a prepared fixture can wait in a save. */
+  homeManagerId: number | null
+  awayManagerId: number | null
   homePosition: number | null
   awayPosition: number | null
   homeBigGame: boolean
@@ -197,15 +196,15 @@ export function prepareFixture(world: World, rng: Rng, fixture: Fixture): Prepar
   const awaySide = lineupFor(world, rng, fixture.awayId, { bigGame: awayBigGame })
   const homeClub = clubById(world, fixture.homeId)
   const awayClub = clubById(world, fixture.awayId)
+  const homeManager = homeClub ? managerAt(world, homeClub) : undefined
+  const awayManager = awayClub ? managerAt(world, awayClub) : undefined
   return {
     fixture,
     knockout,
     homeSide,
     awaySide,
-    homeClub,
-    awayClub,
-    homeManager: homeClub ? managerAt(world, homeClub) : undefined,
-    awayManager: awayClub ? managerAt(world, awayClub) : undefined,
+    homeManagerId: homeManager ? homeManager.id : null,
+    awayManagerId: awayManager ? awayManager.id : null,
     homePosition: homeClub ? positionOf(world, fixture.homeId) : null,
     awayPosition: awayClub ? positionOf(world, fixture.awayId) : null,
     homeBigGame,
@@ -228,12 +227,16 @@ export interface FixtureFacts {
   played: number
 }
 
+function managerOfId(world: World, id: number | null): Manager | undefined {
+  return id === null ? undefined : world.managers[id - 1]
+}
+
 function sideInputFor(world: World, prepared: PreparedFixture, key: 'home' | 'away', result: FixtureResult, outcome: Result): SideInput {
   const home = key === 'home'
   const clubId = home ? prepared.fixture.homeId : prepared.fixture.awayId
   const side = home ? prepared.homeSide : prepared.awaySide
-  const manager = home ? prepared.homeManager : prepared.awayManager
-  const club = home ? prepared.homeClub : prepared.awayClub
+  const manager = managerOfId(world, home ? prepared.homeManagerId : prepared.awayManagerId)
+  const club = clubById(world, clubId)
   return {
     clubId,
     xi: side.lineup.xi,
@@ -252,7 +255,11 @@ function sideInputFor(world: World, prepared: PreparedFixture, key: 'home' | 'aw
 
 /** Write a result into the world: form, morale, tables, the players' facts and the log. */
 export function settleFixture(world: World, rng: Rng, prepared: PreparedFixture, result: FixtureResult, facts: FixtureFacts | null): PlayedFixture {
-  const { fixture, knockout, homeSide, awaySide, homeClub, awayClub, homeManager, awayManager, homePosition, awayPosition, odds } = prepared
+  const { fixture, knockout, homeSide, awaySide, homePosition, awayPosition, odds } = prepared
+  const homeClub = clubById(world, fixture.homeId)
+  const awayClub = clubById(world, fixture.awayId)
+  const homeManager = managerOfId(world, prepared.homeManagerId)
+  const awayManager = managerOfId(world, prepared.awayManagerId)
   const home = homeSide.participant
   const away = awaySide.participant
   fixture.played = true
@@ -366,7 +373,7 @@ export function createFixtureMatch(world: World, rng: Rng, prepared: PreparedFix
     const home = key === 'home'
     const id = home ? prepared.fixture.homeId : prepared.fixture.awayId
     const side = home ? prepared.homeSide : prepared.awaySide
-    const manager = home ? prepared.homeManager : prepared.awayManager
+    const manager = managerOfId(world, home ? prepared.homeManagerId : prepared.awayManagerId)
     return {
       clubId: id,
       name: clubNameOf(world, id),
@@ -459,16 +466,25 @@ export function drawCupRound(world: World, rng: Rng, cup: CupState, seasonWk: nu
 }
 
 /** Play a cup round: the ties drawn earlier, or a draw made now (the simulation draws at kick-off). */
+/** The ties of a cup round, drawn now if the draw has not been made. */
+export function cupRoundFixtures(world: World, rng: Rng, cup: CupState, seasonWk: number): Fixture[] {
+  const fixtures = drawnCupFixtures(world, cup)
+  return fixtures.length === 0 ? drawCupRound(world, rng, cup, seasonWk) : fixtures
+}
+
 export function playCupRound(world: World, rng: Rng, cup: CupState, seasonWk: number): PlayedFixture[] {
+  const fixtures = cupRoundFixtures(world, rng, cup, seasonWk)
+  const played = fixtures.map((fixture) => playFixture(world, rng, fixture))
+  settleCupRound(world, cup, played)
+  return played
+}
+
+/** After a round's ties are played: exits, the field, the round count, the trophy. */
+export function settleCupRound(world: World, cup: CupState, played: PlayedFixture[]): void {
   const final = isFinal(cup)
-  let fixtures = drawnCupFixtures(world, cup)
-  if (fixtures.length === 0) fixtures = drawCupRound(world, rng, cup, seasonWk)
-  const played: PlayedFixture[] = []
   const round = cup.roundsPlayed + 1
   const out = new Set<ClubId>()
-  for (const fixture of fixtures) {
-    const result = playFixture(world, rng, fixture)
-    played.push(result)
+  for (const result of played) {
     if (result.loserId === null || result.winnerId === null) throw new Error('cup tie without a winner')
     out.add(result.loserId)
     const loserTier = tierOfClub(world, result.loserId)
@@ -492,7 +508,6 @@ export function playCupRound(world: World, rng: Rng, cup: CupState, seasonWk: nu
     if (club) awardHonour(world, club, cup.competition)
     else emit(world, 'trophy', { clubId: cup.winnerId, managerId: null, competition: cup.competition, tier: null, season: world.season })
   }
-  return played
 }
 
 /** All football in one season week: league rounds, then any cup round due. */

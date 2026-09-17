@@ -424,3 +424,47 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
 - The formation and style edge targets count only formations and styles
   with at least 600 logged games; a rarely chosen shape with a handful
   of games is noise, not an edge.
+
+## Screens and the match view (phase 3d)
+
+- A fixture of the human's stops the turn before kick-off with the slot
+  read: the human's division (or the human's cup tie) sits in the minute
+  engine inside the save (`world.human.watched`), the rest of the slot
+  waits for the fast path. Continue after the whistle commits the lot
+  and runs the week on as before; a Continue mid-match runs the match
+  to the end headless first. "Change the side" forgets the prepared slot
+  and reads it again at the next Continue, consuming a few more random
+  draws, so a career that goes back is a different career from one that
+  does not; each is deterministic on its own.
+- Other matches in the division run in the same engine at the same
+  minute and show in the latest-scores panel; cup ties from other
+  divisions and other tiers' league matches are fast-path results at
+  full time. The table at full time is the standings with the day's
+  results applied, shown in the match view before the commit.
+- Full speed is 640 ms a match minute, so ninety minutes and stoppage
+  take about a minute of wall time; hold-to-run and the space bar run
+  the match while held, Run/Pause runs it until the next automatic
+  pause, To full time finishes it at once. Substitutions and mentality
+  changes are made while paused, including the pauses the match makes
+  itself (goals, red cards, injuries, half time).
+- An injured player on the human's side leaves the pitch and waits for
+  a change: the view says so and pauses; if the human runs on without
+  one, the side plays short, as an AI side does once its changes are
+  used.
+- The squad screen marks a player as yours (★) when the human's tag is
+  on him; the rating change shown is against the rating when the
+  season's record opened (`ratingAtStart`), which includes anchoring
+  shifts in windows.
+- Potential shows as a range only for your own club's players under 24
+  (the assistant knows them; scouting levels are phase 5): from the
+  rating to the hidden potential ± 4, whole numbers.
+- "Talk terms" on a player's profile queues the same contract decision
+  an expiring deal raises; the assistant's demand is his wage demand.
+- Tap-to-swap on the tactics screen exchanges two players' places (a
+  slot, a bench seat or the stands); taking over the sheet turns the
+  assistant's pick off; injured and banned players left in are replaced
+  at kick-off and reported in the inbox. The captain is a mark for the
+  team sheet with no rule reading it yet.
+- The Playwright smoke runs Chromium at an iPad viewport (WebKit is not
+  on the runner); tap targets are asserted at 32px or more on the
+  buttons, with the stylesheet setting 44px minimum height for controls.

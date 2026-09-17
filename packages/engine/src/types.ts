@@ -1,3 +1,5 @@
+import type { MatchState } from './match/minute.js'
+import type { PreparedFixture } from './season/season.js'
 /**
  * State shapes. Everything here is plain, JSON-serialisable data. A saved
  * game is a `World` and nothing else.
@@ -96,6 +98,8 @@ export interface PlayerSeasonStats {
   rated: number
   /** Rating gained from minutes this season (Your players). */
   growth: number
+  /** Rating when the season's record opened, for the squad screen's change this season. */
+  ratingAtStart: number
 }
 
 export type MadeCircumstance = 'signed' | 'debut' | 'promoted'
@@ -631,11 +635,39 @@ export interface HumanState {
   windowChoice: WindowChoice | null
   /** Answers to this summer's expiring contracts, read when the summer settles them. */
   contractChoices: Record<number, 'release' | { years: number; wage: number }>
+  /** A match week stopped before kick-off so the human can watch it (phase 3d); null between matches. */
+  watched: WatchedWeek | null
+}
+
+/** Enough of a fixture to find it again in world.fixtures. */
+export interface FixtureKey {
+  competition: Competition
+  round: number
+  homeId: ClubId
+  awayId: ClubId
+}
+
+/**
+ * A slot of a match week read before kick-off and held for the match view:
+ * the human's division (or the human's cup tie) runs in the minute engine,
+ * everything else in the slot waits for the fast path at commit. Plain data,
+ * so a save taken mid-match resumes at the same minute.
+ */
+export interface WatchedWeek {
+  seasonWeek: number
+  slot: { kind: 'league' } | { kind: 'cup'; competition: 'nationalCup' | 'leagueCup' | 'european' }
+  /** The fixtures played in the minute engine, the human's first. */
+  prepared: PreparedFixture[]
+  matches: MatchState[]
+  /** The rest of the slot, played on the fast path when the watched matches are committed. */
+  others: FixtureKey[]
 }
 
 export interface HumanInputs {
   tactic?: Partial<Tactic>
   selection?: Partial<Selection>
+  /** Players the human wants to talk terms with: a contract decision is queued for each. */
+  contractOffers?: PlayerId[]
   /** Vacancies to put the human's name forward for. */
   apply?: VacancyId[]
   withdraw?: VacancyId[]

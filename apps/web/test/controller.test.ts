@@ -113,3 +113,60 @@ describe('the web controller', () => {
     expect(serialize(s.world).length).toBeLessThan(4_000_000)
   })
 })
+
+describe('the match view', () => {
+  it('stops before the human fixture, ticks the division in step, takes a substitution and a mentality change, and commits on Continue', { timeout: 60_000 }, async () => {
+    const mod = await import('../src/controller.js')
+    let s = mod.newSession(3, 'Paul', 'coach')
+    s = untilOffer(s)
+    const offer = pendingDecisions(s.world).find((d) => d.kind === 'offer')!
+    s = mod.nextTurn(mod.withAnswer(s, offer.id, 'top-half:2'))
+    for (let i = 0; i < 30 && !mod.watched(s); i++) {
+      for (const d of pendingDecisions(s.world)) if (d.blocking) s = mod.withAnswer(s, d.id, d.defaultKey)
+      s = mod.nextTurn(s)
+    }
+    const w = mod.watched(s)!
+    const m = mod.humanMatch(s)!
+    expect(w.matches.length).toBeGreaterThan(1)
+    expect(m.played).toBe(0)
+    const side = mod.humanSide(s)
+    expect(m[side].isHuman).toBe(true)
+    for (let i = 0; i < 20; i++) mod.tickWatched(s)
+    expect(m.played).toBe(20)
+    for (const other of w.matches) expect(other.played).toBe(20)
+    mod.mentalityWatched(s, 'attack')
+    expect(m[side].mentality).toBe('attack')
+    const off = m[side].players.find((p) => p.on && p.slot?.position === 'F')!
+    const on = m[side].players.find((p) => !p.started && !p.on)!
+    expect(mod.substituteWatched(s, off.id, on.id)).toBe(true)
+    expect(m[side].subsUsed).toBe(1)
+    // A save mid-match keeps the minute.
+    const saved = mod.parseSave(mod.serialize(s.world))
+    expect(saved.human!.watched!.matches[0]!.played).toBe(20)
+    mod.skipWatched(s)
+    expect(m.over).toBe(true)
+    const keys = [...w.prepared.map((p) => p.fixture), ...w.others]
+    const slotFixtures = keys.map((k) => s.world.fixtures.find((f) => f.competition === k.competition && f.round === k.round && f.homeId === k.homeId && f.awayId === k.awayId)!)
+    expect(slotFixtures.some((f) => f.played)).toBe(false)
+    s = mod.nextTurn(s)
+    expect(mod.watched(s)).toBeNull()
+    // The whole slot settled: the division in the minute engine, the rest on the fast path.
+    expect(slotFixtures.every((f) => f.played)).toBe(true)
+    expect(s.world.log.some((e) => e.type === 'match.played' && e.payload['watched'] === true)).toBe(true)
+  })
+
+  it('queues a selection, a captain and a contract talk without touching the world until the turn', async () => {
+    const mod = await import('../src/controller.js')
+    let s = mod.newSession(1, 'Paul', 'coach')
+    s = mod.withSelection(s, { xi: [1, 2, 3], autoPick: false })
+    s = mod.withSelection(s, { captain: 2 })
+    expect(s.inputs.selection).toEqual({ xi: [1, 2, 3], autoPick: false, captain: 2 })
+    expect(s.world.human!.selection.autoPick).toBe(true)
+    s = mod.withContractOffer(s, 7)
+    s = mod.withContractOffer(s, 7)
+    expect(s.inputs.contractOffers).toEqual([7])
+    s = mod.nextTurn(s)
+    expect(s.world.human!.selection.captain).toBe(2)
+    expect(s.world.human!.selection.autoPick).toBe(false)
+  })
+})

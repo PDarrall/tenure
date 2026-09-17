@@ -57,3 +57,14 @@ td, th { padding: 0.35rem 0.4rem; text-align: right; border-bottom: 1px solid rg
 td:first-child, th:first-child, td.name, th.name { text-align: left; }
 tr.me td { font-weight: 700; }
 .notice { padding: 0.6rem 0.8rem; border-left: 4px solid currentColor; margin: 0.5rem 0; }
+/* Phase 3(d): squad, tactics and the match view, still unstyled. */
+button.th { min-height: 32px; padding: 0.2rem 0.3rem; margin: 0; border: 0; font-weight: 700; }
+button.link { min-height: 32px; padding: 0.2rem 0; margin: 0; border: 0; text-align: left; }
+.small { font-size: 0.8rem; }
+ul.plain { list-style: none; padding: 0; margin: 0.25rem 0; }
+ul.plain li { padding: 0.15rem 0; }
+.bar { height: 14px; border: 2px solid currentColor; border-radius: 7px; overflow: hidden; margin: 0.5rem 0 0; }
+.bar .fill { height: 100%; background: currentColor; transition: width 0.4s; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 600px) { .cols { grid-template-columns: 1fr; } }
+tr[data-testid='squad-row'] { cursor: pointer; }

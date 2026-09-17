@@ -13,9 +13,10 @@
  */
 import { rngFromState, type Rng } from '../rng.js'
 import { T } from '../tunables.js'
-import type { ClubId, CupState, Fixture, HumanInputs, Tier, World } from '../types.js'
+import type { ClubId, CupState, Fixture, FixtureKey, HumanInputs, Tier, WatchedWeek, World } from '../types.js'
 import { seasonOf, seasonWeek } from '../season/calendar.js'
-import { drawCupRound, drawnCupFixtures, playCupRound, playFixture, startSeason, type PlayedFixture } from '../season/season.js'
+import { commitFixtureMatch, createFixtureMatch, cupRoundFixtures, drawCupRound, drawnCupFixtures, playCupRound, playFixture, prepareFixture, settleCupRound, startSeason, type PlayedFixture } from '../season/season.js'
+import { runToEnd } from '../match/minute.js'
 import { decayMorale } from '../season/squad.js'
 import * as tenure from '../tenure/hooks.js'
 import { applyInputs } from '../play/inputs.js'
@@ -25,6 +26,12 @@ import { closeWeekHooks } from './week.js'
 export interface TurnOptions {
   /** Play and close the whole week whatever the human's fixtures: advanceWeek for a career. */
   wholeWeek?: boolean
+  /**
+   * Stop before the human's fixture with the slot read and the human's
+   * division in the minute engine (world.human.watched); the next turn
+   * commits whatever the match view played and runs the rest to the end.
+   */
+  watch?: boolean
 }
 
 export type Slot = { kind: 'league'; fixtures: Fixture[] } | { kind: 'cup'; cup: CupState }
@@ -77,6 +84,78 @@ export function nextSlot(world: World, sw: number): Slot | null {
   return null
 }
 
+export function fixtureKey(f: Fixture): FixtureKey {
+  return { competition: f.competition, round: f.round, homeId: f.homeId, awayId: f.awayId }
+}
+
+export function findFixture(world: World, key: FixtureKey): Fixture | undefined {
+  return world.fixtures.find((f) => f.competition === key.competition && f.round === key.round && f.homeId === key.homeId && f.awayId === key.awayId)
+}
+
+/** Does this slot hold a fixture of the club that is drawn and unplayed? */
+function slotInvolves(world: World, slot: Slot, clubId: ClubId): boolean {
+  if (slot.kind === 'league') return slot.fixtures.some((f) => involves(f, clubId))
+  return drawnCupFixtures(world, slot.cup).some((f) => !f.played && involves(f, clubId))
+}
+
+/**
+ * Read a slot for the match view: the human's division (or the human's cup
+ * tie) goes into the minute engine, the human's fixture first; the rest of
+ * the slot waits for the fast path at commit.
+ */
+export function prepareWatchedSlot(world: World, rng: Rng, slot: Slot, sw: number, clubId: ClubId): WatchedWeek {
+  let fixtures: Fixture[]
+  let watchedKind: WatchedWeek['slot']
+  if (slot.kind === 'league') {
+    fixtures = slot.fixtures
+    watchedKind = { kind: 'league' }
+  } else {
+    fixtures = cupRoundFixtures(world, rng, slot.cup, sw)
+    watchedKind = { kind: 'cup', competition: slot.cup.competition }
+  }
+  const mine = fixtures.find((f) => involves(f, clubId))
+  if (!mine) throw new Error('prepareWatchedSlot: the human has no fixture in this slot')
+  const tier = mine.tier
+  const watched = [mine, ...fixtures.filter((f) => f !== mine && slot.kind === 'league' && f.tier === tier)]
+  const others = fixtures.filter((f) => !watched.includes(f))
+  const prepared = watched.map((f) => prepareFixture(world, rng, f))
+  const matches = prepared.map((p) => createFixtureMatch(world, rng, p))
+  return { seasonWeek: sw, slot: watchedKind, prepared, matches, others: others.map(fixtureKey) }
+}
+
+/** Settle a watched slot: finish any match still running, commit them, play the rest on the fast path, run the hooks. */
+export function commitWatched(world: World, rng: Rng): PlayedFixture[] {
+  const w = world.human?.watched
+  if (!world.human || !w) return []
+  const played: PlayedFixture[] = []
+  w.prepared.forEach((prepared, i) => {
+    const state = w.matches[i]
+    if (!state) return
+    const live = findFixture(world, fixtureKey(prepared.fixture))
+    if (!live || live.played) return
+    prepared.fixture = live
+    if (!state.over) runToEnd(state)
+    played.push(commitFixtureMatch(world, rng, prepared, state))
+  })
+  for (const key of w.others) {
+    const f = findFixture(world, key)
+    if (f && !f.played) played.push(playFixture(world, rng, f))
+  }
+  if (w.slot.kind === 'cup') {
+    const competition = w.slot.competition
+    const cup = world.cups.find((c) => c.competition === competition)
+    if (cup) settleCupRound(world, cup, played)
+  }
+  tenure.afterMatches(world, rng, played)
+  world.human.watched = null
+  return played
+}
+
+/** Forget a prepared slot (the human went back to change the side); the next turn reads it again. */
+export function discardWatched(world: World): void {
+  if (world.human) world.human.watched = null
+}
+
 function playSlot(world: World, rng: Rng, slot: Slot, sw: number): PlayedFixture[] {
   const played = slot.kind === 'league' ? slot.fixtures.map((f) => playFixture(world, rng, f)) : playCupRound(world, rng, slot.cup, sw)
   tenure.afterMatches(world, rng, played)
@@ -118,9 +197,19 @@ function statusKey(world: World): string {
 export function advanceTurn(world: World, inputs: HumanInputs = {}, options: TurnOptions = {}): number {
   if (!world.human) throw new Error('advanceTurn needs a career; a simulation uses advanceWeek')
   const rng = rngFromState(world.rng)
+  // Saves from before phase 3(d) have no watched slot.
+  if (world.human.watched === undefined) world.human.watched = null
   applyInputs(world, rng, inputs)
   const startStatus = statusKey(world)
   let fixturesPlayed = 0
+  if (world.human.watched) {
+    const club = humanClubId(world)
+    const played = commitWatched(world, rng)
+    if (club !== null && played.some((p) => involves(p.fixture, club))) {
+      fixturesPlayed++
+      if (!options.wholeWeek) return fixturesPlayed
+    }
+  }
   for (;;) {
     const sw = seasonWeek(world.week)
     if (sw >= T.MATCH_WEEKS) {
@@ -132,6 +221,11 @@ export function advanceTurn(world: World, inputs: HumanInputs = {}, options: Tur
     const club = humanClubId(world)
     const slot = nextSlot(world, sw)
     if (slot) {
+      if (options.watch && !options.wholeWeek && club !== null && slotInvolves(world, slot, club)) {
+        // The pre-match step: the side is picked and the odds are set; the match view plays it.
+        world.human.watched = prepareWatchedSlot(world, rng, slot, sw, club)
+        return fixturesPlayed
+      }
       const played = playSlot(world, rng, slot, sw)
       if (club !== null && played.some((p) => involves(p.fixture, club))) {
         fixturesPlayed++
