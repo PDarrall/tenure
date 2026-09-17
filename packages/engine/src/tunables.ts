@@ -281,8 +281,35 @@ export const T = {
   /** Strength swing from squad morale: ±this at 100 / 0. */
   MORALE_WEIGHT: 3,
 
-  /** Shape matchup: winner's expected goals × (1 + this), loser's × (1 − this). DESIGN: ±5%. */
-  TACTIC_RPS: 0.05,
+  /**
+   * Structure in the one-shot model (DESIGN.md "Formations and tactics"),
+   * until the minute engine owns it. Bands are sums of effective rating ÷ 100.
+   * Serves: no formation or style beats the mean points per game by more than 10%.
+   */
+  /** Expected goals × (1 ± this × midfield-band edge): the midfield drives pressure. */
+  MID_EDGE_K: 0.08,
+  /** Expected goals × (1 + this × (attack ÷ opposing defence − the standard ratio)): attackers against defenders drive chance quality. */
+  ATTACK_DEFENCE_K: 0.2,
+  /** The attack-to-defence power ratio of two 4-4-2s (two forwards over a keeper and back four): the zero of the rule above. */
+  ATTACK_DEFENCE_STANDARD: 0.4,
+  /** A wide side against a back line with fewer wide defenders than this adds this share of chances. */
+  WIDTH_EDGE: 0.04,
+  NARROW_DEFENCE_WIDTH: 2,
+  /** Each defender beyond four cuts chances conceded by this share. */
+  OVERLOAD_K: 0.05,
+  /** Style, one rule each. */
+  STYLE_EFFECTS: {
+    /** More pressure with a higher-rated XI (× on own goals when better), fewer but better chances (variance). */
+    possession: { betterXi: 0.04, variance: 0.95 },
+    /** Each pace or aerial player in the XI adds this to own expected goals; more shots of lower quality lets the opponent in a little. */
+    direct: { perTrait: 0.015, concede: 1.03 },
+    /** Chances after sustained defending: own goals up against an attacking opponent, own pressure down. */
+    counter: { vsAttack: 1.06, own: 0.97, concede: 0.97 },
+    /** More pressure, more fouls, faster condition drain. */
+    pressing: { own: 1.05, concede: 1.03, drain: 1.3, fouls: 1.3 },
+  } as const,
+  /** The big-game trait: effective rating in a cup tie, derby or against a top side. */
+  BIG_GAME_BONUS: 3,
 
   /** Mentality: attack scales both sides' expected goals up, defend down, by this. */
   MENTALITY_VARIANCE: 0.2,
@@ -316,6 +343,109 @@ export const T = {
 
   /** Cup ties level after normal time go to a shoot-out; better side wins with base + this × strength gap share. */
   SHOOTOUT_STRENGTH_EDGE: 0.2,
+
+  // ---------------------------------------------------------------------------
+  // Players (DESIGN.md "Players"). Club strength stays the master number:
+  // squads are generated and re-anchored to it. Serves: every population
+  // target through the anchoring rule; the best XI averages club strength.
+  // ---------------------------------------------------------------------------
+
+  /** Squad size by tier, index 0 = tier 1. DESIGN: 22 in tiers 1–2, 20 in 3–4, 18 in 5. */
+  SQUAD_SIZE_BY_TIER: [22, 22, 20, 20, 18] as readonly number[],
+  FOREIGN_SQUAD_SIZE: 22,
+  /** Keepers in every squad; the outfield splits by these shares. DESIGN: for a 22, about 2 GK, 7 D, 8 M, 4–5 F. */
+  SQUAD_KEEPERS: 2,
+  SQUAD_OUTFIELD_MIX: { D: 0.35, M: 0.4 } as const,
+  /** Side draw for outfield players: left, centre, right, either. */
+  SIDE_WEIGHTS: [0.2, 0.5, 0.2, 0.1] as readonly number[],
+  /** Ages at generation, uniform. */
+  PLAYER_AGE_RANGE: [18, 33] as readonly [number, number],
+  /** Starters are drawn around club strength, backups below it. */
+  STARTER_RATING_SD: 4,
+  BACKUP_RATING_GAP: 7,
+  BACKUP_RATING_SD: 4,
+  /** Potential = rating + years to 24 × this + noise. Hidden. */
+  POTENTIAL_GAIN_PER_YEAR: 2,
+  POTENTIAL_NOISE_SD: 3,
+  /** Under this age a player still grows toward potential. DESIGN: under 24. */
+  YOUTH_AGE: 24,
+  /** Zero, one or two traits per player. */
+  TRAIT_COUNT_WEIGHTS: [0.45, 0.4, 0.15] as readonly number[],
+  /** Trait draw weights by position (1 where unlisted). */
+  TRAIT_POSITION_WEIGHTS: {
+    poacher: { GK: 0, D: 0.1, M: 0.4, F: 3 },
+    playmaker: { GK: 0, D: 0.3, M: 3, F: 0.8 },
+    pace: { GK: 0, D: 1, M: 1.2, F: 1.5 },
+    aerial: { GK: 0.3, D: 2, M: 0.6, F: 1.5 },
+    'tough tackler': { GK: 0, D: 2.5, M: 1.5, F: 0.2 },
+    leader: { GK: 1.5, D: 1.5, M: 1, F: 0.8 },
+    'big-game': { GK: 1, D: 1, M: 1, F: 1 },
+    consistent: { GK: 1.5, D: 1, M: 1, F: 1 },
+    versatile: { GK: 0, D: 1.5, M: 1.5, F: 1 },
+    loyal: { GK: 1, D: 1, M: 1, F: 1 },
+    'injury-prone': { GK: 0.5, D: 1, M: 1, F: 1 },
+    'hot-headed': { GK: 0.3, D: 1.5, M: 1.2, F: 1 },
+  } as Readonly<Record<string, Readonly<Record<'GK' | 'D' | 'M' | 'F', number>>>>,
+  /** Positional penalties. DESIGN: adjacent −15, distant −30, wrong side −5; versatile halves them. */
+  POSITION_PENALTY_ADJACENT: 15,
+  POSITION_PENALTY_DISTANT: 30,
+  SIDE_PENALTY: 5,
+  VERSATILE_PENALTY_SHARE: 0.5,
+  /** Condition (0–100). DESIGN: below 80 it costs rating, below 70 it raises injury risk. */
+  CONDITION_MAX: 100,
+  CONDITION_RATING_FROM: 80,
+  CONDITION_RATING_PER_POINT: 0.25,
+  CONDITION_INJURY_FROM: 70,
+  /** Player morale swings effective rating by ± this at 100 / 0. */
+  PLAYER_MORALE_RATING_SWING: 3,
+  /** The assistant's youth-first lean: selection bonus for under-24s. */
+  YOUTH_LEAN_SELECTION_BONUS: 4,
+  /** Share of AI managers who lean youth-first. */
+  AI_YOUTH_FIRST_SHARE: 0.3,
+  /** Bench size. DESIGN: five. */
+  BENCH_SIZE: 5,
+  /** The formation a club falls back on. */
+  DEFAULT_FORMATION: '4-4-2' as const,
+  /** AI preferred formations, weights in FORMATION_NAMES order. */
+  FORMATION_WEIGHTS: [3, 1, 2, 1.5, 0.5, 1, 1, 1.5, 0.8, 1, 0.8, 0.5] as readonly number[],
+  /** AI styles, weights for possession, direct, counter, pressing. */
+  STYLE_WEIGHTS: [1, 1, 1, 1] as readonly number[],
+  /** Wage in £k a week = base × e^(exp × rating), veterans discounted. */
+  WAGE_BASE_K: 0.5,
+  WAGE_RATING_EXP: 0.055,
+  WAGE_MIN_K: 1,
+  WAGE_VETERAN_AGE: 32,
+  WAGE_VETERAN_SHARE: 0.8,
+  /** Value in £m = base × (rating/100)^power, discounted per year from the peak age. */
+  VALUE_BASE_M: 40,
+  VALUE_RATING_POWER: 3,
+  VALUE_PEAK_AGE: 27,
+  VALUE_AGE_DECAY: 0.08,
+  VALUE_AGE_FLOOR: 0.2,
+  /** No player is worth less than this, £m. */
+  VALUE_MIN_M: 0.1,
+  /** Contract years at generation, uniform. */
+  PLAYER_CONTRACT_YEARS: [1, 4] as readonly [number, number],
+  /** Anchoring tolerance the tests allow after rounding to one decimal; below the minimum strength the rating floor gets in the way. */
+  ANCHOR_TOLERANCE: 0.15,
+  ANCHOR_MIN_STRENGTH: 10,
+  /** The age curve. DESIGN: peak 26–30, decline from 31, keepers from 33. */
+  PEAK_AGE_PLAYER: [26, 30] as readonly [number, number],
+  DECLINE_FROM: 31,
+  GK_DECLINE_FROM: 33,
+  /** Rating lost per summer from the decline age, growing by this share each further year. */
+  DECLINE_PER_YEAR: 1.5,
+  DECLINE_ACCELERATION: 0.25,
+  /** Players may retire from this age, and do at this one. */
+  PLAYER_RETIRE_FROM: 33,
+  PLAYER_RETIRE_P: 0.3,
+  PLAYER_RETIRE_AT: 37,
+  /** Out of contract and this far below club strength: released. */
+  RELEASE_BELOW_STRENGTH: 12,
+  /** Academy promotions: age, rating below club strength, extra hidden potential. */
+  ACADEMY_AGE_RANGE: [17, 19] as readonly [number, number],
+  ACADEMY_RATING_GAP: 15,
+  ACADEMY_POTENTIAL_BONUS: 12,
 
   // ---------------------------------------------------------------------------
   // Squad (DESIGN.md "Squad"). Serves: ceiling resets (turnover), ownership

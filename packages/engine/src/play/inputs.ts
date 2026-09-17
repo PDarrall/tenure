@@ -17,8 +17,8 @@ export function applyInputs(world: World, rng: Rng, inputs: HumanInputs): void {
   if (player.status.kind === 'retired') return
   emit(world, 'human.input', { ...inputs, week: world.week })
 
-  if (inputs.shape) state.shape = inputs.shape
-  if (inputs.mentality) state.mentality = inputs.mentality
+  if (inputs.tactic) state.tactic = { ...state.tactic, ...inputs.tactic }
+  if (inputs.selection) state.selection = { ...state.selection, ...inputs.selection }
 
   for (const id of inputs.withdraw ?? []) {
     const vacancy = world.vacancies[id - 1]

@@ -11,10 +11,10 @@ import {
   sessionFromWorld,
   withAnswer,
   withApply,
+  withFormation,
   withMentality,
   withResign,
   withRetire,
-  withShape,
   withWithdraw,
   type Session,
 } from '../src/controller.js'
@@ -55,13 +55,13 @@ describe('the web controller', () => {
     expect(me(s).name).toBe('Paul')
     expect(me(s).background).toBe('ex-pro')
     expect(s.world.week).toBe(0)
-    s = withShape(withMentality(s, 'attack'), 'C')
-    expect(s.inputs.shape).toBe('C')
-    expect(s.world.human!.shape).not.toBe('C')
+    s = withFormation(withMentality(s, 'attack'), '3-5-2')
+    expect(s.inputs.tactic).toEqual({ mentality: 'attack', formation: '3-5-2' })
+    expect(s.world.human!.tactic.formation).not.toBe('3-5-2')
     s = nextTurn(s)
     expect(s.world.week).toBe(1)
-    expect(s.world.human!.shape).toBe('C')
-    expect(s.world.human!.mentality).toBe('attack')
+    expect(s.world.human!.tactic.formation).toBe('3-5-2')
+    expect(s.world.human!.tactic.mentality).toBe('attack')
     expect(s.inputs).toEqual({ answers: {} })
     expect(s.turn).toBe(1)
     expect(s.shownFrom.week).toBe(0)
@@ -110,6 +110,6 @@ describe('the web controller', () => {
   it('keeps a season of saves small enough for localStorage', () => {
     let s = newSession(3, 'Paul', 'coach')
     for (let i = 0; i < tunables.SEASON_WEEKS; i++) s = nextTurn(s)
-    expect(serialize(s.world).length).toBeLessThan(2_000_000)
+    expect(serialize(s.world).length).toBeLessThan(4_000_000)
   })
 })

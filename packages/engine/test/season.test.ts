@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { createWorld } from '../src/world/gen.js'
 import { createRng } from '../src/rng.js'
 import { leagueFixtures, roundRobin } from '../src/season/fixtures.js'
-import { matchOdds, playMatch, poissonPmf, type Participant } from '../src/season/match.js'
+import { matchOdds, plainBands, playMatch, poissonPmf, type Participant } from '../src/season/match.js'
+import { structureOf } from '../src/players/formations.js'
 import { matchesThisRound, roundsNeeded } from '../src/season/cups.js'
 import { tableFor } from '../src/season/table.js'
 import { advanceWeek, runSeasons, runWeeks } from '../src/sim/advance.js'
@@ -11,7 +12,7 @@ import { renderMatch } from '../src/text/render.js'
 import { T } from '../src/tunables.js'
 
 function side(overrides: Partial<Participant> = {}): Participant {
-  return { id: 1, strength: 50, tactical: 50, form: [], morale: 50, shape: 'A', mentality: 'balanced', ...overrides }
+  return { id: 1, strength: 50, tactical: 50, form: [], morale: 50, mentality: 'balanced', style: 'possession', bands: plainBands(50), ...overrides }
 }
 
 describe('fixtures', () => {
@@ -80,12 +81,16 @@ describe('match model', () => {
     expect(even.pDraw).toBeLessThan(0.35)
   })
 
-  it('applies the shape loop and mentality variance', () => {
-    const base = matchOdds(side({ shape: 'A' }), side({ id: 2, shape: 'A' }))
-    const beats = matchOdds(side({ shape: 'A' }), side({ id: 2, shape: 'B' }))
-    const loses = matchOdds(side({ shape: 'B' }), side({ id: 2, shape: 'A' }))
-    expect(beats.pHome).toBeGreaterThan(base.pHome)
-    expect(loses.pHome).toBeLessThan(base.pHome)
+  it('reads structure: a fifth midfielder wins pressure, a back five concedes less, four forwards make and concede', () => {
+    const base = matchOdds(side(), side({ id: 2 }))
+    const fiveMid = matchOdds(side({ bands: plainBands(50, structureOf('4-5-1')) }), side({ id: 2 }))
+    expect(fiveMid.lambdaHome / fiveMid.lambdaAway).toBeGreaterThan(base.lambdaHome / base.lambdaAway)
+    expect(fiveMid.lambdaHome).toBeLessThan(base.lambdaHome * 1.05)
+    const backFive = matchOdds(side({ bands: plainBands(50, structureOf('5-4-1')) }), side({ id: 2 }))
+    expect(backFive.lambdaAway).toBeLessThan(base.lambdaAway)
+    expect(backFive.lambdaHome).toBeLessThan(base.lambdaHome)
+    const fourUp = matchOdds(side({ bands: plainBands(50, structureOf('4-2-4')) }), side({ id: 2 }))
+    expect(fourUp.lambdaHome + fourUp.lambdaAway).toBeGreaterThan(base.lambdaHome + base.lambdaAway)
     const attack = matchOdds(side({ mentality: 'attack' }), side({ id: 2 }))
     expect(attack.lambdaHome + attack.lambdaAway).toBeGreaterThan(base.lambdaHome + base.lambdaAway)
     expect(attack.pDraw).toBeLessThan(base.pDraw)
@@ -109,8 +114,10 @@ describe('match model', () => {
 
   it('gives the home side of two equal teams the tunable lean, and nothing else', () => {
     const odds = matchOdds(side(), side({ id: 2 }))
-    expect(odds.lambdaHome).toBeCloseTo(T.GOALS_BASE + T.HOME_ADVANTAGE_GOALS, 12)
-    expect(odds.lambdaAway).toBeCloseTo(T.GOALS_BASE, 12)
+    // Identical sides: structure and style cancel, leaving only the lean between the two.
+    expect(odds.lambdaHome / odds.lambdaAway).toBeCloseTo((T.GOALS_BASE + T.HOME_ADVANTAGE_GOALS) / T.GOALS_BASE, 9)
+    expect(odds.lambdaHome).toBeGreaterThan(0.85 * (T.GOALS_BASE + T.HOME_ADVANTAGE_GOALS))
+    expect(odds.lambdaHome).toBeLessThan(1.15 * (T.GOALS_BASE + T.HOME_ADVANTAGE_GOALS))
     // Home win / draw / away win for equal sides. DESIGN target ≈ 45 / 26 / 29, to verify.
     expect(odds.pHome).toBeGreaterThan(0.4)
     expect(odds.pHome).toBeLessThan(0.52)

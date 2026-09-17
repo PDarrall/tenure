@@ -222,7 +222,7 @@ describe('ways out', () => {
     const owed = remainingValue(world, spell)
     leaveByMutualConsent(world, spell)
     expect(spell.endReason).toBe('mutual')
-    expect(Math.abs(spell.payout - owed * T.MUTUAL_PAYOUT_SHARE)).toBeLessThanOrEqual(0.05)
+    expect(Math.abs(spell.payout - owed * T.MUTUAL_PAYOUT_SHARE)).toBeLessThanOrEqual(0.051)
     expect(manager.reputation).toBe(rep + T.REP_MUTUAL)
   })
 

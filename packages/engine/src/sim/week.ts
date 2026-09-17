@@ -29,13 +29,13 @@ export function closeWeekHooks(world: World, rng: Rng, sw: number): void {
     market.monthly(world, rng)
   }
   if (sw === T.WINTER_WINDOW_WEEK - 1) tenure.queueWindowDecision(world, false)
-  if (sw === T.WINTER_WINDOW_WEEK) tenure.afterWinterWindow(world, winterWindow(world))
+  if (sw === T.WINTER_WINDOW_WEEK) tenure.afterWinterWindow(world, winterWindow(world, rng))
   if (sw === T.MATCH_WEEKS) {
     tenure.seasonEnd(world, endSeason(world, rng, extrasFor(world)))
     market.seasonEnd(world, rng)
     tenure.queueWindowDecision(world, true)
   }
-  if (sw === T.SUMMER_WINDOW_WEEK) tenure.afterSummerWindow(world, summerWindow(world, (clubId) => tenure.budgetMultiplierFor(world, clubId)))
+  if (sw === T.SUMMER_WINDOW_WEEK) tenure.afterSummerWindow(world, summerWindow(world, rng, (clubId) => tenure.budgetMultiplierFor(world, clubId)))
   tenure.weekly(world, rng)
   market.weekly(world, rng)
 }

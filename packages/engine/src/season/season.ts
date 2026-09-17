@@ -6,7 +6,11 @@ import { homeClub, managerAt } from '../lookup.js'
 import { matchTemplateKey } from '../text/render.js'
 import { leagueFixtures } from './fixtures.js'
 import { applyResult, positionOf, resetTables, tableFor } from './table.js'
-import { knockoutExpected, playMatch, type Participant } from './match.js'
+import { knockoutExpected, plainBands, playMatch, type Participant } from './match.js'
+import { autoPick, clubFormation, enforceSelection, xiBands, type MatchContext } from '../players/select.js'
+import { ensureForeignSquad } from '../players/gen.js'
+import { playerById } from '../lookup.js'
+import { structureOf } from '../players/formations.js'
 import { drawRound, isFinal, seedCups } from './cups.js'
 import { decayMorale, runHumanWindow, runWindow, summerSquad, updateMorale, type WindowSummary } from './squad.js'
 import { awardHonour, settleLeagues } from './promotion.js'
@@ -27,46 +31,84 @@ function clubById(world: World, id: ClubId): Club | undefined {
   return homeClub(world, id)
 }
 
-function participantFor(world: World, id: ClubId, opponentStrength: number): Participant {
+/** The side a club fields today: the human's pick or the assistant's, read in bands. */
+export interface Lineup {
+  xi: number[]
+  bench: number[]
+  /** Slots the assistant had to change in the human's pick. */
+  changed: number[]
+}
+
+export function lineupFor(world: World, rng: Rng, id: ClubId, ctx: MatchContext): { lineup: Lineup; participant: Participant } {
   const club = clubById(world, id)
   if (club) {
     const manager = managerAt(world, club)
     const tactical = manager ? manager.ability.tactical : T.CARETAKER_ABILITY
-    const gap = club.squad.strength - opponentStrength
+    let lineup: Lineup
     if (manager && manager.isHuman && world.human) {
-      // The player picks a shape and a mentality per match; they stick until changed.
-      club.shape = world.human.shape
-      club.mentality = world.human.mentality
+      // The player picks a tactic and a side; they stick until changed.
+      club.formation = world.human.tactic.formation
+      club.style = world.human.tactic.style
+      club.mentality = world.human.tactic.mentality
+      const sel = world.human.selection
+      if (sel.autoPick) lineup = { ...autoPick(world, club, club.formation, 'results-first', ctx), changed: [] }
+      else lineup = enforceSelection(world, club, club.formation, sel.xi, sel.bench, ctx)
+      sel.xi = [...lineup.xi]
+      sel.bench = [...lineup.bench]
     } else {
-      club.mentality = gap >= T.AI_MENTALITY_GAP ? 'attack' : gap <= -T.AI_MENTALITY_GAP ? 'defend' : 'balanced'
-      if (manager) club.shape = manager.preferredShape
+      club.formation = clubFormation(world, club)
+      club.style = manager ? manager.style : club.style
+      lineup = { ...autoPick(world, club, club.formation, manager ? manager.youthLean : 'results-first', ctx), changed: [] }
     }
+    const bands = xiBands(world, lineup.xi, club.formation, ctx)
+    const morale = lineup.xi.length ? lineup.xi.reduce((s, pid) => s + (playerById(world, pid)?.morale ?? T.MORALE_INITIAL), 0) / lineup.xi.length : club.squad.morale
     return {
-      id,
-      strength: club.squad.strength,
-      tactical,
-      form: club.form,
-      morale: club.squad.morale,
-      shape: club.shape,
-      mentality: club.mentality,
+      lineup,
+      participant: { id, strength: bands.strength, tactical, form: club.form, morale, mentality: club.mentality, style: club.style, bands },
     }
   }
   for (const league of world.foreign) {
     const foreign = league.clubs.find((c) => c.id === id)
     if (foreign) {
+      ensureForeignSquad(world, rng, foreign)
       const manager = world.managers.find((m) => m.id === foreign.managerId)
+      const formation = manager ? manager.preferredFormation : T.DEFAULT_FORMATION
+      const picked = autoPick(world, foreign, formation, 'results-first', ctx)
+      const bands = picked.xi.length === 11 ? xiBands(world, picked.xi, formation, ctx) : plainBands(foreign.strength, structureOf(formation))
       return {
-        id,
-        strength: foreign.strength,
-        tactical: manager ? manager.ability.tactical : T.CARETAKER_ABILITY,
-        form: [],
-        morale: T.MORALE_INITIAL,
-        shape: manager ? manager.preferredShape : 'A',
-        mentality: 'balanced',
+        lineup: { ...picked, changed: [] },
+        participant: {
+          id,
+          strength: bands.strength,
+          tactical: manager ? manager.ability.tactical : T.CARETAKER_ABILITY,
+          form: [],
+          morale: T.MORALE_INITIAL,
+          mentality: 'balanced',
+          style: manager ? manager.style : 'possession',
+          bands,
+        },
       }
     }
   }
-  throw new Error(`participantFor: unknown club ${id}`)
+  throw new Error(`lineupFor: unknown club ${id}`)
+}
+
+/** AI mentality by the strength gap: attack the weak, defend against the strong. */
+function aiMentality(world: World, id: ClubId, opponentStrength: number): void {
+  const club = clubById(world, id)
+  if (!club) return
+  const manager = managerAt(world, club)
+  if (manager && manager.isHuman) return
+  const gap = club.squad.strength - opponentStrength
+  club.mentality = gap >= T.AI_MENTALITY_GAP ? 'attack' : gap <= -T.AI_MENTALITY_GAP ? 'defend' : 'balanced'
+}
+
+function isBigGame(world: World, fixture: Fixture, id: ClubId, opponentId: ClubId): boolean {
+  if (fixture.competition !== 'league') return true
+  const club = clubById(world, id)
+  if (club && club.rivals.includes(opponentId)) return true
+  const opponent = clubById(world, opponentId)
+  return opponent !== undefined && world.tables.length > 0 && positionOf(world, opponentId) <= T.CREDIT_TOP_SIDE_RANK
 }
 
 function strengthOf(world: World, id: ClubId): number {
@@ -97,6 +139,8 @@ export interface PlayedFixture {
   loserId: ClubId | null
   homeManager: Manager | undefined
   awayManager: Manager | undefined
+  homeLineup: Lineup
+  awayLineup: Lineup
   expHome: number
   expAway: number
   homePoints: number
@@ -111,8 +155,12 @@ export interface PlayedFixture {
 /** Play one fixture: sample the result, update form, morale, tables and the log. */
 export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFixture {
   const knockout = fixture.competition !== 'league'
-  const home = participantFor(world, fixture.homeId, strengthOf(world, fixture.awayId))
-  const away = participantFor(world, fixture.awayId, strengthOf(world, fixture.homeId))
+  aiMentality(world, fixture.homeId, strengthOf(world, fixture.awayId))
+  aiMentality(world, fixture.awayId, strengthOf(world, fixture.homeId))
+  const homeSide = lineupFor(world, rng, fixture.homeId, { bigGame: isBigGame(world, fixture, fixture.homeId, fixture.awayId) })
+  const awaySide = lineupFor(world, rng, fixture.awayId, { bigGame: isBigGame(world, fixture, fixture.awayId, fixture.homeId) })
+  const home = homeSide.participant
+  const away = awaySide.participant
   const homePosition = clubById(world, fixture.homeId) ? positionOf(world, fixture.homeId) : null
   const awayPosition = clubById(world, fixture.awayId) ? positionOf(world, fixture.awayId) : null
   const outcome = playMatch(rng, home, away, knockout)
@@ -172,7 +220,7 @@ export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFix
     text: matchTemplateKey(outcome.homeGoals, outcome.awayGoals, outcome.shootoutWinnerId !== undefined),
   })
 
-  return { fixture, winnerId, loserId, homeManager, awayManager, expHome, expAway, homePoints, awayPoints, homePosition, awayPosition, event }
+  return { fixture, winnerId, loserId, homeManager, awayManager, homeLineup: homeSide.lineup, awayLineup: awaySide.lineup, expHome, expAway, homePoints, awayPoints, homePosition, awayPosition, event }
 }
 
 function tierOfClub(world: World, id: ClubId): Tier | null {
@@ -359,22 +407,22 @@ export type BudgetMultiplierFor = (clubId: ClubId) => number
 const flatBudget: BudgetMultiplierFor = () => 1
 
 /** The human's club follows the player's plan when one is set; every other club is AI-run. */
-function windowFor(world: World, club: Club, summer: boolean, multiplier: number): WindowSummary {
+function windowFor(world: World, rng: Rng, club: Club, summer: boolean, multiplier: number): WindowSummary {
   const state = world.human
   if (state && club.managerId === state.managerId && state.windowChoice) {
-    const summary = runHumanWindow(world, club, summer, multiplier, state.windowChoice)
+    const summary = runHumanWindow(world, rng, club, summer, multiplier, state.windowChoice)
     state.windowChoice = null
     return summary
   }
-  return runWindow(world, club, summer, multiplier)
+  return runWindow(world, rng, club, summer, multiplier)
 }
 
-export function summerWindow(world: World, multiplierFor: BudgetMultiplierFor = flatBudget): WindowSummary[] {
-  return world.clubs.map((club) => windowFor(world, club, true, multiplierFor(club.id)))
+export function summerWindow(world: World, rng: Rng, multiplierFor: BudgetMultiplierFor = flatBudget): WindowSummary[] {
+  return world.clubs.map((club) => windowFor(world, rng, club, true, multiplierFor(club.id)))
 }
 
-export function winterWindow(world: World): WindowSummary[] {
-  return world.clubs.map((club) => windowFor(world, club, false, 1))
+export function winterWindow(world: World, rng: Rng): WindowSummary[] {
+  return world.clubs.map((club) => windowFor(world, rng, club, false, 1))
 }
 
 export { tableFor }

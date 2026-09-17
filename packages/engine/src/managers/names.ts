@@ -6,7 +6,7 @@
 import type { Rng } from '../rng.js'
 import type { Nationality } from '../types.js'
 
-const POOLS: Record<Nationality, { first: string[]; last: string[] }> = {
+export const POOLS: Record<Nationality, { first: string[]; last: string[] }> = {
   home: {
     first: [
       'Alan', 'Barry', 'Callum', 'Dean', 'Eddie', 'Frank', 'Gary', 'Harry', 'Ian', 'Jack',

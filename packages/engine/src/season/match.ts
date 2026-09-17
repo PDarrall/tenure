@@ -1,22 +1,28 @@
 /**
- * The abstract match model (DESIGN.md "Season and match"). Each side's
- * effective strength feeds an expected-goals figure; goals are Poisson. The
- * same distribution gives the win/draw/loss probabilities used for expected
- * points, so credit is judged against the odds the model itself produced.
+ * The one-shot match model (DESIGN.md "Formations and tactics", until the
+ * minute engine in phase 3c). Each side's effective XI feeds an expected-goals
+ * figure; structure (bands and width), mentality, style and home advantage
+ * lean it; goals are Poisson. The same distribution gives the win/draw/loss
+ * probabilities used for expected points, so credit is judged against the
+ * odds the model itself produced.
  */
 import type { Rng } from '../rng.js'
 import { T } from '../tunables.js'
-import type { Mentality, Result, Shape } from '../types.js'
+import type { Mentality, Result, Style } from '../types.js'
+import type { XiBands } from '../players/select.js'
 
 export interface Participant {
   id: number
+  /** Mean effective rating of the XI. */
   strength: number
   /** Manager's tactical ability, 0–100. */
   tactical: number
   form: readonly Result[]
+  /** Team morale, 0–100 (the XI's mean). */
   morale: number
-  shape: Shape
   mentality: Mentality
+  style: Style
+  bands: XiBands
 }
 
 export interface MatchOdds {
@@ -37,8 +43,6 @@ export interface MatchOutcome {
   shootoutWinnerId?: number
   odds: MatchOdds
 }
-
-const BEATS: Record<Shape, Shape> = { A: 'B', B: 'C', C: 'A' }
 
 export function formScore(form: readonly Result[]): number {
   if (form.length === 0) return 0
@@ -72,19 +76,45 @@ export function poissonPmf(lambda: number, max: number): number[] {
   return pmf.map((x) => x / total)
 }
 
+/** Structural lean of `us` over `them` on our expected goals: the midfield, our attack against their defence, width, their overload. */
+function structureFactor(us: Participant, them: Participant): number {
+  const midEdge = us.bands.midfield - them.bands.midfield
+  let f = 1 + T.MID_EDGE_K * midEdge
+  const ratio = them.bands.defence > 0 ? us.bands.attack / them.bands.defence : T.ATTACK_DEFENCE_STANDARD
+  f *= 1 + T.ATTACK_DEFENCE_K * (ratio - T.ATTACK_DEFENCE_STANDARD)
+  if (them.bands.defenceWidth < T.NARROW_DEFENCE_WIDTH && us.bands.width >= 4) f *= 1 + T.WIDTH_EDGE
+  const overload = Math.max(0, Math.round(them.bands.defence / Math.max(0.01, them.bands.strength / 100)) - 1 - 4)
+  if (overload > 0) f *= 1 - T.OVERLOAD_K * overload
+  return Math.max(0.5, f)
+}
+
+/** Style, one rule each (DESIGN.md "Formations and tactics"): returns multipliers on our goals and on theirs. */
+export function styleFactors(us: Participant, them: Participant): { own: number; concede: number; variance: number } {
+  const e = T.STYLE_EFFECTS
+  switch (us.style) {
+    case 'possession':
+      return { own: us.strength > them.strength ? 1 + e.possession.betterXi : 1, concede: 1, variance: e.possession.variance }
+    case 'direct':
+      return { own: 1 + e.direct.perTrait * (us.bands.pace + us.bands.aerial), concede: e.direct.concede, variance: 1 }
+    case 'counter':
+      return { own: (them.mentality === 'attack' ? e.counter.vsAttack : 1) * e.counter.own, concede: e.counter.concede, variance: 1 }
+    case 'pressing':
+      return { own: e.pressing.own, concede: e.pressing.concede, variance: 1 }
+  }
+}
+
 export function matchOdds(home: Participant, away: Participant): MatchOdds {
   const diff = effectiveStrength(home) - effectiveStrength(away)
   // Home advantage is the only asymmetry between the sides before strength is read.
   let lambdaHome = (T.GOALS_BASE + T.HOME_ADVANTAGE_GOALS) * Math.exp(T.GOAL_SENSITIVITY * diff)
   let lambdaAway = T.GOALS_BASE * Math.exp(-T.GOAL_SENSITIVITY * diff)
-  if (BEATS[home.shape] === away.shape) {
-    lambdaHome *= 1 + T.TACTIC_RPS
-    lambdaAway *= 1 - T.TACTIC_RPS
-  } else if (BEATS[away.shape] === home.shape) {
-    lambdaHome *= 1 - T.TACTIC_RPS
-    lambdaAway *= 1 + T.TACTIC_RPS
-  }
-  const variance = mentalityFactor(home.mentality) * mentalityFactor(away.mentality)
+  lambdaHome *= structureFactor(home, away)
+  lambdaAway *= structureFactor(away, home)
+  const sh = styleFactors(home, away)
+  const sa = styleFactors(away, home)
+  lambdaHome *= sh.own * sa.concede
+  lambdaAway *= sa.own * sh.concede
+  const variance = mentalityFactor(home.mentality) * mentalityFactor(away.mentality) * sh.variance * sa.variance
   lambdaHome *= variance
   lambdaAway *= variance
   const ph = poissonPmf(lambdaHome, T.MAX_GOALS)
@@ -145,5 +175,21 @@ export function knockoutExpected(odds: MatchOdds, home: Participant, away: Parti
   return {
     home: T.POINTS_WIN * (odds.pHome + odds.pDraw * ph),
     away: T.POINTS_WIN * (odds.pAway + odds.pDraw * (1 - ph)),
+  }
+}
+
+/** A plain participant for tests and the abstract sides: eleven equal players in a 4-4-2. */
+export function plainBands(strength: number, formation: { defence: number; midfield: number; attack: number; width: number; defenceWidth: number } = { defence: 4, midfield: 4, attack: 2, width: 4, defenceWidth: 2 }): XiBands {
+  const s = strength / 100
+  return {
+    strength,
+    defence: (formation.defence + 1) * s,
+    midfield: formation.midfield * s,
+    attack: formation.attack * s,
+    width: formation.width,
+    defenceWidth: formation.defenceWidth,
+    pace: 0,
+    aerial: 0,
+    leaders: 0,
   }
 }

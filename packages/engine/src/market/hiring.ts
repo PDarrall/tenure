@@ -1,4 +1,5 @@
 import type { Rng } from '../rng.js'
+import { anchorSquad } from '../players/gen.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import { clamp } from '../world/gen.js'
@@ -116,6 +117,11 @@ export function hire(world: World, rng: Rng, manager: Manager, vacancy: Vacancy,
   const years = chosen ? chosen.years : contractYearsFor(rng, manager, vacancy)
   const salary = salaryForYears(salaryFor(world, vacancy.post, manager.reputation), years)
   const spell = startSpell(world, rng, manager, vacancy.post, { years, promise, crisis: vacancy.crisis, salary })
+  // The squad is the club's strength in the new manager's formation: re-anchor so nobody inherits a side that does not fit.
+  if (vacancy.post.kind === 'home') {
+    const club = clubById(world, vacancy.post.clubId)
+    anchorSquad(world, club, club.squad.strength, manager.isHuman && world.human ? world.human.tactic.formation : manager.preferredFormation)
+  }
   vacancy.filledWeek = world.week
   vacancy.hiredManagerId = manager.id
   emit(world, 'vacancy.filled', {

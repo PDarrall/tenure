@@ -15,11 +15,13 @@ import {
   spellOf,
   tableFor,
   tunables,
+  FORMATION_NAMES,
   type Decision,
   type FixtureView,
   type Manager,
+  type Formation,
   type Mentality,
-  type Shape,
+  type Style,
   type Tier,
   type UnemployedActivity,
   type Vacancy,
@@ -36,7 +38,8 @@ import {
   withMentality,
   withResign,
   withRetire,
-  withShape,
+  withFormation,
+  withStyle,
   withWithdraw,
   type Session,
 } from '../controller.js'
@@ -295,8 +298,10 @@ function Controls({ session, onChange, confirm, setConfirm }: { session: Session
   const world = session.world
   const me = player(world)
   const employed = me.status.kind === 'employed'
-  const shape = session.inputs.shape ?? world.human!.shape
-  const mentality = session.inputs.mentality ?? world.human!.mentality
+  const tactic = { ...world.human!.tactic, ...(session.inputs.tactic ?? {}) }
+  const formation = tactic.formation
+  const style = tactic.style
+  const mentality = tactic.mentality
   // When the monthly card is pending the buttons answer it, so the two controls never disagree.
   const activityCard = pendingDecisions(world).find((d) => d.kind === 'activity')
   const cardAnswer = activityCard ? (session.inputs.answers ?? {})[activityCard.id] : undefined
@@ -306,11 +311,19 @@ function Controls({ session, onChange, confirm, setConfirm }: { session: Session
     <section aria-label="Controls">
       {employed && (
         <>
-          <h3>Shape</h3>
+          <h3>Formation</h3>
+          <select aria-label="Formation" value={formation} onChange={(e) => onChange(withFormation(session, e.target.value as Formation))}>
+            {FORMATION_NAMES.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+          <h3>Style</h3>
           <div className="row">
-            {(['A', 'B', 'C'] as Shape[]).map((s) => (
-              <button key={s} className={shape === s ? 'selected' : ''} onClick={() => onChange(withShape(session, s))} aria-pressed={shape === s}>
-                <span>Shape {s}</span>
+            {(['possession', 'direct', 'counter', 'pressing'] as Style[]).map((st) => (
+              <button key={st} className={style === st ? 'selected' : ''} onClick={() => onChange(withStyle(session, st))} aria-pressed={style === st}>
+                <span>{st}</span>
               </button>
             ))}
           </div>
@@ -322,7 +335,7 @@ function Controls({ session, onChange, confirm, setConfirm }: { session: Session
               </button>
             ))}
           </div>
-          <p className="muted">Shape A beats B, B beats C, C beats A. Attack and defend change how open the game is. Both apply from the next match.</p>
+          <p className="muted">Structure does the work: midfielders win pressure, forwards against defenders make chances, width opens a narrow back line, a back five concedes less. Attack and defend change how open the game is. All apply from the next match.</p>
         </>
       )}
       {me.status.kind === 'unemployed' && (

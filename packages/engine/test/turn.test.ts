@@ -108,11 +108,11 @@ describe('one match per turn', () => {
     expect(ready).toBe(true)
     const club = humanClubId(world)!
     const week = world.week
-    queueDecision(world, { kind: 'board', from: 'board', title: 'A word', body: 'Before the next game.', options: [{ key: 'ok', label: 'Fine' }], defaultKey: 'ok', blocking: false })
+    const waiting = queueDecision(world, { kind: 'board', from: 'board', title: 'A word', body: 'Before the next game.', options: [{ key: 'ok', label: 'Fine' }], defaultKey: 'ok', blocking: false })
     expect(advanceTurn(world, {})).toBe(0)
     expect(world.week).toBe(week + 1)
     expect(clubFixturesInWeek(world, seasonWeek(world.week), club).some((f) => f.played)).toBe(false)
-    expect(pendingDecisions(world)).toHaveLength(1)
+    expect(pendingDecisions(world).some((d) => d.id === waiting.id)).toBe(true)
     // Answered (or defaulted), the next turn plays the fixture without moving the week.
     expect(advanceTurn(world, {})).toBe(1)
     expect(world.week).toBe(week + 1)

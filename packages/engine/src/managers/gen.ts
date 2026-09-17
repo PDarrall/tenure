@@ -1,7 +1,8 @@
 import type { Rng } from '../rng.js'
 import { T } from '../tunables.js'
 import { clamp } from '../world/gen.js'
-import type { Ability, Background, Manager, Nationality, Post, Shape, World } from '../types.js'
+import type { Ability, Background, Formation, Manager, Nationality, Post, Style, World } from '../types.js'
+import { FORMATION_NAMES } from '../players/formations.js'
 import { ManagerNamer } from './names.js'
 
 function drawBackground(rng: Rng): Background {
@@ -37,7 +38,10 @@ function makeManager(rng: Rng, namer: ManagerNamer, id: number, draft: Draft, co
   ability.tactical = clamp(ability.tactical + offsets.tactical, 0, 100)
   ability.development = clamp(ability.development + offsets.development, 0, 100)
   ability.dealing = clamp(ability.dealing + offsets.dealing, 0, 100)
-  const shapes: Shape[] = ['A', 'B', 'C']
+  const styles: Style[] = ['possession', 'direct', 'counter', 'pressing']
+  const preferredFormation: Formation = rng.weighted(FORMATION_NAMES, T.FORMATION_WEIGHTS)
+  const style = rng.weighted(styles, T.STYLE_WEIGHTS)
+  const youthLean = rng.chance(T.AI_YOUTH_FIRST_SHARE) ? 'youth-first' : 'results-first'
   return {
     id,
     name: draft.name ?? namer.next(draft.nationality),
@@ -53,13 +57,16 @@ function makeManager(rng: Rng, namer: ManagerNamer, id: number, draft: Draft, co
       players: clamp(T.TRUST_BASE + offsets.playersTrust, 0, 100),
       board: clamp(T.TRUST_BASE + offsets.boardTrust, 0, 100),
     },
-    preferredShape: rng.pick(shapes),
+    preferredFormation,
+    style,
+    youthLean,
     history: {
       spellIds: [],
       honours: [],
       earnings: 0,
       games: 0,
       trophyPoints: 0,
+      playersMade: 0,
       walkouts: 0,
       steppedDown: false,
       seasons: [],

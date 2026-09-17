@@ -11,8 +11,9 @@ import {
   type Decision,
   type HumanInputs,
   type InboxMark,
+  type Formation,
   type Mentality,
-  type Shape,
+  type Style,
   type UnemployedActivity,
   type World,
 } from '@tenure/engine'
@@ -63,12 +64,16 @@ export function withWithdraw(s: Session, vacancyId: number): Session {
   return bump(s, { ...s.inputs, apply, withdraw })
 }
 
-export function withShape(s: Session, shape: Shape): Session {
-  return bump(s, { ...s.inputs, shape })
+export function withFormation(s: Session, formation: Formation): Session {
+  return bump(s, { ...s.inputs, tactic: { ...(s.inputs.tactic ?? {}), formation } })
+}
+
+export function withStyle(s: Session, style: Style): Session {
+  return bump(s, { ...s.inputs, tactic: { ...(s.inputs.tactic ?? {}), style } })
 }
 
 export function withMentality(s: Session, mentality: Mentality): Session {
-  return bump(s, { ...s.inputs, mentality })
+  return bump(s, { ...s.inputs, tactic: { ...(s.inputs.tactic ?? {}), mentality } })
 }
 
 export function withActivity(s: Session, activity: UnemployedActivity): Session {

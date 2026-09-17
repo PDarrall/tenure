@@ -8,6 +8,8 @@ import { addCredit } from './credit.js'
 import { easeExpectation } from './expectation.js'
 import { thresholdFor } from './spell.js'
 import { queueFallout } from '../play/decisions.js'
+import { anchorSquad } from '../players/gen.js'
+import { clubFormation } from '../players/select.js'
 
 function drawOwnerType(rng: Rng): OwnerType {
   const types = Object.keys(T.OWNER_TYPE_WEIGHTS) as OwnerType[]
@@ -59,6 +61,7 @@ export function monthlyShocks(world: World, rng: Rng, spell: Spell): void {
 
   if (lowWealth && rng.chance(T.STAR_SALE_P)) {
     club.squad.strength = round1(clamp(club.squad.strength + T.STAR_SALE_STRENGTH, 1, 100))
+    anchorSquad(world, club, club.squad.strength, clubFormation(world, club))
     easeExpectation(world, spell, T.STAR_SALE_EXPECTATION_EASE)
     emit(world, 'shock.starSale', {
       clubId: club.id,
@@ -102,6 +105,7 @@ export function resolveFallout(world: World, spell: Spell, sell: boolean): void 
   if (sell) {
     spell.ownership = round1(clamp(spell.ownership + T.FALLOUT_OWNERSHIP_GAIN, 0, 1) * 100) / 100
     club.squad.strength = round1(clamp(club.squad.strength - T.FALLOUT_STRENGTH_LOSS, 1, 100))
+    anchorSquad(world, club, club.squad.strength, clubFormation(world, club))
   } else {
     club.squad.morale = round1(clamp(club.squad.morale - T.FALLOUT_MORALE_LOSS, 0, 100))
   }

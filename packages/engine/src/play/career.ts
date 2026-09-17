@@ -32,8 +32,8 @@ export function createCareer(seed: number, options: CareerOptions): World {
     managerId: player.id,
     pending: [],
     nextDecisionId: 1,
-    shape: player.preferredShape,
-    mentality: 'balanced',
+    tactic: { formation: player.preferredFormation, mentality: 'balanced', style: player.style },
+    selection: { xi: [], bench: [], captain: null, autoPick: true },
     declinedVacancies: [],
     windowChoice: null,
   }
