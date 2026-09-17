@@ -74,7 +74,7 @@ function header(world: World): string {
   const phase = sw < tunables.MATCH_WEEKS ? `week ${sw + 1} of ${tunables.MATCH_WEEKS}` : `summer week ${sw - tunables.MATCH_WEEKS + 1}`
   const score = careerSummary(world).score
   const lines: string[] = []
-  lines.push(`Season ${world.season}, ${phase}.  ${me.name}, ${me.age}.  Games ${score.games} · £${score.earnings}m · Trophy points ${score.trophyPoints} · Legacy ${score.legacy}`)
+  lines.push(`Season ${world.season}, ${phase}.  ${me.name}, ${me.age}.  Games ${score.games} · £${score.earnings}m · Trophy points ${score.trophyPoints} · Players made ${score.playersMade} · Legacy ${score.legacy}`)
   if (me.status.kind === 'employed') {
     const spell = spellOf(world, me)!
     if (spell.post.kind === 'home') {
@@ -180,7 +180,8 @@ function showTable(world: World): void {
 function showCareer(world: World): void {
   const s = careerSummary(world)
   console.log(`  ${s.name}, ${s.age}, ${s.background}. ${s.status}. Reputation ${s.reputation} (${bandName(s.reputation)}).`)
-  console.log(`  Games ${s.score.games} · Earnings £${s.score.earnings}m · Trophy points ${s.score.trophyPoints} · Legacy ${s.score.legacy} · Seasons managed ${s.seasonsManaged}`)
+  console.log(`  Games ${s.score.games} · Earnings £${s.score.earnings}m · Trophy points ${s.score.trophyPoints} · Players made ${s.score.playersMade} · Legacy ${s.score.legacy} · Seasons managed ${s.seasonsManaged}`)
+  for (const m of s.playersMade.slice(0, 10)) console.log(`    ${m.name} (${m.position}) ${m.circumstance} at ${m.club}, S${m.season}: ${Math.round(m.ratingThen)} → ${Math.round(m.ratingNow)}, ${m.points} pts, ${m.now}`)
   for (const sp of s.spells) {
     console.log(`  ${sp.club} (${sp.where}), season ${sp.fromSeason}${sp.toSeason !== null ? `–${sp.toSeason}` : '–'}, ${sp.seasons} seasons${sp.endReason ? `, ${sp.endReason}` : ''}${sp.finishes.length ? `, finishes ${sp.finishes.join(', ')}` : ''}`)
   }

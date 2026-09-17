@@ -7,7 +7,7 @@ import type { Event, Post, World } from '../types.js'
 import { renderMatch, renderText, clubNameOf, ordinal } from '../text/render.js'
 import { qualifies } from '../market/shortlist.js'
 
-export type InboxFrom = 'board' | 'agent' | 'press' | 'staff' | 'match' | 'news'
+export type InboxFrom = 'board' | 'agent' | 'press' | 'staff' | 'match' | 'news' | 'players'
 
 export interface InboxItem {
   week: number
@@ -111,6 +111,22 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
         const scorers = (p['homeManagerId'] === me ? p['homeScorers'] : p['awayScorers']) as { name: string; assist: string | null }[] | undefined
         const goals = scorers && scorers.length ? ` Goals: ${scorers.map((g) => (g.assist ? `${g.name} (${g.assist})` : g.name)).join(', ')}.` : ''
         push(e, 'match', `${renderMatch(world, e)}${comp}${position}${goals}`)
+        break
+      }
+      case 'player.tagged':
+        if (mine(e)) push(e, 'players', renderText('players', `tagged_${String(p['circumstance'])}`, { name: String(p['name']), position: String(p['position']), age: p['age'] as number, rating: Math.round(p['rating'] as number) }, e.week))
+        break
+      case 'player.grew':
+        if (mine(e)) push(e, 'players', renderText('players', 'grew', { name: String(p['name']), growth: p['growth'] as number, rating: Math.round(p['rating'] as number) }, e.week))
+        break
+      case 'player.milestone': {
+        const managers = p['managers'] as number[]
+        if (!managers.includes(me)) break
+        const pl = world.players[(p['playerId'] as number) - 1]
+        const tag = pl ? pl.madeBy.find((m) => m.managerId === me) : undefined
+        // Wherever you are: while he is at your club you hear it as club news anyway.
+        if (tag && myClubId !== null && p['clubId'] === myClubId && p['kind'] !== 'retired') break
+        push(e, 'players', renderText('players', `milestone_${String(p['kind'])}`, { name: String(p['name']), madeAt: tag ? clubNameOf(world, tag.clubId) : 'your club', club: clubNameOf(world, p['clubId'] as number), fee: (p['fee'] as number) ?? 0, tier: (p['tier'] as number) ?? '', age: (p['age'] as number) ?? '' }, e.week))
         break
       }
       case 'player.injured':

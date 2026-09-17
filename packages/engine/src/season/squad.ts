@@ -3,11 +3,12 @@ import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import { clamp, gravityTarget, round1 } from '../world/gen.js'
 import { managerAt } from '../lookup.js'
-import type { Club, Manager, Player, Result, Tier, World } from '../types.js'
-import { anchorSquad, forgetPlayer, makePlayer, releasePlayer, squadSizeFor, valueFor } from '../players/gen.js'
+import type { Club, Manager, Player, Position, Result, Tier, World } from '../types.js'
+import { anchorSquad, forgetPlayer, makePlayer, pickFreeAgent, releasePlayer, signFreeAgent, squadSizeFor, valueFor, freeAgents } from '../players/gen.js'
 import { clubFormation, squadOf, autoPick } from '../players/select.js'
 import { slotsOf } from '../players/formations.js'
 import { wageDemand as contractWageDemand } from '../players/contracts.js'
+import { milestone, tagPlayer } from '../players/made.js'
 
 export function managerOf(world: World, club: Club): Manager | undefined {
   return managerAt(world, club)
@@ -174,21 +175,25 @@ export function applyWindowToSquad(world: World, rng: Rng, club: Club, turnover:
   for (const p of out) {
     releasePlayer(world, p, club)
     emit(world, 'player.left', { playerId: p.id, clubId: club.id, name: p.name, rating: p.rating, fee: p.value, reason: sold > 0 ? 'sold' : 'window', season: world.season })
-    forgetPlayer(world, p)
+    moveOn(world, rng, p, club)
   }
   const formation = clubFormation(world, club)
   const slots = slotsOf(formation)
   const signings = leaving - Math.min(leaving, youth)
   for (let i = 0; i < signings; i++) {
     const slot = slots[(i + 1) % slots.length]!
-    const p = makePlayer(world, rng, club.id, club.tier, {
-      position: slot.position,
-      side: slot.side,
-      age: T.SIGNING_AGE + rng.int(-3, 3),
-      rating: club.squad.strength + rng.normal(0, T.STARTER_RATING_SD),
-    })
-    club.playerIds.push(p.id)
+    const fromPool = signFromPool(world, club, slot.position)
+    const p =
+      fromPool ??
+      makePlayer(world, rng, club.id, club.tier, {
+        position: slot.position,
+        side: slot.side,
+        age: T.SIGNING_AGE + rng.int(-3, 3),
+        rating: club.squad.strength + rng.normal(0, T.STARTER_RATING_SD),
+      })
+    if (!fromPool) club.playerIds.push(p.id)
     emit(world, 'player.signed', { playerId: p.id, clubId: club.id, managerId: manager ? manager.id : null, name: p.name, rating: p.rating, fee: p.value, season: world.season })
+    if (manager) tagPlayer(world, p, manager, club, 'signed')
   }
   for (let i = 0; i < youth; i++) {
     const slot = slots[1 + rng.int(0, slots.length - 2)]!
@@ -202,19 +207,62 @@ export function applyWindowToSquad(world: World, rng: Rng, club: Club, turnover:
     p.potential = Math.min(100, p.potential + T.ACADEMY_POTENTIAL_BONUS)
     club.playerIds.push(p.id)
     emit(world, 'player.promoted', { playerId: p.id, clubId: club.id, managerId: manager ? manager.id : null, name: p.name, rating: p.rating, season: world.season })
+    if (manager) tagPlayer(world, p, manager, club, 'promoted')
   }
-  trimSquad(world, club)
+  trimSquad(world, rng, club)
   anchorSquad(world, club, club.squad.strength, formation)
 }
 
+/**
+ * A player nobody made is forgotten when he leaves; a tagged player keeps
+ * living: he joins a home club at his level and the move is a milestone
+ * when the fee clears the threshold.
+ */
+export function moveOn(world: World, _rng: Rng, p: Player, from: Club): void {
+  if (p.madeBy.length === 0) {
+    forgetPlayer(world, p)
+    return
+  }
+  // He waits in the pool; a club at his level takes him at its next window or top-up.
+  p.lastClubId = from.id
+  p.clubId = 0
+  p.freeSince = world.season
+}
+
+/** A club signs a free agent at its level for a slot, and the move is a milestone above the fee threshold. */
+function signFromPool(world: World, club: Club, position: Position): Player | null {
+  const p = pickFreeAgent(world, club, position)
+  if (!p) return null
+  const from = p.lastClubId ?? 0
+  signFreeAgent(world, p, club, club.tier)
+  if (p.value >= T.TRANSFER_MILESTONE_FEE) milestone(world, p, 'transfer', { fee: p.value, fromClubId: from, toClubId: club.id })
+  return p
+}
+
+/** Free agents a season on: a year older, the decline, then retirement for those nobody took. */
+export function summerFreeAgents(world: World, rng: Rng): void {
+  for (const p of freeAgents(world)) {
+    p.age++
+    const declineFrom = p.position === 'GK' ? T.GK_DECLINE_FROM : T.DECLINE_FROM
+    if (p.age >= declineFrom) p.rating = round1(clamp(p.rating - T.DECLINE_PER_YEAR * (1 + (p.age - declineFrom) * T.DECLINE_ACCELERATION), 1, 100))
+    p.value = valueFor(p.rating, p.age)
+    const waited = world.season - (p.freeSince ?? world.season)
+    if (waited >= T.FREE_AGENT_MAX_SEASONS || p.age >= T.PLAYER_RETIRE_AT || (p.age >= T.PLAYER_RETIRE_FROM && rng.chance(T.PLAYER_RETIRE_P))) {
+      emit(world, 'player.retired', { playerId: p.id, clubId: 0, name: p.name, age: p.age, rating: round1(p.rating), season: world.season })
+      milestone(world, p, 'retired', { age: p.age })
+      forgetPlayer(world, p)
+    }
+  }
+}
+
 /** Keep the squad at the tier's size: the lowest-value surplus players leave. */
-export function trimSquad(world: World, club: Club): void {
+export function trimSquad(world: World, rng: Rng, club: Club): void {
   const size = squadSizeFor(club.tier)
   const players = squadOf(world, club).sort((a, b) => b.value - a.value || a.id - b.id)
   for (const p of players.slice(size)) {
     releasePlayer(world, p, club)
     emit(world, 'player.left', { playerId: p.id, clubId: club.id, name: p.name, rating: p.rating, fee: p.value, reason: 'released', season: world.season })
-    forgetPlayer(world, p)
+    moveOn(world, rng, p, club)
   }
 }
 
@@ -230,7 +278,8 @@ export function summerPlayers(world: World, rng: Rng, club: Club): void {
     if (p.age >= declineFrom) p.rating = round1(clamp(p.rating - T.DECLINE_PER_YEAR * (1 + (p.age - declineFrom) * T.DECLINE_ACCELERATION), 1, 100))
     if (p.age >= T.PLAYER_RETIRE_FROM && (p.age >= T.PLAYER_RETIRE_AT || rng.chance(T.PLAYER_RETIRE_P))) {
       releasePlayer(world, p, club)
-      emit(world, 'player.retired', { playerId: p.id, clubId: club.id, name: p.name, age: p.age, rating: p.rating, season: world.season })
+      emit(world, 'player.retired', { playerId: p.id, clubId: club.id, name: p.name, age: p.age, rating: round1(p.rating), season: world.season })
+      milestone(world, p, 'retired', { age: p.age })
       forgetPlayer(world, p)
       continue
     }
@@ -247,7 +296,7 @@ export function summerPlayers(world: World, rng: Rng, club: Club): void {
       } else {
         releasePlayer(world, p, club)
         emit(world, 'player.left', { playerId: p.id, clubId: club.id, name: p.name, rating: p.rating, fee: 0, reason: 'released', season: world.season })
-        forgetPlayer(world, p)
+        moveOn(world, rng, p, club)
         continue
       }
     }
@@ -270,6 +319,12 @@ export function topUpSquad(world: World, rng: Rng, club: Club): void {
     const have = squadOf(world, club)
     const keepers = have.filter((p) => p.position === 'GK').length
     const slot = keepers < T.SQUAD_KEEPERS ? slots[0]! : slots[1 + ((i++) % (slots.length - 1))]!
+    const fromPool = signFromPool(world, club, slot.position)
+    if (fromPool) {
+      const manager = managerOf(world, club)
+      if (manager) tagPlayer(world, fromPool, manager, club, 'signed')
+      continue
+    }
     const p = makePlayer(world, rng, club.id, club.tier, {
       position: slot.position,
       side: slot.side,

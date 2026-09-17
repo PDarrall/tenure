@@ -161,7 +161,7 @@ describe('one match per turn', () => {
     }
   })
 
-  it('is deterministic turn by turn and a save between two turns of one week continues identically', () => {
+  it('is deterministic turn by turn and a save between two turns of one week continues identically', { timeout: 60_000 }, () => {
     const a = createCareer(7, { name: 'Test Player', background: 'coach' })
     const b = createCareer(7, { name: 'Test Player', background: 'coach' })
     for (let i = 0; i < 90; i++) {

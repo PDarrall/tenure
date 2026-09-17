@@ -157,11 +157,11 @@ export function queueRenewal(world: World, spell: Spell, years: number, salary: 
   })
 }
 
-export function queueFallout(world: World, spell: Spell): Decision {
+export function queueFallout(world: World, spell: Spell, name: string | null = null): Decision {
   return queueDecision(world, {
     kind: 'fallout',
     from: 'staff',
-    title: 'A senior player has turned on you',
+    title: name ? `${name} has turned on you` : 'A senior player has turned on you',
     body: 'Back down and the dressing room loses heart. Sell him and the squad is weaker but yours.',
     options: [
       { key: 'back-down', label: 'Back down' },
@@ -298,7 +298,7 @@ export function applyAnswer(world: World, rng: Rng, decision: Decision, rawKey: 
     }
     case 'fallout': {
       const spell = spellOf(world, manager)
-      if (spell) resolveFallout(world, spell, key === 'sell')
+      if (spell) resolveFallout(world, spell, rng, key === 'sell')
       break
     }
     case 'summerWindow':
@@ -343,7 +343,7 @@ export function applyAnswer(world: World, rng: Rng, decision: Decision, rawKey: 
       applyNewDeal(world, decision, key === 'accept')
       break
     case 'wantsAway':
-      applyWantsAway(world, decision, key === 'sell')
+      applyWantsAway(world, rng, decision, key === 'sell')
       break
     case 'playerContract':
       applyContract(world, decision, key)

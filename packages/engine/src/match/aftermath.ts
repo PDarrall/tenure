@@ -13,6 +13,7 @@ import { playerById } from '../lookup.js'
 import { slotsOf } from '../players/formations.js'
 import { effectiveRating } from '../players/select.js'
 import { hasTrait } from '../players/traits.js'
+import { bondForStart, growWithMinutes, tagPlayer } from '../players/made.js'
 import type { Fixture, Formation, Player, PlayerId, Position, Result, Style, World } from '../types.js'
 
 export interface Scorer {
@@ -35,6 +36,10 @@ export interface SideInput {
   motivation: number
   /** Manager in post, for the log. */
   managerId: number | null
+  /** Manager's development ability, for growth. */
+  development: number
+  /** The club's tier, for the tag. */
+  tier: import('../types.js').Tier | null
 }
 
 /** Draw one player from the XI by weight. */
@@ -157,7 +162,13 @@ export function applySide(world: World, rng: Rng, fixture: Fixture, side: SideIn
     p.season.apps++
     p.season.starts++
     p.season.minutes += T.MATCH_MINUTES
-    if (!p.debuted) p.debuted = true
+    const manager = side.managerId === null ? undefined : world.managers[side.managerId - 1]
+    if (!p.debuted) {
+      p.debuted = true
+      if (manager && manager.id === side.managerId) tagPlayer(world, p, manager, { id: side.clubId, ...(side.tier === null ? {} : { tier: side.tier }) }, 'debut')
+    }
+    bondForStart(p, side.managerId)
+    growWithMinutes(p, T.MATCH_MINUTES, side.development, side.managerId)
     const goals = goalsBy.get(p.id) ?? 0
     const assists = assistsBy.get(p.id) ?? 0
     p.season.goals += goals

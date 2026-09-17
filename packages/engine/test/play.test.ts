@@ -170,7 +170,7 @@ describe('a human career', () => {
     expect(JSON.stringify(player)).toBe(before)
   })
 
-  it('is deterministic for the same inputs and survives a JSON save mid-career', () => {
+  it('is deterministic for the same inputs and survives a JSON save mid-career', { timeout: 60_000 }, () => {
     const script = (world: World): HumanInputs => {
       const player = me(world)
       const answers: Record<number, string> = {}

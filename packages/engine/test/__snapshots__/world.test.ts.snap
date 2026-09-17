@@ -126,7 +126,7 @@ exports[`world generation > seed 1 always produces the same world 1`] = `
     "mid Bundesland Liga: 1020 Rheinfeld mgr=137; 1021 Mannfeld mgr=138; 1022 SC Niederlingen mgr=139; 1023 Mannstadt mgr=140; 1024 VfB Niederburg mgr=141; 1025 Mannbach mgr=142; 1026 TSV Kassbach mgr=143; 1027 Niederlingen mgr=144; 1028 Mannhausen mgr=145; 1029 TSV Frankheim mgr=146; 1030 FC Reutfurt mgr=147; 1031 SC Frankfurt mgr=148; 1032 Niederburg mgr=149; 1033 FC Walddorf mgr=150; 1034 SC Waldstadt mgr=151; 1035 Waldheim mgr=152; 1036 Oberbach mgr=153; 1037 SC Reutstadt mgr=154",
     "small Nordisk Serien: 1038 Viking Varvik mgr=155; 1039 Halvik mgr=156; 1040 FK Norstrand mgr=157; 1041 Halsund mgr=158; 1042 SK Krisstad mgr=159; 1043 FK Krisnes mgr=160; 1044 SK Krissø mgr=161; 1045 Brannstad mgr=162; 1046 Viking Varsund mgr=163; 1047 Tromberg mgr=164; 1048 Lilkøb mgr=165; 1049 Varsø mgr=166; 1050 Hauholm mgr=167; 1051 Tromholm mgr=168; 1052 IF Krisberg mgr=169; 1053 BK Norkøb mgr=170",
   ],
-  "hash": "d4e7db78",
+  "hash": "28325839",
   "managers": [
     "1 Jamie Clegg (home, 54, ex-pro) rep=87 employed@1",
     "2 Mark Noble (home, 44, coach) rep=69 employed@2",

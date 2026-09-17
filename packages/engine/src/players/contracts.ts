@@ -13,7 +13,8 @@ import { clubById, playerById, spellOf } from '../lookup.js'
 import { human, hasPending, queueDecision } from '../play/decisions.js'
 import { squadOf } from './select.js'
 import { hasTrait } from './traits.js'
-import { forgetPlayer, releasePlayer, valueFor } from './gen.js'
+import { releasePlayer, valueFor } from './gen.js'
+import { moveOn } from '../season/squad.js'
 import type { Club, Decision, ManagerId, Player, World } from '../types.js'
 
 /** What a player asks for a week: rating and age; the loyal ask less of a manager they are bonded to (the loyal rule). */
@@ -158,7 +159,7 @@ export function applyNewDeal(world: World, decision: Decision, accept: boolean):
   } else refusalFallout(world, p, 'new deal')
 }
 
-export function applyWantsAway(world: World, decision: Decision, sell: boolean): void {
+export function applyWantsAway(world: World, rng: Rng, decision: Decision, sell: boolean): void {
   const p = playerById(world, decision.payload['playerId'] as number)
   if (!p || p.retired) return
   const club = humanClub(world)
@@ -168,7 +169,7 @@ export function applyWantsAway(world: World, decision: Decision, sell: boolean):
     club.cash = round1(club.cash + fee)
     releasePlayer(world, p, club)
     emit(world, 'player.left', { playerId: p.id, clubId: club.id, managerId: human(world).id, name: p.name, rating: p.rating, fee, reason: 'sold', season: world.season })
-    forgetPlayer(world, p)
+    moveOn(world, rng, p, club)
   } else refusalFallout(world, p, 'wants away')
 }
 

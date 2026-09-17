@@ -202,6 +202,7 @@ describe('contracts and requests', () => {
     advanceWeek(world, { answers: { [away.id]: 'sell' } })
     expect(club.cash).toBeGreaterThan(cashBefore)
     expect(club.playerIds).not.toContain(leaver.id)
-    expect(playerById(world, leaver.id)).toBeUndefined() // untagged: record dropped
+    const gone = playerById(world, leaver.id)
+    expect(gone === undefined || gone.clubId !== club.id).toBe(true) // dropped, or in the pool if somebody made him
   })
 })

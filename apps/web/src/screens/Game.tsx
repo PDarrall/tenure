@@ -208,7 +208,7 @@ function Header({ session }: { session: Session }) {
         Season {world.season}, {weekLabel(sw)}.
       </p>
       <p>
-        <strong>{score.games}</strong> games · <strong>£{score.earnings}m</strong> · <strong>{score.trophyPoints}</strong> trophy points · Legacy <strong>{score.legacy}</strong>
+        <strong>{score.games}</strong> games · <strong>£{score.earnings}m</strong> · <strong>{score.trophyPoints}</strong> trophy points · <strong>{score.playersMade}</strong> players made · Legacy <strong>{score.legacy}</strong>
       </p>
       <p>{line}</p>
     </header>
@@ -528,7 +528,7 @@ export function Career({ world }: { world: World }) {
         {s.name}, {s.age}, {s.background}. {s.status}. Reputation {s.reputation} ({bandName(s.reputation)}).
       </p>
       <p>
-        {s.score.games} games · £{s.score.earnings}m · {s.score.trophyPoints} trophy points · Legacy {s.score.legacy} · {s.seasonsManaged} seasons managed
+        {s.score.games} games · £{s.score.earnings}m · {s.score.trophyPoints} trophy points · {s.score.playersMade} players made · Legacy {s.score.legacy} · {s.seasonsManaged} seasons managed
       </p>
       {s.spells.length === 0 && <p className="muted">No clubs yet.</p>}
       {s.spells.map((sp) => (
@@ -540,6 +540,13 @@ export function Career({ world }: { world: World }) {
       ))}
       {s.honours.length > 0 && <p>Honours: {s.honours.map((h) => `${competitionName(h.competition)} (season ${h.season})`).join(', ')}</p>}
       {s.tags.length > 0 && <p>Tags: {s.tags.map((t) => t.tag).join(', ')}</p>}
+      <h3>Players made</h3>
+      {s.playersMade.length === 0 && <p className="muted">Nobody yet. Sign, debut or promote a player and he is yours for good.</p>}
+      {s.playersMade.map((m) => (
+        <div className="item" key={m.playerId}>
+          <strong>{m.name}</strong> ({m.position}) · {m.circumstance} at {m.club}, season {m.season} · rated {Math.round(m.ratingThen)} then, {Math.round(m.ratingNow)} now · {m.points} points · {m.now}
+        </div>
+      ))}
     </section>
   )
 }

@@ -225,9 +225,14 @@ describe('players over seasons', () => {
     }
     const kept = world.players.filter((p) => p !== null).length
     const live = livePlayers(world).length
-    expect(live).toBe(world.clubs.reduce((n, c) => n + c.playerIds.length, 0) + world.foreign.reduce((n, l) => n + l.clubs.reduce((m, c) => m + c.playerIds.length, 0), 0))
-    // Dropped records leave holes, not ghosts: nothing retired lingers without a tag.
-    expect(kept).toBe(live)
+    const inClubs = world.clubs.reduce((n, c) => n + c.playerIds.length, 0) + world.foreign.reduce((n, l) => n + l.clubs.reduce((m, c) => m + c.playerIds.length, 0), 0)
+    const pool = livePlayers(world).filter((p) => p.clubId === 0).length
+    expect(live).toBe(inClubs + pool)
+    // Dropped records leave holes, not ghosts: a retired player is kept only if somebody made him, and only made players wait in the pool.
+    const keptRetired = world.players.filter((p): p is Player => p !== null && p.retired)
+    expect(kept).toBe(live + keptRetired.length)
+    for (const p of keptRetired) expect(p.madeBy.length).toBeGreaterThan(0)
+    for (const p of livePlayers(world)) if (p.clubId === 0) expect(p.madeBy.length).toBeGreaterThan(0)
     expect(world.log.some((e) => e.type === 'player.retired')).toBe(true)
     expect(world.log.some((e) => e.type === 'player.promoted')).toBe(true)
   })

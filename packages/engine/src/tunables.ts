@@ -508,6 +508,33 @@ export const T = {
   BOND_RENEWAL: 3,
   BOND_BACKED: 5,
 
+  // Your players (DESIGN.md "Your players"). Serves: a starter gains at
+  // least three times a bench player over a season; buying finished players
+  // yields under 10% of players-made points; the best maker's Legacy within
+  // 20% of the best trophy-winner's.
+  /** A full season of starts moves an under-24 this far toward potential. */
+  GROWTH_PER_SEASON: 4,
+  EXPECTED_STARTS: 46,
+  /** Growth × (base + slope × development ÷ 100). */
+  DEV_FACTOR_BASE: 0.6,
+  DEV_FACTOR_SLOPE: 0.8,
+  /** Players-made points per rating point of growth under the manager. */
+  GROWTH_POINTS_PER_RATING: 3,
+  /** Tag weights: debut and promotion in full, a signing less; a finished player (bought at this rating or above) almost nothing. */
+  TAG_WEIGHTS: { debut: 1, promoted: 1, signed: 0.5 } as Readonly<Record<'debut' | 'promoted' | 'signed', number>>,
+  BOUGHT_FINISHED_RATING: 70,
+  BOUGHT_FINISHED_WEIGHT: 0.05,
+  /** Milestone points: a tier above the one he was made in, a transfer above the fee threshold, a top-tier or European title. */
+  MILESTONE_POINTS: { tierAbove: 8, transfer: 10, title: 20, promotion: 0, cupFinal: 0, retired: 0 } as Readonly<Record<string, number>>,
+  /** £m: a transfer at or above this is a milestone. */
+  TRANSFER_MILESTONE_FEE: 3,
+  /** A tagged player who leaves waits as a free agent for a club within this many strength points of his rating. */
+  MOVE_ON_STRENGTH_WINDOW: 10,
+  /** A generated player older than this has debuted somewhere already. */
+  DEBUT_AGE_LIMIT: 19,
+  /** Seasons a free agent waits before retiring. */
+  FREE_AGENT_MAX_SEASONS: 1,
+
   /** Anchoring tolerance the tests allow after rounding to one decimal; below the minimum strength the rating floor gets in the way. */
   ANCHOR_TOLERANCE: 0.15,
   ANCHOR_MIN_STRENGTH: 10,
@@ -738,6 +765,8 @@ export const T = {
   FALLOUT_OWNERSHIP_GAIN: 1 / 11,
   /** AI sells the player when its motivation ability is below this. */
   AI_FALLOUT_SELL_BELOW_MOTIVATION: 50,
+  /** The player who turns is the best outfielder at least this old. */
+  FALLOUT_SENIOR_AGE: 27,
   /** Board rows: monthly roll while credit is within the margin above threshold. */
   BOARD_ROW_P: 0.05,
   BOARD_ROW_MARGIN: 10,
@@ -971,8 +1000,8 @@ export const T = {
     foreign: { big: 80, mid: 40, small: 20 },
   } as const,
 
-  /** Legacy = games × a + earnings(£m) × b + trophy points × c. */
-  LEGACY_WEIGHTS: { games: 0.2, earnings: 2, trophyPoints: 0.15 } as const,
+  /** Legacy = games × a + earnings(£m) × b + trophy points × c + players made × d. */
+  LEGACY_WEIGHTS: { games: 0.2, earnings: 2, trophyPoints: 0.15, playersMade: 0.12 } as const,
 
   /** Bonuses as a share of the season's salary: for a trophy, for a promotion. Serves: earnings mix. */
   TROPHY_BONUS_SHARE: 0.25,
@@ -980,8 +1009,10 @@ export const T = {
 
   /** Reference careers the Legacy weights are checked against (DESIGN: within ~20%). */
   LEGACY_ARCHETYPES: {
-    midTableThirtyYears: { games: 1260, earnings: 35, trophyPoints: 30 },
-    trophyLadenTwelveYears: { games: 600, earnings: 45, trophyPoints: 900 },
+    midTableThirtyYears: { games: 1260, earnings: 35, trophyPoints: 30, playersMade: 120 },
+    trophyLadenTwelveYears: { games: 600, earnings: 45, trophyPoints: 900, playersMade: 40 },
+    /** Thirty years making players at small clubs: little money, few trophies, the fourth line. */
+    makerThirtyYears: { games: 1260, earnings: 12, trophyPoints: 15, playersMade: 900 },
     tolerance: 0.2,
   } as const,
 
@@ -1010,6 +1041,16 @@ export const T = {
     topTierLongTenures: { target: 3, min: 2, max: 4 },
     /** Unjust sackings ≈ 20–30% of all sackings. To verify. */
     unjustSackingShare: { target: 0.25, min: 0.2, max: 0.3 },
+    /** Match ratings average ≈ 6.9 with a spread of about 0.6. To verify. */
+    ratingMean: { target: 6.9, min: 6.6, max: 7.2 },
+    ratingSpread: { target: 0.6, min: 0.35, max: 0.85 },
+    /** No formation or style beats the mean points per game by more than 10%. */
+    formationEdge: { target: 0, min: 0, max: 0.1 },
+    styleEdge: { target: 0, min: 0, max: 0.1 },
+    /** The best maker's Legacy lands within 20% of the best trophy-winner's. */
+    makerLegacyRatio: { target: 1, min: 0.8, max: 1.25 },
+    /** Buying finished players yields under 10% of players-made points. */
+    boughtFinishedShare: { target: 0.05, min: 0, max: 0.1 },
   } as const,
 
   /** Seasons skipped before sampling "at any moment" figures, so genesis spells can age. */

@@ -81,4 +81,28 @@ describe('500 AI careers (DESIGN.md validation targets, to verify)', () => {
     const l = line('unjustSackingShare')
     expect(l.pass, describeLine(l)).toBe(true)
   })
+
+  it('match ratings average ≈ 6.9 with a spread of about 0.6', () => {
+    const m = line('ratingMean')
+    const sd = line('ratingSpread')
+    expect(m.pass, describeLine(m)).toBe(true)
+    expect(sd.pass, describeLine(sd)).toBe(true)
+  })
+
+  it('no formation or style beats the mean points per game by more than 10%', () => {
+    const f = line('formationEdge')
+    const st = line('styleEdge')
+    expect(f.pass, describeLine(f)).toBe(true)
+    expect(st.pass, describeLine(st)).toBe(true)
+  })
+
+  it("the best maker's Legacy lands within 20% of the best trophy-winner's", () => {
+    const l = line('makerLegacyRatio')
+    expect(l.pass, describeLine(l)).toBe(true)
+  })
+
+  it('buying finished players yields under 10% of players-made points', () => {
+    const l = line('boughtFinishedShare')
+    expect(l.pass, describeLine(l)).toBe(true)
+  })
 })

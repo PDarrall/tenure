@@ -13,8 +13,9 @@ import { playerById } from '../lookup.js'
 import { structureOf } from '../players/formations.js'
 import { applySide } from '../match/aftermath.js'
 import { freshSeasonStats } from '../players/gen.js'
+import { milestone, seasonMilestones, settleSeasonGrowth, tierAboveMilestones } from '../players/made.js'
 import { drawRound, isFinal, seedCups } from './cups.js'
-import { decayMorale, runHumanWindow, runWindow, summerSquad, updateMorale, type WindowSummary } from './squad.js'
+import { decayMorale, runHumanWindow, runWindow, summerFreeAgents, summerSquad, updateMorale, type WindowSummary } from './squad.js'
 import { awardHonour, settleLeagues } from './promotion.js'
 import { settleForeignLeagues } from './abroad.js'
 
@@ -35,6 +36,7 @@ export function startSeason(world: World, rng: Rng): void {
       p.season = freshSeasonStats(world.season, p.clubId, tierOf.get(p.clubId) ?? null)
     }
   }
+  tierAboveMilestones(world)
   emit(world, 'season.start', { season: world.season })
 }
 
@@ -220,8 +222,8 @@ export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFix
 
   // The players: goals, ratings, condition, cards, injuries, morale.
   const squadIdsOf = (id: ClubId): readonly number[] => clubById(world, id)?.playerIds ?? foreignSquadIds(world, id)
-  const homeAfter = applySide(world, rng, fixture, { clubId: fixture.homeId, xi: homeSide.lineup.xi, bench: homeSide.lineup.bench, formation: homeFormation(world, fixture.homeId, home), style: home.style, goalsFor: outcome.homeGoals, goalsAgainst: outcome.awayGoals, result: homeResult, motivation: homeManager ? homeManager.ability.motivation : T.CARETAKER_ABILITY, managerId: homeManager ? homeManager.id : null }, squadIdsOf(fixture.homeId))
-  const awayAfter = applySide(world, rng, fixture, { clubId: fixture.awayId, xi: awaySide.lineup.xi, bench: awaySide.lineup.bench, formation: homeFormation(world, fixture.awayId, away), style: away.style, goalsFor: outcome.awayGoals, goalsAgainst: outcome.homeGoals, result: awayResult, motivation: awayManager ? awayManager.ability.motivation : T.CARETAKER_ABILITY, managerId: awayManager ? awayManager.id : null }, squadIdsOf(fixture.awayId))
+  const homeAfter = applySide(world, rng, fixture, { clubId: fixture.homeId, xi: homeSide.lineup.xi, bench: homeSide.lineup.bench, formation: homeFormation(world, fixture.homeId, home), style: home.style, goalsFor: outcome.homeGoals, goalsAgainst: outcome.awayGoals, result: homeResult, motivation: homeManager ? homeManager.ability.motivation : T.CARETAKER_ABILITY, managerId: homeManager ? homeManager.id : null, development: homeManager ? homeManager.ability.development : T.CARETAKER_ABILITY, tier: homeClub ? homeClub.tier : null }, squadIdsOf(fixture.homeId))
+  const awayAfter = applySide(world, rng, fixture, { clubId: fixture.awayId, xi: awaySide.lineup.xi, bench: awaySide.lineup.bench, formation: homeFormation(world, fixture.awayId, away), style: away.style, goalsFor: outcome.awayGoals, goalsAgainst: outcome.homeGoals, result: awayResult, motivation: awayManager ? awayManager.ability.motivation : T.CARETAKER_ABILITY, managerId: awayManager ? awayManager.id : null, development: awayManager ? awayManager.ability.development : T.CARETAKER_ABILITY, tier: awayClub ? awayClub.tier : null }, squadIdsOf(fixture.awayId))
 
   const event = emit(world, 'match.played', {
     competition: fixture.competition,
@@ -243,6 +245,8 @@ export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFix
     awayXi: [...awaySide.lineup.xi],
     homeFormation: homeFormation(world, fixture.homeId, home),
     awayFormation: homeFormation(world, fixture.awayId, away),
+    homeStyle: home.style,
+    awayStyle: away.style,
     cards: homeAfter.yellows + awayAfter.yellows,
     reds: homeAfter.reds + awayAfter.reds,
   })
@@ -298,6 +302,10 @@ export function drawCupRound(world: World, rng: Rng, cup: CupState, seasonWk: nu
       const club = clubById(world, id)
       if (club) club.thisSeason.cupFinals++
       emit(world, 'cup.final', { competition: cup.competition, clubId: id, managerId: club?.managerId ?? null, season: world.season })
+      if (club) for (const pid of club.playerIds) {
+        const p = playerById(world, pid)
+        if (p && !p.retired && p.madeBy.length > 0 && p.season.apps > 0) milestone(world, p, 'cupFinal', { competition: cup.competition })
+      }
     }
   }
   const drawn: Fixture[] = []
@@ -401,7 +409,10 @@ export function endSeason(world: World, rng: Rng, extrasFor: ExtrasFor = noExtra
   // Net-spend ranks are taken against the tiers as played, before any swap.
   const spendRank = new Map<ClubId, number>()
   for (const club of world.clubs) spendRank.set(club.id, netSpendRank(world, club, club.tier))
+  // Growth under a manager becomes points before the tables settle anything.
+  for (const club of world.clubs) settleSeasonGrowth(world, club)
   const outcome = settleLeagues(world)
+  seasonMilestones(world, outcome, world.cups.find((c) => c.competition === 'european')?.winnerId ?? null)
 
   for (const club of world.clubs) {
     const manager = managerAt(world, club)
@@ -443,6 +454,7 @@ export function endSeason(world: World, rng: Rng, extrasFor: ExtrasFor = noExtra
   }
   emit(world, 'managers.aged', { season: world.season, count: aged })
   for (const club of world.clubs) summerSquad(world, rng, club)
+  summerFreeAgents(world, rng)
 
   emit(world, 'season.end', {
     season: world.season,

@@ -114,6 +114,8 @@ export interface MadeBy {
   growth: number
   /** Tier of the club on the day, for the "tier above" milestone. */
   tier: Tier | null
+  /** The tier-above milestone is paid once. */
+  tierAboveDone?: boolean
 }
 
 export interface Player {
@@ -144,6 +146,10 @@ export interface Player {
   traits: Trait[]
   /** Current club, home or foreign id; 0 when a free agent. */
   clubId: ClubId
+  /** Season he became a free agent, while he is one. */
+  freeSince?: number | null
+  /** The club he left last, for the transfer record. */
+  lastClubId?: ClubId
   /** Came through the academy of the club that promoted him. */
   academy: boolean
   /** Has played a first-team match. */
@@ -517,6 +523,8 @@ export interface Spell {
   takeover: { week: number; replaceWeek: number } | null
   /** Set when a fallout has already been rolled for the current losing run. */
   falloutRolled: boolean
+  /** The senior player behind an open fallout, if any. */
+  falloutPlayerId?: number | null
   season: SpellSeasonTally
   /** £m paid on the way out. */
   payout: number

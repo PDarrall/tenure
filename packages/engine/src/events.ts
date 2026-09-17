@@ -36,6 +36,7 @@ export function concernsHuman(world: World, event: Event): boolean {
   const p = event.payload
   const id = human.managerId
   if (p['managerId'] === id || p['homeManagerId'] === id || p['awayManagerId'] === id) return true
+  if (Array.isArray(p['managers']) && (p['managers'] as unknown[]).includes(id)) return true
   const manager = world.managers[id - 1]
   if (manager && typeof p['spellId'] === 'number' && manager.history.spellIds.includes(p['spellId'])) return true
   if (manager && manager.status.kind === 'employed') {

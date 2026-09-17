@@ -91,7 +91,8 @@ export function makePlayer(world: World, rng: Rng, clubId: number, tier: Tier | 
     traits: drawTraits(rng, draft.position),
     clubId,
     academy: draft.academy === true,
-    debuted: false,
+    // A generated senior has played first-team football somewhere; academy graduates and the very young have not.
+    debuted: draft.academy !== true && draft.age > T.DEBUT_AGE_LIMIT,
     retired: false,
     season: freshSeasonStats(world.season, clubId, tier),
     history: [],
@@ -181,6 +182,41 @@ export function generateHomeSquads(world: World, rng: Rng): void {
 export function releasePlayer(world: World, player: Player, club: { playerIds: PlayerId[] }): void {
   club.playerIds = club.playerIds.filter((id) => id !== player.id)
   player.clubId = 0
+  player.freeSince = world.season
+}
+
+/** Free agents: players with a record somebody keeps, waiting for a club. */
+export function freeAgents(world: World): Player[] {
+  const out: Player[] = []
+  for (const p of world.players) if (p && !p.retired && p.clubId === 0) out.push(p)
+  return out
+}
+
+/** The best free agent for a slot at a club's level, if any: same role, within the strength window. */
+export function pickFreeAgent(world: World, club: { squad: { strength: number } }, position: Position): Player | null {
+  let best: Player | null = null
+  for (const p of freeAgents(world)) {
+    if (p.position !== position) continue
+    if (Math.abs(p.rating - club.squad.strength) > T.MOVE_ON_STRENGTH_WINDOW) continue
+    if (!best || p.rating > best.rating || (p.rating === best.rating && p.id < best.id)) best = p
+  }
+  return best
+}
+
+/** A free agent joins a club: a transfer on the record, a milestone above the fee threshold, and he is the new manager's signing. */
+export function signFreeAgent(world: World, player: Player, club: Club, tier: Tier | null): void {
+  const from = player.lastClubId ?? 0
+  club.playerIds.push(player.id)
+  player.clubId = club.id
+  player.freeSince = null
+  player.condition = T.CONDITION_MAX
+  player.injuryWeeks = 0
+  player.suspension = 0
+  player.yellows = 0
+  player.contract = { years: Math.max(1, Math.min(T.PLAYER_CONTRACT_YEARS[1], Math.round((T.PLAYER_CONTRACT_YEARS[0] + T.PLAYER_CONTRACT_YEARS[1]) / 2))), wage: wageFor(player.rating, player.age) }
+  player.season = { ...player.season, clubId: club.id, tier }
+  const fee = player.value
+  emit(world, 'player.transfer', { playerId: player.id, name: player.name, fromClubId: from, clubId: club.id, fee, rating: round1(player.rating), season: world.season })
 }
 
 /** Drop a player whose record nobody needs, so the world stays small. Tagged players are kept. */
