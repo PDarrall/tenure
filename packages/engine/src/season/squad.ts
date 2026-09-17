@@ -3,8 +3,8 @@ import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import { clamp, gravityTarget, round1 } from '../world/gen.js'
 import { managerAt } from '../lookup.js'
-import type { Club, Manager, Player, Position, Result, Tier, World } from '../types.js'
-import { anchorSquad, forgetPlayer, makePlayer, pickFreeAgent, releasePlayer, signFreeAgent, squadSizeFor, valueFor, freeAgents } from '../players/gen.js'
+import type { Club, Formation, FormationSlot, Manager, Player, Position, Result, Tier, World } from '../types.js'
+import { anchorSquad, forgetPlayer, makePlayer, pickFreeAgent, positionMix, releasePlayer, signFreeAgent, squadSizeFor, valueFor, freeAgents } from '../players/gen.js'
 import { clubFormation, squadOf, autoPick } from '../players/select.js'
 import { slotsOf } from '../players/formations.js'
 import { wageDemand as contractWageDemand } from '../players/contracts.js'
@@ -181,7 +181,7 @@ export function applyWindowToSquad(world: World, rng: Rng, club: Club, turnover:
   const slots = slotsOf(formation)
   const signings = leaving - Math.min(leaving, youth)
   for (let i = 0; i < signings; i++) {
-    const slot = slots[(i + 1) % slots.length]!
+    const slot = neededSlot(world, club, formation)
     const fromPool = signFromPool(world, club, slot.position)
     const p =
       fromPool ??
@@ -311,14 +311,48 @@ export function summerPlayers(world: World, rng: Rng, club: Club): void {
 }
 
 /** A squad short of the tier's size takes generated backups. */
+/**
+ * The slot a squad most needs filling: the position furthest below its share
+ * of the squad (positionMix), with the shape's own slots as the floor, so a
+ * club never fills up with defenders because they come first in the list.
+ */
+export function neededSlot(world: World, club: Club, formation: Formation): FormationSlot {
+  const slots = slotsOf(formation)
+  const mix = positionMix(squadSizeFor(club.tier))
+  const have: Record<Position, number> = { GK: 0, D: 0, M: 0, F: 0 }
+  for (const p of squadOf(world, club)) have[p.position]++
+  let best: Position = 'D'
+  let deficit = -Infinity
+  for (const position of ['GK', 'D', 'M', 'F'] as const) {
+    const starters = slots.filter((s) => s.position === position).length
+    const want = Math.max(mix[position], starters)
+    const d = (want - have[position]) / Math.max(1, want)
+    if (d > deficit) {
+      deficit = d
+      best = position
+    }
+  }
+  // The side: the shape's slot of that position the squad covers least.
+  const candidates = slots.filter((s) => s.position === best)
+  if (candidates.length === 0) return { position: best, side: 'C' }
+  const squad = squadOf(world, club)
+  let chosen = candidates[0]!
+  let fewest = Infinity
+  for (const slot of candidates) {
+    const covering = squad.filter((p) => p.position === best && (p.side === slot.side || p.side === 'any')).length
+    if (covering < fewest) {
+      fewest = covering
+      chosen = slot
+    }
+  }
+  return chosen
+}
+
 export function topUpSquad(world: World, rng: Rng, club: Club): void {
   const size = squadSizeFor(club.tier)
-  const slots = slotsOf(clubFormation(world, club))
-  let i = 0
+  const formation = clubFormation(world, club)
   while (club.playerIds.filter((id) => world.players[id - 1] && !world.players[id - 1]!.retired).length < size) {
-    const have = squadOf(world, club)
-    const keepers = have.filter((p) => p.position === 'GK').length
-    const slot = keepers < T.SQUAD_KEEPERS ? slots[0]! : slots[1 + ((i++) % (slots.length - 1))]!
+    const slot = neededSlot(world, club, formation)
     const fromPool = signFromPool(world, club, slot.position)
     if (fromPool) {
       const manager = managerOf(world, club)

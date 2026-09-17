@@ -436,9 +436,9 @@ export const T = {
   // morale, ratings out of ten). Serves: yellows ≈ 3–4 a match, reds ≈ 0.2,
   // match ratings average ≈ 6.9 with a spread of about 0.6.
   MATCH_MINUTES: 90,
-  /** Condition lost over ninety minutes and won back each week of rest. */
+  /** Condition lost over ninety minutes and won back each week of rest: a weekly starter is fresh, a midweek game leaves him short. */
   CONDITION_DRAIN_PER_90: 22,
-  CONDITION_RECOVERY_PER_WEEK: 16,
+  CONDITION_RECOVERY_PER_WEEK: 24,
   /** Injuries per player per match; low condition and the injury-prone multiply it. DESIGN: 1–20 weeks. */
   INJURY_P_PER_MATCH: 0.012,
   INJURY_LOW_CONDITION_MULT: 1.6,
@@ -461,6 +461,9 @@ export const T = {
   POACHER_SCORER_MULT: 1.6,
   PLAYMAKER_ASSIST_MULT: 1.6,
   ASSIST_P: 0.7,
+  /** The one-shot model's stand-in shot counts for the record: base plus per goal. */
+  ONE_SHOT_SHOTS_BASE: 8,
+  ONE_SHOT_SHOTS_PER_GOAL: 2,
   /** Match ratings out of ten: base, the result, level against the XI, events, noise. Serves: mean ≈ 6.9, spread ≈ 0.6. */
   RATING_BASE: 6.6,
   RATING_WIN: 0.5,
@@ -534,6 +537,97 @@ export const T = {
   DEBUT_AGE_LIMIT: 19,
   /** Seasons a free agent waits before retiring. */
   FREE_AGENT_MAX_SEASONS: 1,
+
+  // ---------------------------------------------------------------------------
+  // The minute engine (DESIGN.md "Match"). Serves: goals per game ≈ 2.7,
+  // home / draw / away ≈ 45 / 26 / 29, yellows ≈ 3–4, reds ≈ 0.2 (to verify);
+  // a match in about a minute at full speed.
+  // ---------------------------------------------------------------------------
+
+  /** Pressure target per point of effective XI difference, and per midfielder of presence (a quality-weighted count). */
+  PRESSURE_PER_POINT: 1.0,
+  PRESSURE_PER_MID: 6,
+  /** Home advantage as a pressure lean. DESIGN names 8; 12 nets out to the home-win target once a leading side sits deep. To verify against real home-win rates. */
+  HOME_PRESSURE_LEAN: 12,
+  /** Mentality lean on pressure: attack +, defend −. */
+  MENTALITY_LEAN: 8,
+  /** A leading side sits deeper by this unless attacking. */
+  LEAD_SIT_DEEP: 16,
+  /** Style leans on pressure: possession with a better XI, pressing, counter sits back. */
+  STYLE_PRESSURE: { possessionBetter: 6, pressing: 7, counter: -5 } as const,
+  /** Pressure moves this share of the way to its target each minute, with noise. */
+  PRESSURE_DRIFT: 0.3,
+  PRESSURE_NOISE_SD: 6,
+  /** A goal swings momentum by this for the scorers; momentum fades by this share each minute. */
+  MOMENTUM_GOAL: 6,
+  MOMENTUM_DECAY: 0.9,
+  /** The home share of chances is a logistic in pressure with this scale: the lean of 8 gives ≈ 58%. Serves: home / draw / away ≈ 45 / 26 / 29. */
+  CHANCE_SHARE_SCALE: 25,
+  /** Chances per minute at level pressure, and the extra share at full pressure. Serves: ≈ 24 shots a match (to verify). */
+  CHANCE_BASE: 0.36,
+  CHANCE_PRESSURE: 0.2,
+  /** Chance probability scales with the square root of openness (our attack over their defence, against the standard), within bounds. */
+  OPENNESS_MIN: 0.7,
+  OPENNESS_MAX: 1.4,
+  /** Style, one rule each, on chances: fewer but better; more of lower quality; on the break; more of them. */
+  STYLE_CHANCE: {
+    possession: { chance: 0.85, quality: 1.15 },
+    direct: { perTrait: 0.03, quality: 0.9 },
+    counter: { onBreak: 1.25, notOnBreak: 0.9, quality: 1.1 },
+    pressing: { chance: 1.08 },
+  } as const,
+  /** Openness counts a midfielder as this much of an attacker and this much of a defender; the standard is a 4-4-2 against a 4-4-2 (4 ÷ 7). */
+  MID_ATTACK_SHARE: 0.5,
+  MID_DEFENCE_SHARE: 0.5,
+  OPENNESS_STANDARD: 4 / 7,
+  /** Width against a narrow back line (a shape this wide or more), and the overload of a back line this long, on chance frequency. */
+  WIDTH_CHANCE: 1.06,
+  WIDE_ATTACK_WIDTH: 4,
+  OVERLOAD_CHANCE: 0.9,
+  OVERLOAD_BACK_LINE: 5,
+  /** Conversion: P(goal) = base × e^(sens × edge), edge from attacker against keeper and defenders in rating points ÷ EDGE_SCALE, plus ln(quality). Serves: goals per game ≈ 2.7. */
+  GOAL_BASE_P: 0.11,
+  GOAL_SENS: 0.12,
+  GOAL_P_MAX: 0.5,
+  EDGE_SCALE: 10,
+  QUALITY_FLOOR: 0.2,
+  /** Keeper and defence shares of the stop, and an outfielder in goal's penalty. */
+  KEEPER_SHARE: 0.6,
+  DEFENCE_SHARE: 0.4,
+  NO_KEEPER_PENALTY: 30,
+  /** A chance that is not a goal: save, miss or block. Serves: about a third of shots on target (to verify). */
+  SAVE_SHARE: 0.3,
+  MISS_SHARE: 0.45,
+  /** Share of chances that are not goals that go for a corner. Serves: ≈ 9 corners a match (to verify). */
+  CORNER_SHARE: 0.4,
+  /** Fouls per minute and the card odds per foul. Serves: ≈ 3–4 yellows and ≈ 0.2 reds a match. */
+  FOUL_BASE: 0.22,
+  YELLOW_PER_FOUL: 0.15,
+  RED_PER_FOUL: 0.003,
+  /** A booked player fouls this share as often: second yellows are rare. */
+  BOOKED_CAUTION: 0.3,
+  /** Injuries per side per minute, drawn by the injury rule. */
+  INJURY_MINUTE_P: 0.0014,
+  /** Substitutions by rule: from this minute for tiredness, chasing from this one, holding from this one; tired below this condition; at least this many minutes between a side's own changes. */
+  SUB_TIRED_FROM: 55,
+  SUB_TIRED_BELOW: 60,
+  SUB_CHASE_FROM: 65,
+  SUB_HOLD_FROM: 78,
+  SUBS_MAX: 3,
+  SUB_MIN_GAP: 8,
+  /** Added time per half, uniform. */
+  STOPPAGE_FIRST: [0, 3] as readonly [number, number],
+  STOPPAGE_SECOND: [1, 5] as readonly [number, number],
+  /** Possession moves this much per point of the share of minutes a side spent on top (cosmetic; to verify against ≈ 53% at home). */
+  POSSESSION_SWING: 0.6,
+  /** Live rating moves in the match view: a save, a card; a short cameo counts a little less. */
+  LIVE_RATING_START: 6,
+  LIVE_RATING_SAVE: 0.05,
+  LIVE_RATING_YELLOW: -0.3,
+  LIVE_RATING_RED: -1,
+  LIVE_RATING_CAMEO: -0.2,
+  /** Headless full match must finish under this many milliseconds. */
+  MATCH_HEADLESS_MS: 50,
 
   /** Anchoring tolerance the tests allow after rounding to one decimal; below the minimum strength the rating floor gets in the way. */
   ANCHOR_TOLERANCE: 0.15,

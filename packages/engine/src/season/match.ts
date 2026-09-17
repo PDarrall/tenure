@@ -192,5 +192,9 @@ export function plainBands(strength: number, formation: { defence: number; midfi
     pace: 0,
     aerial: 0,
     leaders: 0,
+    attackerEff: strength,
+    keeperEff: strength,
+    defenderEff: strength,
+    backLine: formation.defence,
   }
 }

@@ -11,8 +11,11 @@ import { hasTrait } from './traits.js'
 
 const ROLE_INDEX: Record<Position, number> = { GK: 0, D: 1, M: 2, F: 3 }
 
+/** What the rating rules need to know about a player: a Player, or a copy of one inside a match. */
+export type Rateable = Pick<Player, 'rating' | 'condition' | 'morale' | 'traits' | 'position' | 'side'>
+
 /** Rating lost playing a slot: adjacent role −15, distant −30, wrong side −5; versatile halves it (tunables). */
-export function positionPenalty(player: Player, slot: FormationSlot): number {
+export function positionPenalty(player: Rateable, slot: FormationSlot): number {
   let penalty = 0
   if (player.position !== slot.position) {
     const distance = Math.abs(ROLE_INDEX[player.position] - ROLE_INDEX[slot.position])
@@ -20,7 +23,7 @@ export function positionPenalty(player: Player, slot: FormationSlot): number {
     penalty += distance === 1 && !gkInvolved ? T.POSITION_PENALTY_ADJACENT : T.POSITION_PENALTY_DISTANT
   }
   if (player.side !== 'any' && slot.side !== player.side && player.position !== 'GK') penalty += T.SIDE_PENALTY
-  if (hasTrait(player, 'versatile')) penalty *= T.VERSATILE_PENALTY_SHARE
+  if (player.traits.includes('versatile')) penalty *= T.VERSATILE_PENALTY_SHARE
   return penalty
 }
 
@@ -30,12 +33,25 @@ export interface MatchContext {
 }
 
 /** What a player brings to a slot today: rating less position, condition and morale, plus the traits that read here. */
-export function effectiveRating(player: Player, slot: FormationSlot, ctx: MatchContext = { bigGame: false }): number {
+export function effectiveRating(player: Rateable, slot: FormationSlot, ctx: MatchContext = { bigGame: false }): number {
   let rating = player.rating - positionPenalty(player, slot)
   if (player.condition < T.CONDITION_RATING_FROM) rating -= (T.CONDITION_RATING_FROM - player.condition) * T.CONDITION_RATING_PER_POINT
   rating += ((player.morale - T.SCALE_MIDPOINT) / T.SCALE_MIDPOINT) * T.PLAYER_MORALE_RATING_SWING
-  if (ctx.bigGame && hasTrait(player, 'big-game')) rating += T.BIG_GAME_BONUS
-  return rating
+  if (ctx.bigGame && player.traits.includes('big-game')) rating += T.BIG_GAME_BONUS
+  // A nobody on a bad day is still a nobody, not a liability with a minus sign.
+  return Math.max(0, rating)
+}
+
+/** Scorers by position, poachers weighted up (the poacher rule). */
+export function scorerWeight(p: Rateable): number {
+  const base = T.SCORER_POSITION_WEIGHTS[p.position]
+  return base * (p.traits.includes('poacher') ? T.POACHER_SCORER_MULT : 1) * (p.rating / 100)
+}
+
+/** Assisters by position, playmakers weighted up (the playmaker rule). */
+export function assisterWeight(p: Rateable): number {
+  const base = T.ASSIST_POSITION_WEIGHTS[p.position]
+  return base * (p.traits.includes('playmaker') ? T.PLAYMAKER_ASSIST_MULT : 1) * (p.rating / 100)
 }
 
 export function available(player: Player): boolean {
@@ -158,6 +174,12 @@ export interface XiBands {
   pace: number
   aerial: number
   leaders: number
+  /** Who a chance is between: the scorer-weighted mean of the outfield effective ratings, the keeper's, the back line's mean. */
+  attackerEff: number
+  keeperEff: number
+  defenderEff: number
+  /** Defenders in the shape, for the overload rule. */
+  backLine: number
 }
 
 /** Read a picked XI in bands for the match model. */
@@ -172,6 +194,11 @@ export function xiBands(world: World, xi: readonly PlayerId[], formation: Format
   let aerial = 0
   let leaders = 0
   let n = 0
+  let attackerWeight = 0
+  let attackerSum = 0
+  let keeperEff: number | null = null
+  let defenderSum = 0
+  let defenders = 0
   slots.forEach((slot, i) => {
     const id = xi[i]
     const p = id === undefined ? null : playerById(world, id)
@@ -179,15 +206,40 @@ export function xiBands(world: World, xi: readonly PlayerId[], formation: Format
     const eff = effectiveRating(p, slot, ctx)
     total += eff
     n++
+    if (slot.position === 'GK') keeperEff = eff
     if (slot.position === 'GK' || slot.position === 'D') defence += eff / 100
     else if (slot.position === 'M') midfield += eff / 100
     else attack += eff / 100
+    if (slot.position === 'D') {
+      defenderSum += eff
+      defenders++
+    }
+    if (slot.position !== 'GK') {
+      const w = scorerWeight(p)
+      attackerWeight += w
+      attackerSum += eff * w
+    }
     if (hasTrait(p, 'pace')) pace++
     if (hasTrait(p, 'aerial')) aerial++
     if (hasTrait(p, 'leader')) leaders++
   })
-  // Missing players (a short squad) count as nobody.
-  return { strength: n ? total / n : 0, defence, midfield, attack, width: structure.width, defenceWidth: structure.defenceWidth, pace, aerial, leaders }
+  // Missing players (a short squad) count as nobody; no keeper is an outfielder in goal.
+  const strength = n ? total / n : 0
+  return {
+    strength,
+    defence,
+    midfield,
+    attack,
+    width: structure.width,
+    defenceWidth: structure.defenceWidth,
+    pace,
+    aerial,
+    leaders,
+    attackerEff: attackerWeight > 0 ? attackerSum / attackerWeight : strength,
+    keeperEff: keeperEff ?? strength - T.NO_KEEPER_PENALTY,
+    defenderEff: defenders ? defenderSum / defenders : strength - T.NO_KEEPER_PENALTY,
+    backLine: structure.defence,
+  }
 }
 
 /** The best XI mean in a formation: the anchoring number (DESIGN.md "club strength stays the master number"). */

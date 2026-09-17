@@ -206,8 +206,8 @@ describe('traits', () => {
       const read = code.includes(`'${trait}'`)
       expect(read, `no engine code reads the ${trait} trait (rule: ${rule.rule})`).toBe(true)
     }
-    // Rules the minute engine will own may wait for phase 3(c); after it this list must be empty.
-    expect(pending.length).toBeLessThanOrEqual(12)
+    // Since phase 3(c) the minute engine owns its rules: nothing may be pending.
+    expect(pending).toEqual([])
   })
 })
 

@@ -247,8 +247,10 @@ export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFix
     awayFormation: homeFormation(world, fixture.awayId, away),
     homeStyle: home.style,
     awayStyle: away.style,
-    cards: homeAfter.yellows + awayAfter.yellows,
-    reds: homeAfter.reds + awayAfter.reds,
+    cards: homeAfter.stats.yellows + awayAfter.stats.yellows,
+    reds: homeAfter.stats.reds + awayAfter.stats.reds,
+    homeStats: homeAfter.stats,
+    awayStats: awayAfter.stats,
   })
 
   return { fixture, winnerId, loserId, homeManager, awayManager, homeLineup: homeSide.lineup, awayLineup: awaySide.lineup, expHome, expAway, homePoints, awayPoints, homePosition, awayPosition, event }
