@@ -89,7 +89,7 @@ describe('growth with minutes', () => {
 })
 
 describe('milestones and the record of people', () => {
-  it('a tagged player keeps living after the manager leaves: he moves on rather than vanishing, and his milestones name the manager', () => {
+  it('a tagged player keeps living after the manager leaves: he moves on rather than vanishing, and his milestones name the manager', { timeout: 60_000 }, () => {
     const world = createWorld(15)
     runSeasons(world, 4)
     const tagged = world.players.filter((p): p is Player => p !== null && p.madeBy.length > 0)

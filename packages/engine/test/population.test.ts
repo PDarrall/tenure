@@ -101,6 +101,20 @@ describe('500 AI careers (DESIGN.md validation targets, to verify)', () => {
     expect(l.pass, describeLine(l)).toBe(true)
   })
 
+  it('match: goals per game ≈ 2.7 and home / draw / away ≈ 45 / 26 / 29', () => {
+    for (const key of ['goalsPerGame', 'homeWinShare', 'drawShare', 'awayWinShare'] as const) {
+      const l = line(key)
+      expect(l.pass, describeLine(l)).toBe(true)
+    }
+  })
+
+  it('match: yellows ≈ 3–4 and reds ≈ 0.2 a match', () => {
+    for (const key of ['yellowsPerGame', 'redsPerGame'] as const) {
+      const l = line(key)
+      expect(l.pass, describeLine(l)).toBe(true)
+    }
+  })
+
   it('buying finished players yields under 10% of players-made points', () => {
     const l = line('boughtFinishedShare')
     expect(l.pass, describeLine(l)).toBe(true)

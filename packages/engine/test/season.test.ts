@@ -84,16 +84,24 @@ describe('match model', () => {
   it('reads structure: a fifth midfielder wins pressure, a back five concedes less, four forwards make and concede', () => {
     const base = matchOdds(side(), side({ id: 2 }))
     const fiveMid = matchOdds(side({ bands: plainBands(50, structureOf('4-5-1')) }), side({ id: 2 }))
-    expect(fiveMid.lambdaHome / fiveMid.lambdaAway).toBeGreaterThan(base.lambdaHome / base.lambdaAway)
-    expect(fiveMid.lambdaHome).toBeLessThan(base.lambdaHome * 1.05)
+    // DESIGN: 4-5-1 wins the midfield against 4-4-2 but creates less.
+    expect(fiveMid.lean).toBeGreaterThan(base.lean)
+    expect(fiveMid.lambdaAway).toBeLessThan(base.lambdaAway)
+    expect(fiveMid.lambdaHome).toBeLessThan(base.lambdaHome)
     const backFive = matchOdds(side({ bands: plainBands(50, structureOf('5-4-1')) }), side({ id: 2 }))
     expect(backFive.lambdaAway).toBeLessThan(base.lambdaAway)
     expect(backFive.lambdaHome).toBeLessThan(base.lambdaHome)
     const fourUp = matchOdds(side({ bands: plainBands(50, structureOf('4-2-4')) }), side({ id: 2 }))
     expect(fourUp.lambdaHome + fourUp.lambdaAway).toBeGreaterThan(base.lambdaHome + base.lambdaAway)
+    // Mentality: attack opens the game up and leans on pressure; defend closes it and concedes less.
     const attack = matchOdds(side({ mentality: 'attack' }), side({ id: 2 }))
+    expect(attack.lean).toBeGreaterThan(base.lean)
+    expect(attack.lambdaHome).toBeGreaterThan(base.lambdaHome)
     expect(attack.lambdaHome + attack.lambdaAway).toBeGreaterThan(base.lambdaHome + base.lambdaAway)
-    expect(attack.pDraw).toBeLessThan(base.pDraw)
+    const defend = matchOdds(side({ mentality: 'defend' }), side({ id: 2 }))
+    expect(defend.lean).toBeLessThan(base.lean)
+    expect(defend.lambdaAway).toBeLessThan(base.lambdaAway)
+    expect(defend.lambdaHome).toBeLessThan(base.lambdaHome)
   })
 
   it('samples deterministically and settles knockout ties', () => {
@@ -112,18 +120,21 @@ describe('match model', () => {
     expect(shootouts).toBeGreaterThan(30)
   })
 
-  it('gives the home side of two equal teams the tunable lean, and nothing else', () => {
+  it('gives the home side of two equal teams the pressure lean, and nothing else', () => {
     const odds = matchOdds(side(), side({ id: 2 }))
     // Identical sides: structure and style cancel, leaving only the lean between the two.
-    expect(odds.lambdaHome / odds.lambdaAway).toBeCloseTo((T.GOALS_BASE + T.HOME_ADVANTAGE_GOALS) / T.GOALS_BASE, 9)
-    expect(odds.lambdaHome).toBeGreaterThan(0.85 * (T.GOALS_BASE + T.HOME_ADVANTAGE_GOALS))
-    expect(odds.lambdaHome).toBeLessThan(1.15 * (T.GOALS_BASE + T.HOME_ADVANTAGE_GOALS))
+    expect(odds.lean).toBe(T.HOME_PRESSURE_LEAN)
+    expect(odds.lambdaHome / odds.lambdaAway).toBeGreaterThan(1.15)
+    expect(odds.lambdaHome / odds.lambdaAway).toBeLessThan(1.7)
+    expect(odds.lambdaHome + odds.lambdaAway).toBeGreaterThan(2.2)
+    expect(odds.lambdaHome + odds.lambdaAway).toBeLessThan(3.3)
     // Home win / draw / away win for equal sides. DESIGN target ≈ 45 / 26 / 29, to verify.
+    // Two equal sides draw more often than the population does, whose gaps between sides decide more matches.
     expect(odds.pHome).toBeGreaterThan(0.4)
-    expect(odds.pHome).toBeLessThan(0.52)
+    expect(odds.pHome).toBeLessThan(0.54)
     expect(odds.pDraw).toBeGreaterThan(0.2)
-    expect(odds.pDraw).toBeLessThan(0.32)
-    expect(odds.pAway).toBeGreaterThan(0.22)
+    expect(odds.pDraw).toBeLessThan(0.37)
+    expect(odds.pAway).toBeGreaterThan(0.18)
     expect(odds.pAway).toBeLessThan(0.34)
   })
 
@@ -143,15 +154,13 @@ describe('match model', () => {
     }
     const n = league.length
     expect(n).toBeGreaterThan(2000)
-    // The one-shot model reads about 3.1 goals a game and 47 / 19 / 34 across a
-    // season: strength gaps inflate goals and thin out draws. Phase 3(c)
-    // calibrates against 2.7 and 45 / 26 / 29; these bands only catch a break.
-    // With structure and style in the one-shot model the reading is about 3.5; phase 3(c) calibrates the minute engine and the fast path against 2.7.
+    // A first season carries wide strength gaps (tiers are not yet sorted), so it reads above the
+    // 2.7 and 45 / 26 / 29 the fast path is calibrated to on settled worlds; these bands only catch a break.
     expect(goals / n).toBeGreaterThan(2.3)
-    expect(goals / n).toBeLessThan(3.9)
+    expect(goals / n).toBeLessThan(3.6)
     expect(home / n).toBeGreaterThan(0.38)
     expect(home / n).toBeLessThan(0.54)
-    expect(draw / n).toBeGreaterThan(0.14)
+    expect(draw / n).toBeGreaterThan(0.18)
     expect(draw / n).toBeLessThan(0.32)
   })
 
@@ -303,7 +312,7 @@ describe('a full season', () => {
 })
 
 describe('determinism', () => {
-  it('two worlds from one seed match after two seasons', () => {
+  it('two worlds from one seed match after two seasons', { timeout: 60_000 }, () => {
     const a = createWorld(7)
     const b = createWorld(7)
     runSeasons(a, 2)

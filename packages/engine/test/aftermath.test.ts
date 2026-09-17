@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createWorld } from '../src/world/gen.js'
-import { createRng } from '../src/rng.js'
+import { createRng, rngFromState } from '../src/rng.js'
 import { runSeasons, runWeeks, advanceWeek } from '../src/sim/advance.js'
 import { attributeGoals, averageRating, cardChance, injuryChance, matchRating, moraleAfterMatch, playersWeekly } from '../src/match/aftermath.js'
 import { squadOf } from '../src/players/select.js'
 import { createCareer } from '../src/play/career.js'
-import { pendingDecisions } from '../src/play/decisions.js'
+import { pendingDecisions, resolveDecisions } from '../src/play/decisions.js'
 import { queueContract, queueNewDeal, queueWantsAway, wageDemand, wantsAway, wantsNewDeal } from '../src/players/contracts.js'
 import { openVacancies } from '../src/market/vacancies.js'
 import { qualifies } from '../src/market/shortlist.js'
@@ -192,9 +192,11 @@ describe('contracts and requests', () => {
     const asker = squad[1]!
     asker.contract.wage = 1
     const deal = queueNewDeal(world, asker, wageDemand(asker, me.id))
-    advanceWeek(world, { answers: { [deal.id]: 'refuse' } })
+    const falloutsBefore = spellOf(world, me)?.season.fallouts ?? 0
+    // Answered in place: a week's advance could cross into a new season and reset the season's counts.
+    resolveDecisions(world, rngFromState(world.rng), { [deal.id]: 'refuse' })
     expect(asker.morale).toBeLessThan(50)
-    expect(spellOf(world, me)?.season.fallouts ?? 1).toBeGreaterThanOrEqual(1)
+    expect(spellOf(world, me)?.season.fallouts ?? 1).toBe(falloutsBefore + 1)
     expect(world.log.some((e) => e.type === 'player.refused' && e.payload['playerId'] === asker.id)).toBe(true)
     const leaver = squad[2]!
     const cashBefore = club.cash

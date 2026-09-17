@@ -142,7 +142,7 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
         totals.set(k, t)
       }
     }
-    const rates = [...totals.values()].filter((t) => t.games >= 200).map((t) => t.points / t.games)
+    const rates = [...totals.values()].filter((t) => t.games >= T.EDGE_MIN_GAMES).map((t) => t.points / t.games)
     if (rates.length === 0) return 0
     const mean = rates.reduce((a, b) => a + b, 0) / rates.length
     return mean > 0 ? Math.max(...rates) / mean - 1 : 0
@@ -175,6 +175,7 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     if (tag && tag.circumstance === 'signed' && tag.rating >= T.BOUGHT_FINISHED_RATING) boughtFinished += pts
   }
   const boughtFinishedShare = madePoints > 0 ? boughtFinished / madePoints : 0
+  const match = matchAverages(world)
   const lines: StatLine[] = [
     line('firstSpellMedianSeasons', 'Median first-spell length (seasons)', median(firstSpellLengths), 'seasons'),
     line('firstSpellInsideSeasonShare', 'First spells ending inside a season', firstSpells.length ? insideSeason / firstSpells.length : 0, 'share'),
@@ -191,6 +192,12 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     line('styleEdge', 'Best style over the mean points per game', styleEdge, 'share'),
     line('makerLegacyRatio', "Best maker's Legacy over the best trophy-winner's", makerLegacyRatio, 'number'),
     line('boughtFinishedShare', 'Players-made points from players bought finished', boughtFinishedShare, 'share'),
+    line('goalsPerGame', 'Goals per league game', match.goals, 'number'),
+    line('homeWinShare', 'Home wins (league)', match.home, 'share'),
+    line('drawShare', 'Draws (league)', match.draw, 'share'),
+    line('awayWinShare', 'Away wins (league)', match.away, 'share'),
+    line('yellowsPerGame', 'Yellow cards per match', match.yellows, 'number'),
+    line('redsPerGame', 'Red cards per match', match.reds, 'number'),
   ]
 
   const endReasons: Record<string, number> = {}
@@ -244,26 +251,13 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     'best maker legacy': bestMaker ? bestMaker.score.legacy : 0,
     'best trophy winner legacy': bestWinner ? bestWinner.score.legacy : 0,
     'best trophy points': bestWinner ? bestWinner.score.trophyPoints : 0,
-    'goals per league game': (() => {
-      const league = world.log.filter((e) => e.type === 'match.played' && e.payload['competition'] === 'league')
-      return league.length ? league.reduce((s, e) => s + (e.payload['homeGoals'] as number) + (e.payload['awayGoals'] as number), 0) / league.length : 0
-    })(),
-    'home win share': (() => {
-      const league = world.log.filter((e) => e.type === 'match.played' && e.payload['competition'] === 'league')
-      return league.length ? league.filter((e) => (e.payload['homeGoals'] as number) > (e.payload['awayGoals'] as number)).length / league.length : 0
-    })(),
-    'draw share': (() => {
-      const league = world.log.filter((e) => e.type === 'match.played' && e.payload['competition'] === 'league')
-      return league.length ? league.filter((e) => e.payload['homeGoals'] === e.payload['awayGoals']).length / league.length : 0
-    })(),
-    'yellows per game': (() => {
-      const all = world.log.filter((e) => e.type === 'match.played')
-      return all.length ? all.reduce((s, e) => s + ((e.payload['cards'] as number) ?? 0), 0) / all.length : 0
-    })(),
-    'reds per game': (() => {
-      const all = world.log.filter((e) => e.type === 'match.played')
-      return all.length ? all.reduce((s, e) => s + ((e.payload['reds'] as number) ?? 0), 0) / all.length : 0
-    })(),
+    'goals per league game': match.goals,
+    'home win share': match.home,
+    'draw share': match.draw,
+    'away win share': match.away,
+    'yellows per game': match.yellows,
+    'reds per game': match.reds,
+    'league matches': match.leagueMatches,
     'mean age at career end': ended.length ? ended.reduce((s, m) => s + m.age, 0) / ended.length : 0,
     'events logged': world.log.length,
   }
@@ -290,4 +284,37 @@ export function countLongTopTierTenures(world: World): number {
     if (world.week - spell.startWeek >= T.LONG_TENURE_SEASONS * T.SEASON_WEEKS) count++
   }
   return count
+}
+
+/** The match layer's averages from the log (DESIGN.md "Validation targets", Match). */
+export function matchAverages(world: World): { goals: number; home: number; draw: number; away: number; yellows: number; reds: number; leagueMatches: number } {
+  let league = 0
+  let goals = 0
+  let home = 0
+  let draw = 0
+  let all = 0
+  let yellows = 0
+  let reds = 0
+  for (const e of world.log) {
+    if (e.type !== 'match.played') continue
+    all++
+    yellows += (e.payload['cards'] as number) ?? 0
+    reds += (e.payload['reds'] as number) ?? 0
+    if (e.payload['competition'] !== 'league') continue
+    league++
+    const hg = e.payload['homeGoals'] as number
+    const ag = e.payload['awayGoals'] as number
+    goals += hg + ag
+    if (hg > ag) home++
+    else if (hg === ag) draw++
+  }
+  return {
+    goals: league ? goals / league : 0,
+    home: league ? home / league : 0,
+    draw: league ? draw / league : 0,
+    away: league ? (league - home - draw) / league : 0,
+    yellows: all ? yellows / all : 0,
+    reds: all ? reds / all : 0,
+    leagueMatches: league,
+  }
 }

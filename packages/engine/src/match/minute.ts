@@ -524,7 +524,7 @@ export function tick(state: MatchState): MatchEvent[] {
     }
   }
   // A chance?
-  if (rng.chance(chanceRate(state.pressure))) {
+  if (rng.chance(chanceRate(state.pressure, state.home.mentality, state.away.mentality))) {
     const homeChance = rng.float() < share
     const usKey: 'home' | 'away' = homeChance ? 'home' : 'away'
     const us = homeChance ? home : away

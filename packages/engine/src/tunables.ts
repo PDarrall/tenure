@@ -251,23 +251,10 @@ export const T = {
   BOTTOM_ZONE: 4,
 
   // ---------------------------------------------------------------------------
-  // Match model (DESIGN.md "Season and match"). Drives result variance and so
-  // every credit-based target: median first spell, 30% inside a season.
+  // Match model (DESIGN.md "Match"): what both paths read before kick-off.
+  // Drives result variance and so every credit-based target: median first
+  // spell, 30% inside a season.
   // ---------------------------------------------------------------------------
-
-  /** Expected goals for the away side of two equal sides. The home side gets HOME_ADVANTAGE_GOALS on top. */
-  GOALS_BASE: 1.15,
-
-  /**
-   * Home advantage in the one-shot model: a pre-match lean of this many extra
-   * expected goals for the home side against an equal opponent. Serves: home
-   * win / draw / away win ≈ 45 / 26 / 29 (to verify). Phase 3(c) replaces it
-   * with the minute engine's pressure lean.
-   */
-  HOME_ADVANTAGE_GOALS: 0.35,
-
-  /** Expected goals scale by exp(± sensitivity × strength difference). */
-  GOAL_SENSITIVITY: 0.032,
 
   /** Results kept for form. DESIGN: last six. */
   FORM_WINDOW: 6,
@@ -281,44 +268,17 @@ export const T = {
   /** Strength swing from squad morale: ±this at 100 / 0. */
   MORALE_WEIGHT: 3,
 
-  /**
-   * Structure in the one-shot model (DESIGN.md "Formations and tactics"),
-   * until the minute engine owns it. Bands are sums of effective rating ÷ 100.
-   * Serves: no formation or style beats the mean points per game by more than 10%.
-   */
-  /** Expected goals × (1 ± this × midfield-band edge): the midfield drives pressure. */
-  MID_EDGE_K: 0.08,
-  /** Expected goals × (1 + this × (attack ÷ opposing defence − the standard ratio)): attackers against defenders drive chance quality. */
-  ATTACK_DEFENCE_K: 0.2,
-  /** The attack-to-defence power ratio of two 4-4-2s (two forwards over a keeper and back four): the zero of the rule above. */
-  ATTACK_DEFENCE_STANDARD: 0.4,
-  /** A wide side against a back line with fewer wide defenders than this adds this share of chances. */
-  WIDTH_EDGE: 0.04,
-  NARROW_DEFENCE_WIDTH: 2,
-  /** Each defender beyond four cuts chances conceded by this share. */
-  OVERLOAD_K: 0.05,
-  /** Bounds that keep a side of nobodies from breaking the arithmetic: the least a band counts for, the most structure can lean expected goals. */
+  /** Bands are sums of effective rating ÷ 100, a quality-weighted count; a side of nobodies still has a back line, so the ratio is floored. Serves: no formation or style beats the mean points per game by more than 10%. */
   BAND_FLOOR: 1,
-  STRUCTURE_FACTOR_MIN: 0.6,
-  STRUCTURE_FACTOR_MAX: 1.6,
-  /** Expected goals for a side are capped here, so the Poisson table always has mass. */
+  /** Expected goals for a side are bounded here, so the scoreline table always has mass. */
+  LAMBDA_MIN: 0.02,
   LAMBDA_MAX: 6,
-  /** Style, one rule each. */
+  /** The pressing style: faster condition drain, more fouls (its other effects are the minute engine's). */
   STYLE_EFFECTS: {
-    /** More pressure with a higher-rated XI (× on own goals when better), fewer but better chances (variance). */
-    possession: { betterXi: 0.04, variance: 0.95 },
-    /** Each pace or aerial player in the XI adds this to own expected goals; more shots of lower quality lets the opponent in a little. */
-    direct: { perTrait: 0.015, concede: 1.03 },
-    /** Chances after sustained defending: own goals up against an attacking opponent, own pressure down. */
-    counter: { vsAttack: 1.06, own: 0.97, concede: 0.97 },
-    /** More pressure, more fouls, faster condition drain. */
-    pressing: { own: 1.05, concede: 1.03, drain: 1.3, fouls: 1.3 },
+    pressing: { drain: 1.3, fouls: 1.3 },
   } as const,
   /** The big-game trait: effective rating in a cup tie, derby or against a top side. */
   BIG_GAME_BONUS: 3,
-
-  /** Mentality: attack scales both sides' expected goals up, defend down, by this. */
-  MENTALITY_VARIANCE: 0.2,
 
   /** AI picks attack when the opponent is weaker by this many points, defend when stronger. */
   AI_MENTALITY_GAP: 12,
@@ -462,8 +422,11 @@ export const T = {
   PLAYMAKER_ASSIST_MULT: 1.6,
   ASSIST_P: 0.7,
   /** The one-shot model's stand-in shot counts for the record: base plus per goal. */
-  ONE_SHOT_SHOTS_BASE: 8,
-  ONE_SHOT_SHOTS_PER_GOAL: 2,
+  ONE_SHOT_SHOTS_BASE: 9,
+  ONE_SHOT_SHOTS_PER_GOAL: 1.5,
+  ONE_SHOT_ON_TARGET_SHARE: 0.35,
+  ONE_SHOT_CORNERS: 4.5,
+  ONE_SHOT_FOULS: 11,
   /** Match ratings out of ten: base, the result, level against the XI, events, noise. Serves: mean ≈ 6.9, spread ≈ 0.6. */
   RATING_BASE: 6.6,
   RATING_WIN: 0.5,
@@ -546,11 +509,13 @@ export const T = {
 
   /** Pressure target per point of effective XI difference, and per midfielder of presence (a quality-weighted count). */
   PRESSURE_PER_POINT: 1.0,
-  PRESSURE_PER_MID: 6,
+  PRESSURE_PER_MID: 3,
   /** Home advantage as a pressure lean. DESIGN names 8; 12 nets out to the home-win target once a leading side sits deep. To verify against real home-win rates. */
   HOME_PRESSURE_LEAN: 12,
-  /** Mentality lean on pressure: attack +, defend −. */
-  MENTALITY_LEAN: 8,
+  /** Mentality (DESIGN: shifts every band's weight and the pressure lean): the lean, the tempo of the whole match per attacking side (− per defending side), and the share moved between a side's attack and defence bands. */
+  MENTALITY_LEAN: 6,
+  MENTALITY_TEMPO: 0.15,
+  MENTALITY_BAND_SHIFT: 0.1,
   /** A leading side sits deeper by this unless attacking. */
   LEAD_SIT_DEEP: 16,
   /** Style leans on pressure: possession with a better XI, pressing, counter sits back. */
@@ -576,12 +541,13 @@ export const T = {
     counter: { onBreak: 1.25, notOnBreak: 0.9, quality: 1.1 },
     pressing: { chance: 1.08 },
   } as const,
-  /** Openness counts a midfielder as this much of an attacker and this much of a defender; the standard is a 4-4-2 against a 4-4-2 (4 ÷ 7). */
-  MID_ATTACK_SHARE: 0.5,
+  /** Openness counts a midfielder as this much of an attacker and this much of a defender; the standard is a 4-4-2 against a 4-4-2 (3.4 ÷ 7). DESIGN: 4-5-1 wins the midfield against 4-4-2 but creates less. */
+  MID_ATTACK_SHARE: 0.35,
   MID_DEFENCE_SHARE: 0.5,
-  OPENNESS_STANDARD: 4 / 7,
-  /** Width against a narrow back line (a shape this wide or more), and the overload of a back line this long, on chance frequency. */
+  OPENNESS_STANDARD: 3.4 / 7,
+  /** Width against a narrow back line (fewer wide defenders than this, from a shape this wide or more), and the overload of a back line this long, on chance frequency. */
   WIDTH_CHANCE: 1.06,
+  NARROW_DEFENCE_WIDTH: 2,
   WIDE_ATTACK_WIDTH: 4,
   OVERLOAD_CHANCE: 0.9,
   OVERLOAD_BACK_LINE: 5,
@@ -632,6 +598,9 @@ export const T = {
   /** Anchoring tolerance the tests allow after rounding to one decimal; below the minimum strength the rating floor gets in the way. */
   ANCHOR_TOLERANCE: 0.15,
   ANCHOR_MIN_STRENGTH: 10,
+  /** Anchoring passes, and the residue below which it stops. */
+  ANCHOR_PASSES: 4,
+  ANCHOR_RESIDUE: 0.02,
   /** The age curve. DESIGN: peak 26–30, decline from 31, keepers from 33. */
   PEAK_AGE_PLAYER: [26, 30] as readonly [number, number],
   DECLINE_FROM: 31,
@@ -824,8 +793,8 @@ export const T = {
   SACK_ROLL_BASE: 0.04,
   SACK_ROLL_PER_YEAR: 0.2,
   SACK_ROLL_FLOOR: 0.03,
-  /** Credit at or below this: sacked at once, and counted as deserved. DESIGN started at 5. */
-  CREDIT_INSTANT_SACK: 8,
+  /** Credit at or below this: sacked at once, and counted as deserved. DESIGN started at 5; 9 since the fast path (phase 3c), whose draw-heavier results had stretched the median first spell to the top of its band. */
+  CREDIT_INSTANT_SACK: 9,
   /** A sacking is "deserved" after this many consecutive weeks below threshold. */
   DESERVED_WEEKS: 8,
   REP_SACKED_DESERVED: -8,
@@ -1145,10 +1114,19 @@ export const T = {
     makerLegacyRatio: { target: 1, min: 0.8, max: 1.25 },
     /** Buying finished players yields under 10% of players-made points. */
     boughtFinishedShare: { target: 0.05, min: 0, max: 0.1 },
+    /** Match: goals per game ≈ 2.7; home / draw / away ≈ 45 / 26 / 29; yellows ≈ 3–4; reds ≈ 0.2. All to verify against real league averages. */
+    goalsPerGame: { target: 2.7, min: 2.4, max: 3.0 },
+    homeWinShare: { target: 0.45, min: 0.4, max: 0.5 },
+    drawShare: { target: 0.26, min: 0.22, max: 0.3 },
+    awayWinShare: { target: 0.29, min: 0.24, max: 0.34 },
+    yellowsPerGame: { target: 3.5, min: 2.8, max: 4.2 },
+    redsPerGame: { target: 0.2, min: 0.1, max: 0.3 },
   } as const,
 
   /** How many of each kind the maker-to-winner comparison takes: the ten biggest makers against the ten biggest trophy-winners. */
   MAKER_WINNER_TOP_N: 10,
+  /** Games a formation or style needs in the log before its points per game count toward the edge targets; fewer is noise. */
+  EDGE_MIN_GAMES: 600,
   /** Seasons skipped before sampling "at any moment" figures, so genesis spells can age. */
   VALIDATION_WARM_UP_SEASONS: 8,
   /** A "long" top-tier tenure in seasons. */

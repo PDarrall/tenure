@@ -143,18 +143,24 @@ export function generateSquad(world: World, rng: Rng, club: { id: number; player
 
 /** Shift every rating so the best XI in the formation averages the club's strength. */
 export function anchorSquad(world: World, club: { playerIds: PlayerId[] }, strength: number, formation: Formation): number {
-  const mean = bestXiMean(world, club, formation)
   if (club.playerIds.length === 0) return 0
-  const shift = strength - mean
-  if (Math.abs(shift) < 1e-9) return 0
-  for (const id of club.playerIds) {
-    const p = world.players[id - 1]
-    if (!p || p.retired) continue
-    p.rating = round1(clamp(p.rating + shift, 1, 100))
-    if (p.potential < p.rating) p.potential = p.rating
-    p.value = valueFor(p.rating, p.age)
+  let total = 0
+  // Rounding to a decimal and the rating floor can leave a residue after one pass (a tie in the best XI
+  // resolves the other way, a floored player cannot fall), so pass again until the XI sits on the target.
+  for (let pass = 0; pass < T.ANCHOR_PASSES; pass++) {
+    const mean = bestXiMean(world, club, formation)
+    const shift = strength - mean
+    if (Math.abs(shift) < T.ANCHOR_RESIDUE) break
+    for (const id of club.playerIds) {
+      const p = world.players[id - 1]
+      if (!p || p.retired) continue
+      p.rating = round1(clamp(p.rating + shift, 1, 100))
+      if (p.potential < p.rating) p.potential = p.rating
+      p.value = valueFor(p.rating, p.age)
+    }
+    total += shift
   }
-  return shift
+  return total
 }
 
 /** A foreign club's squad, generated the first time it is needed. */
@@ -193,10 +199,12 @@ export function freeAgents(world: World): Player[] {
 }
 
 /** The best free agent for a slot at a club's level, if any: same role, within the strength window. */
-export function pickFreeAgent(world: World, club: { squad: { strength: number } }, position: Position): Player | null {
+export function pickFreeAgent(world: World, club: { id: number; squad: { strength: number } }, position: Position): Player | null {
   let best: Player | null = null
   for (const p of freeAgents(world)) {
     if (p.position !== position) continue
+    // The club that just let him go does not sign him straight back.
+    if (p.lastClubId === club.id) continue
     if (Math.abs(p.rating - club.squad.strength) > T.MOVE_ON_STRENGTH_WINDOW) continue
     if (!best || p.rating > best.rating || (p.rating === best.rating && p.id < best.id)) best = p
   }

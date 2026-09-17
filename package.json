@@ -14,7 +14,8 @@
     "sim": "tsx packages/cli/src/sim.ts",
     "play": "tsx packages/cli/src/play.ts",
     "web:dev": "pnpm --filter @tenure/web dev",
-    "web:build": "pnpm --filter @tenure/web build"
+    "web:build": "pnpm --filter @tenure/web build",
+    "calibrate:fast-path": "tsx scripts/calibrate-fast-path.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

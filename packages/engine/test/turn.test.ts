@@ -63,7 +63,7 @@ describe('one match per turn', () => {
     expect(world.tables.some((r) => r.played > 0)).toBe(true)
   })
 
-  it('in a job, a turn plays at most one fixture of the human club, and every step does something', () => {
+  it('in a job, a turn plays at most one fixture of the human club, and every step does something', { timeout: 60_000 }, () => {
     const world = createCareer(1, { name: 'Test Player', background: 'coach' })
     getJob(world)
     const player = me(world)

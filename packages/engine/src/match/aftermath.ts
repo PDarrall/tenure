@@ -183,8 +183,12 @@ export function oneShotFacts(world: World, rng: Rng, side: SideInput): SideFacts
     stats.reds += red ? 1 : 0
     return { playerId: p.id, started: true, minutes: T.MATCH_MINUTES, goals, assists, yellows, red, injuryWeeks: injury, rating }
   })
+  // Stats the fast path cannot see, sketched to the minute engine's averages.
   stats.shots = side.goalsFor + Math.round(T.ONE_SHOT_SHOTS_PER_GOAL * side.goalsFor + T.ONE_SHOT_SHOTS_BASE)
-  stats.onTarget = side.goalsFor + Math.round(T.ONE_SHOT_SHOTS_BASE / 2)
+  stats.onTarget = side.goalsFor + Math.round(T.ONE_SHOT_SHOTS_BASE * T.ONE_SHOT_ON_TARGET_SHARE)
+  stats.corners = Math.round(T.ONE_SHOT_CORNERS)
+  stats.fouls = Math.round(T.ONE_SHOT_FOULS)
+  stats.possession = 50
   return { clubId: side.clubId, players, scorers, stats }
 }
 

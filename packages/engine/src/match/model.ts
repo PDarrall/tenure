@@ -79,16 +79,25 @@ export function chanceShare(pressure: number): number {
   return 1 / (1 + Math.exp(-pressure / T.CHANCE_SHARE_SCALE))
 }
 
-/** Chances per minute across both sides: the game opens up when one side is on top. */
-export function chanceRate(pressure: number): number {
-  return T.CHANCE_BASE * (1 + (T.CHANCE_PRESSURE * Math.abs(pressure)) / 100)
+function tempoOf(m: Mentality): number {
+  return m === 'attack' ? T.MENTALITY_TEMPO : m === 'defend' ? -T.MENTALITY_TEMPO : 0
 }
 
-/** Openness: our attack (forwards and half the midfield) against their defence (keeper, backs and half the midfield), against a 4-4-2 pairing. */
-export function openness(us: XiBands, them: XiBands): number {
-  const attack = Math.max(0, us.attack + T.MID_ATTACK_SHARE * us.midfield)
+/** Chances per minute across both sides: the game opens up when one side is on top, and with attacking mentalities. */
+export function chanceRate(pressure: number, home: Mentality = 'balanced', away: Mentality = 'balanced'): number {
+  return T.CHANCE_BASE * (1 + (T.CHANCE_PRESSURE * Math.abs(pressure)) / 100) * (1 + tempoOf(home) + tempoOf(away))
+}
+
+/** A mentality moves weight between a side's attack and defence bands. */
+function bandShift(m: Mentality): number {
+  return m === 'attack' ? T.MENTALITY_BAND_SHIFT : m === 'defend' ? -T.MENTALITY_BAND_SHIFT : 0
+}
+
+/** Openness: our attack (forwards and a share of the midfield) against their defence (keeper, backs and a share of the midfield), against a 4-4-2 pairing; mentalities shift the bands. */
+export function openness(us: XiBands, them: XiBands, usMentality: Mentality = 'balanced', themMentality: Mentality = 'balanced'): number {
+  const attack = Math.max(0, (us.attack + T.MID_ATTACK_SHARE * us.midfield) * (1 + bandShift(usMentality)))
   // A band is a quality-weighted count; a side of nobodies still has a back line, so the ratio is floored.
-  const defence = Math.max(T.BAND_FLOOR, them.defence + T.MID_DEFENCE_SHARE * them.midfield)
+  const defence = Math.max(T.BAND_FLOOR, (them.defence + T.MID_DEFENCE_SHARE * them.midfield) * (1 - bandShift(themMentality)))
   return attack / defence / T.OPENNESS_STANDARD
 }
 
@@ -99,7 +108,7 @@ export function openness(us: XiBands, them: XiBands): number {
  * back line; a five-man defence soaks.
  */
 export function chanceProfile(us: SideView, them: SideView, underPressure: boolean): { frequency: number; quality: number } {
-  const open = openness(us.bands, them.bands)
+  const open = openness(us.bands, them.bands, us.mentality, them.mentality)
   let frequency = clamp(Math.sqrt(open), T.OPENNESS_MIN, T.OPENNESS_MAX)
   let quality = open
   const sc = T.STYLE_CHANCE
@@ -140,7 +149,7 @@ export function goalChance(attackerEff: number, keeperEff: number, defenderEff: 
 export function analyticGoals(home: SideView, away: SideView): { home: number; away: number; lean: number } {
   const lean = pressureLean(home, away, 0, 0, 0)
   const minutes = T.MATCH_MINUTES + (T.STOPPAGE_FIRST[0] + T.STOPPAGE_FIRST[1] + T.STOPPAGE_SECOND[0] + T.STOPPAGE_SECOND[1]) / 2
-  const rate = chanceRate(lean) * minutes
+  const rate = chanceRate(lean, home.mentality, away.mentality) * minutes
   const share = chanceShare(lean)
   const side = (us: SideView, them: SideView, ourShare: number, underPressure: boolean): number => {
     const profile = chanceProfile(us, them, underPressure)

@@ -6,12 +6,13 @@ import { homeClub, managerAt } from '../lookup.js'
 import { matchTemplateKey } from '../text/render.js'
 import { leagueFixtures } from './fixtures.js'
 import { applyResult, positionOf, resetTables, tableFor } from './table.js'
-import { knockoutExpected, plainBands, playMatch, type Participant } from './match.js'
+import { knockoutExpected, matchOdds, plainBands, playMatch, type MatchOdds, type Participant } from './match.js'
 import { autoPick, clubFormation, enforceSelection, xiBands, type MatchContext } from '../players/select.js'
 import { ensureForeignSquad } from '../players/gen.js'
 import { playerById } from '../lookup.js'
 import { structureOf } from '../players/formations.js'
-import { applySide } from '../match/aftermath.js'
+import { applyFacts, applySide, type SideFacts, type SideInput } from '../match/aftermath.js'
+import { createMatch, factsOf, scoreline, type MatchState, type SideSetup } from '../match/minute.js'
 import { freshSeasonStats } from '../players/gen.js'
 import { milestone, seasonMilestones, settleSeasonGrowth, tierAboveMilestones } from '../players/made.js'
 import { drawRound, isFinal, seedCups } from './cups.js'
@@ -110,7 +111,7 @@ export function lineupFor(world: World, rng: Rng, id: ClubId, ctx: MatchContext)
 }
 
 /** AI mentality by the strength gap: attack the weak, defend against the strong. */
-function aiMentality(world: World, id: ClubId, opponentStrength: number): void {
+export function aiMentality(world: World, id: ClubId, opponentStrength: number): void {
   const club = clubById(world, id)
   if (!club) return
   const manager = managerAt(world, club)
@@ -168,34 +169,106 @@ export interface PlayedFixture {
   event: Event
 }
 
-/** Play one fixture: sample the result, update form, morale, tables and the log. */
-export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFixture {
+/** A fixture read before kick-off: both sides picked, the odds set, positions noted. Shared by the fast path and a watched match. */
+export interface PreparedFixture {
+  fixture: Fixture
+  knockout: boolean
+  homeSide: { lineup: Lineup; participant: Participant }
+  awaySide: { lineup: Lineup; participant: Participant }
+  homeClub: Club | undefined
+  awayClub: Club | undefined
+  homeManager: Manager | undefined
+  awayManager: Manager | undefined
+  homePosition: number | null
+  awayPosition: number | null
+  homeBigGame: boolean
+  awayBigGame: boolean
+  odds: MatchOdds
+}
+
+/** Read a fixture before kick-off: AI mentality, both line-ups, the odds from the fast path. */
+export function prepareFixture(world: World, rng: Rng, fixture: Fixture): PreparedFixture {
   const knockout = fixture.competition !== 'league'
   aiMentality(world, fixture.homeId, strengthOf(world, fixture.awayId))
   aiMentality(world, fixture.awayId, strengthOf(world, fixture.homeId))
-  const homeSide = lineupFor(world, rng, fixture.homeId, { bigGame: isBigGame(world, fixture, fixture.homeId, fixture.awayId) })
-  const awaySide = lineupFor(world, rng, fixture.awayId, { bigGame: isBigGame(world, fixture, fixture.awayId, fixture.homeId) })
-  const home = homeSide.participant
-  const away = awaySide.participant
-  const homePosition = clubById(world, fixture.homeId) ? positionOf(world, fixture.homeId) : null
-  const awayPosition = clubById(world, fixture.awayId) ? positionOf(world, fixture.awayId) : null
-  const outcome = playMatch(rng, home, away, knockout)
-  fixture.played = true
-  fixture.homeGoals = outcome.homeGoals
-  fixture.awayGoals = outcome.awayGoals
-
+  const homeBigGame = isBigGame(world, fixture, fixture.homeId, fixture.awayId)
+  const awayBigGame = isBigGame(world, fixture, fixture.awayId, fixture.homeId)
+  const homeSide = lineupFor(world, rng, fixture.homeId, { bigGame: homeBigGame })
+  const awaySide = lineupFor(world, rng, fixture.awayId, { bigGame: awayBigGame })
   const homeClub = clubById(world, fixture.homeId)
   const awayClub = clubById(world, fixture.awayId)
+  return {
+    fixture,
+    knockout,
+    homeSide,
+    awaySide,
+    homeClub,
+    awayClub,
+    homeManager: homeClub ? managerAt(world, homeClub) : undefined,
+    awayManager: awayClub ? managerAt(world, awayClub) : undefined,
+    homePosition: homeClub ? positionOf(world, fixture.homeId) : null,
+    awayPosition: awayClub ? positionOf(world, fixture.awayId) : null,
+    homeBigGame,
+    awayBigGame,
+    odds: matchOdds(homeSide.participant, awaySide.participant),
+  }
+}
+
+export interface FixtureResult {
+  homeGoals: number
+  awayGoals: number
+  shootoutWinnerId: number | null
+}
+
+/** The facts of a watched match, one per side; the fast path draws its own. */
+export interface FixtureFacts {
+  home: SideFacts
+  away: SideFacts
+  /** Minutes played, both halves' stoppage included. */
+  played: number
+}
+
+function sideInputFor(world: World, prepared: PreparedFixture, key: 'home' | 'away', result: FixtureResult, outcome: Result): SideInput {
+  const home = key === 'home'
+  const clubId = home ? prepared.fixture.homeId : prepared.fixture.awayId
+  const side = home ? prepared.homeSide : prepared.awaySide
+  const manager = home ? prepared.homeManager : prepared.awayManager
+  const club = home ? prepared.homeClub : prepared.awayClub
+  return {
+    clubId,
+    xi: side.lineup.xi,
+    bench: side.lineup.bench,
+    formation: homeFormation(world, clubId, side.participant),
+    style: side.participant.style,
+    goalsFor: home ? result.homeGoals : result.awayGoals,
+    goalsAgainst: home ? result.awayGoals : result.homeGoals,
+    result: outcome,
+    motivation: manager ? manager.ability.motivation : T.CARETAKER_ABILITY,
+    managerId: manager ? manager.id : null,
+    development: manager ? manager.ability.development : T.CARETAKER_ABILITY,
+    tier: club ? club.tier : null,
+  }
+}
+
+/** Write a result into the world: form, morale, tables, the players' facts and the log. */
+export function settleFixture(world: World, rng: Rng, prepared: PreparedFixture, result: FixtureResult, facts: FixtureFacts | null): PlayedFixture {
+  const { fixture, knockout, homeSide, awaySide, homeClub, awayClub, homeManager, awayManager, homePosition, awayPosition, odds } = prepared
+  const home = homeSide.participant
+  const away = awaySide.participant
+  fixture.played = true
+  fixture.homeGoals = result.homeGoals
+  fixture.awayGoals = result.awayGoals
+
   let winnerId: ClubId | null = null
   let loserId: ClubId | null = null
   let homeResult: Result
   let awayResult: Result
-  if (outcome.homeGoals > outcome.awayGoals || outcome.shootoutWinnerId === fixture.homeId) {
+  if (result.homeGoals > result.awayGoals || result.shootoutWinnerId === fixture.homeId) {
     winnerId = fixture.homeId
     loserId = fixture.awayId
     homeResult = 'W'
     awayResult = 'L'
-  } else if (outcome.awayGoals > outcome.homeGoals || outcome.shootoutWinnerId === fixture.awayId) {
+  } else if (result.awayGoals > result.homeGoals || result.shootoutWinnerId === fixture.awayId) {
     winnerId = fixture.awayId
     loserId = fixture.homeId
     homeResult = 'L'
@@ -208,22 +281,31 @@ export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFix
   recordResult(world, awayClub, awayResult)
   applyResult(world, fixture)
 
-  let expHome = outcome.odds.expHome
-  let expAway = outcome.odds.expAway
+  let expHome = odds.expHome
+  let expAway = odds.expAway
   if (knockout) {
-    const exp = knockoutExpected(outcome.odds, home, away)
+    const exp = knockoutExpected(odds, home, away)
     expHome = exp.home
     expAway = exp.away
   }
   const homePoints = homeResult === 'W' ? T.POINTS_WIN : homeResult === 'D' ? T.POINTS_DRAW : 0
   const awayPoints = awayResult === 'W' ? T.POINTS_WIN : awayResult === 'D' ? T.POINTS_DRAW : 0
-  const homeManager = homeClub ? managerAt(world, homeClub) : undefined
-  const awayManager = awayClub ? managerAt(world, awayClub) : undefined
 
   // The players: goals, ratings, condition, cards, injuries, morale.
   const squadIdsOf = (id: ClubId): readonly number[] => clubById(world, id)?.playerIds ?? foreignSquadIds(world, id)
-  const homeAfter = applySide(world, rng, fixture, { clubId: fixture.homeId, xi: homeSide.lineup.xi, bench: homeSide.lineup.bench, formation: homeFormation(world, fixture.homeId, home), style: home.style, goalsFor: outcome.homeGoals, goalsAgainst: outcome.awayGoals, result: homeResult, motivation: homeManager ? homeManager.ability.motivation : T.CARETAKER_ABILITY, managerId: homeManager ? homeManager.id : null, development: homeManager ? homeManager.ability.development : T.CARETAKER_ABILITY, tier: homeClub ? homeClub.tier : null }, squadIdsOf(fixture.homeId))
-  const awayAfter = applySide(world, rng, fixture, { clubId: fixture.awayId, xi: awaySide.lineup.xi, bench: awaySide.lineup.bench, formation: homeFormation(world, fixture.awayId, away), style: away.style, goalsFor: outcome.awayGoals, goalsAgainst: outcome.homeGoals, result: awayResult, motivation: awayManager ? awayManager.ability.motivation : T.CARETAKER_ABILITY, managerId: awayManager ? awayManager.id : null, development: awayManager ? awayManager.ability.development : T.CARETAKER_ABILITY, tier: awayClub ? awayClub.tier : null }, squadIdsOf(fixture.awayId))
+  const homeInput = sideInputFor(world, prepared, 'home', result, homeResult)
+  const awayInput = sideInputFor(world, prepared, 'away', result, awayResult)
+  let homeAfter: SideFacts
+  let awayAfter: SideFacts
+  if (facts) {
+    homeAfter = facts.home
+    awayAfter = facts.away
+    applyFacts(world, homeInput, homeAfter, squadIdsOf(fixture.homeId))
+    applyFacts(world, awayInput, awayAfter, squadIdsOf(fixture.awayId))
+  } else {
+    homeAfter = applySide(world, rng, fixture, homeInput, squadIdsOf(fixture.homeId))
+    awayAfter = applySide(world, rng, fixture, awayInput, squadIdsOf(fixture.awayId))
+  }
 
   const event = emit(world, 'match.played', {
     competition: fixture.competition,
@@ -231,29 +313,79 @@ export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFix
     tier: fixture.tier ?? null,
     homeId: fixture.homeId,
     awayId: fixture.awayId,
-    homeGoals: outcome.homeGoals,
-    awayGoals: outcome.awayGoals,
-    shootoutWinnerId: outcome.shootoutWinnerId ?? null,
+    homeGoals: result.homeGoals,
+    awayGoals: result.awayGoals,
+    shootoutWinnerId: result.shootoutWinnerId,
     homeManagerId: homeManager ? homeManager.id : null,
     awayManagerId: awayManager ? awayManager.id : null,
     expHome: Math.round(expHome * 100) / 100,
     expAway: Math.round(expAway * 100) / 100,
-    text: matchTemplateKey(outcome.homeGoals, outcome.awayGoals, outcome.shootoutWinnerId !== undefined),
+    pHome: Math.round(odds.pHome * 100) / 100,
+    pDraw: Math.round(odds.pDraw * 100) / 100,
+    pAway: Math.round(odds.pAway * 100) / 100,
+    text: matchTemplateKey(result.homeGoals, result.awayGoals, result.shootoutWinnerId !== null),
     homeScorers: homeAfter.scorers,
     awayScorers: awayAfter.scorers,
     homeXi: [...homeSide.lineup.xi],
     awayXi: [...awaySide.lineup.xi],
-    homeFormation: homeFormation(world, fixture.homeId, home),
-    awayFormation: homeFormation(world, fixture.awayId, away),
+    homeFormation: homeInput.formation,
+    awayFormation: awayInput.formation,
     homeStyle: home.style,
     awayStyle: away.style,
     cards: homeAfter.stats.yellows + awayAfter.stats.yellows,
     reds: homeAfter.stats.reds + awayAfter.stats.reds,
     homeStats: homeAfter.stats,
     awayStats: awayAfter.stats,
+    watched: facts !== null,
+    minutes: facts ? facts.played : T.MATCH_MINUTES,
   })
 
   return { fixture, winnerId, loserId, homeManager, awayManager, homeLineup: homeSide.lineup, awayLineup: awaySide.lineup, expHome, expAway, homePoints, awayPoints, homePosition, awayPosition, event }
+}
+
+/** Play one fixture on the fast path: read it, draw a scoreline from the odds, settle it. */
+export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFixture {
+  const prepared = prepareFixture(world, rng, fixture)
+  const outcome = playMatch(rng, prepared.homeSide.participant, prepared.awaySide.participant, prepared.knockout)
+  return settleFixture(world, rng, prepared, { homeGoals: outcome.homeGoals, awayGoals: outcome.awayGoals, shootoutWinnerId: outcome.shootoutWinnerId ?? null }, null)
+}
+
+function clubNameOf(world: World, id: ClubId): string {
+  const club = clubById(world, id)
+  if (club) return club.name
+  for (const league of world.foreign) {
+    const c = league.clubs.find((x) => x.id === id)
+    if (c) return c.name
+  }
+  return `Club ${id}`
+}
+
+/** A prepared fixture as a minute-engine match, for the ones somebody watches. */
+export function createFixtureMatch(world: World, rng: Rng, prepared: PreparedFixture): MatchState {
+  const setup = (key: 'home' | 'away'): SideSetup => {
+    const home = key === 'home'
+    const id = home ? prepared.fixture.homeId : prepared.fixture.awayId
+    const side = home ? prepared.homeSide : prepared.awaySide
+    const manager = home ? prepared.homeManager : prepared.awayManager
+    return {
+      clubId: id,
+      name: clubNameOf(world, id),
+      isHuman: manager !== undefined && manager.isHuman,
+      managerId: manager ? manager.id : null,
+      participant: side.participant,
+      xi: side.lineup.xi,
+      bench: side.lineup.bench,
+      formation: homeFormation(world, id, side.participant),
+    }
+  }
+  return createMatch(world, rng, setup('home'), setup('away'), prepared.knockout, prepared.homeBigGame || prepared.awayBigGame)
+}
+
+/** Settle a finished minute-engine match into the world. */
+export function commitFixtureMatch(world: World, rng: Rng, prepared: PreparedFixture, state: MatchState): PlayedFixture {
+  if (!state.over) throw new Error('commitFixtureMatch: the match is not over')
+  const score = scoreline(state)
+  return settleFixture(world, rng, prepared, score, { home: factsOf(state, 'home'), away: factsOf(state, 'away'), played: state.played })
 }
 
 function homeFormation(world: World, id: ClubId, participant: Participant): Formation {
