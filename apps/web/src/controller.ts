@@ -113,6 +113,7 @@ export function isApplying(s: Session, vacancyId: number): boolean {
   if ((s.inputs.withdraw ?? []).includes(vacancyId)) return false
   if ((s.inputs.apply ?? []).includes(vacancyId)) return true
   const vacancy = s.world.vacancies[vacancyId - 1]
+  if (s.world.human?.declinedVacancies.includes(vacancyId)) return false
   return vacancy !== undefined && s.world.human !== null && vacancy.applicants.includes(s.world.human.managerId)
 }
 

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { autoPick, available, effectiveRating, playerById, slotsOf, squadOf, FORMATION_NAMES, type Formation, type FormationSlot, type Mentality, type Player, type PlayerId, type Style, type World } from '@tenure/engine'
 import { withFormation, withMentality, withSelection, withStyle, type Session } from '../controller.js'
-import { fitness, humanClub, isMine, positionLabel, rating } from './common.js'
+import { fitness, humanClub, isMine, positionLabel, rating, seasonLine } from './common.js'
+import { Head, Seg, Star } from './ui.js'
 
 /** The tactic as it will be at the next match: the world's, with this turn's changes on top. */
 export function currentTactic(session: Session) {
@@ -16,20 +17,78 @@ function slotLabel(slot: FormationSlot): string {
   return slot.position === 'GK' ? 'GK' : `${slot.position}${slot.side}`
 }
 
+const MENTALITIES: { key: Mentality; label: string }[] = [
+  { key: 'defend', label: 'Defend' },
+  { key: 'balanced', label: 'Balanced' },
+  { key: 'attack', label: 'Attack' },
+]
+const STYLES: { key: Style; label: string; blurb: string }[] = [
+  { key: 'possession', label: 'Possession', blurb: 'Fewer, better chances.' },
+  { key: 'direct', label: 'Direct', blurb: 'Pace and aerial players.' },
+  { key: 'counter', label: 'Counter', blurb: 'On the break.' },
+  { key: 'pressing', label: 'Pressing', blurb: 'More pressure, more fouls, tired legs.' },
+]
+
+function formationBlurb(f: Formation): string {
+  const [d, ...rest] = f.split(' ')[0]!.split('-').map(Number)
+  const forwards = rest[rest.length - 1] ?? 0
+  const mids = rest.slice(0, -1).reduce((s, n) => s + n, 0)
+  const parts: string[] = []
+  parts.push(forwards >= 3 ? 'Three up top' : forwards === 2 ? 'Two up top' : 'One up top')
+  if ((d ?? 4) >= 5) parts.push('a back five concedes less')
+  else if ((d ?? 4) === 3) parts.push('a back three, width from the wing-backs')
+  if (mids >= 5) parts.push('and the midfield is won')
+  else if (mids <= 2) parts.push('and the midfield can be lost to a five')
+  return parts.join(', ') + '.'
+}
+
 /** Formation, mentality, style, the XI and bench with tap-to-swap, the captain, the assistant's pick (DESIGN.md "Formations and tactics"). */
 export function Tactics({ session, onChange }: { session: Session; onChange: (s: Session) => void }) {
   const world: World = session.world
   const club = humanClub(world)
   const [picked, setPicked] = useState<PlayerId | null>(null)
+  const tactic = currentTactic(session)
+  const sub = `${tactic.formation} · ${tactic.mentality} · ${tactic.style}`
+
+  const tacticControls = (
+    <>
+      <div className="stack g8">
+        <div className="label">Formation</div>
+        <div className="chips">
+          {FORMATION_NAMES.map((f: Formation) => (
+            <button key={f} type="button" className="chip" aria-pressed={tactic.formation === f} onClick={() => onChange(withFormation(session, f))} data-testid={`formation-${f}`}>
+              {f}
+            </button>
+          ))}
+        </div>
+        <div className="caption">{formationBlurb(tactic.formation)}</div>
+      </div>
+      <div className="stack g8">
+        <div className="label">Mentality</div>
+        <Seg options={MENTALITIES} value={tactic.mentality} onChange={(m) => onChange(withMentality(session, m))} testId={(k) => `tactic-${k}`} />
+      </div>
+      <div className="stack g8">
+        <div className="label">Style</div>
+        <Seg options={STYLES.map((s) => ({ key: s.key, label: s.label }))} value={tactic.style} onChange={(s) => onChange(withStyle(session, s))} testId={(k) => `style-${k}`} />
+        <div className="caption">{STYLES.find((s) => s.key === tactic.style)?.blurb} All from the next match.</div>
+      </div>
+    </>
+  )
+
   if (!club) {
     return (
-      <section aria-label="Tactics">
-        <p className="muted">No club, no side to pick. Your formation and style still travel with you.</p>
-        <TacticButtons session={session} onChange={onChange} />
-      </section>
+      <>
+        <Head eyebrow={seasonLine(world)} title="Tactics" sub={sub} />
+        <div className="scroll" aria-label="Tactics">
+          <div className="stack g16 pt2">
+            {tacticControls}
+            <div className="caption">No club, no side to pick. Your formation and style travel with you.</div>
+          </div>
+          <div className="tail" />
+        </div>
+      </>
     )
   }
-  const tactic = currentTactic(session)
   const selection = currentSelection(session)
   const slots = slotsOf(tactic.formation)
   const squad = squadOf(world, club)
@@ -71,99 +130,78 @@ export function Tactics({ session, onChange }: { session: Session; onChange: (s:
     onChange(withSelection(session, { xi: nextXi.filter((x): x is PlayerId => x !== 0), bench: nextBench.filter((x): x is PlayerId => x !== 0), autoPick: false }))
   }
 
-  const takeAssistantPick = () => {
+  const setPicker = (who: 'assistant' | 'mine') => {
     setPicked(null)
-    onChange(withSelection(session, { xi: [...assistant.xi], bench: [...assistant.bench], autoPick: false }))
-  }
-  const toggleAssistant = () => {
-    setPicked(null)
-    if (selection.autoPick) onChange(withSelection(session, { xi: [...assistant.xi], bench: [...assistant.bench], autoPick: false }))
-    else onChange(withSelection(session, { autoPick: true }))
+    if (who === 'assistant') onChange(withSelection(session, { autoPick: true }))
+    else onChange(withSelection(session, { xi: [...assistant.xi], bench: [...assistant.bench], autoPick: false }))
   }
 
   const row = (id: PlayerId | 0, slot: FormationSlot | null, where: string) => {
     const p = id === 0 ? null : playerById(world, id)
     if (!p) {
       return (
-        <li key={`${where}-empty-${slot ? slotLabel(slot) : ''}`} className="item">
-          <span className="muted">{slot ? slotLabel(slot) : where}: nobody</span>
-        </li>
+        <div key={`${where}-empty-${slot ? slotLabel(slot) : ''}`} className="pitch-row">
+          <span className="slot">{slot ? slotLabel(slot) : ''}</span>
+          <span className="who ink3">nobody</span>
+        </div>
       )
     }
     const eff = slot ? Math.round(effectiveRating(p, slot)) : rating(p)
     const fit = available(p)
     return (
-      <li key={`${where}-${p.id}`} className="item">
-        <button className={picked === p.id ? 'selected' : ''} onClick={() => tap(p.id)} aria-pressed={picked === p.id} data-testid={`pick-${where}`} data-player={p.id}>
-          <span>
-            {slot ? `${slotLabel(slot)} · ` : ''}
-            {isMine(world, p) ? '★ ' : ''}
-            {p.name} · {positionLabel(p)} {rating(p)}
-            {slot && eff !== rating(p) ? ` (${eff} here)` : ''}
-            {!fit ? ` · ${fitness(p)}` : ''}
-          </span>
+      <div key={`${where}-${p.id}`} className={`pitch-row${picked === p.id ? ' picked' : ''}`}>
+        <button type="button" className="who" onClick={() => tap(p.id)} aria-pressed={picked === p.id} data-testid={`pick-${where}`} data-player={p.id} style={{ minHeight: 44 }}>
+          <span className="slot">{slot ? slotLabel(slot) : positionLabel(p)}</span>
+          {isMine(world, p) && <Star />}
+          <span className="nm">{p.name}</span>
+          {slot && eff !== rating(p) && <span className="note">{eff} here</span>}
+          {!fit && <span className="note">{fitness(p)}</span>}
         </button>
-        {where === 'xi' && (
-          <button className={selection.captain === p.id ? 'selected' : ''} onClick={() => onChange(withSelection(session, { captain: p.id, autoPick: selection.autoPick }))} aria-pressed={selection.captain === p.id} title="Captain">
-            <span>C</span>
-          </button>
+        {where === 'xi' && selection.captain === p.id && (
+          <span className="cap on" aria-label="captain">
+            C
+          </span>
         )}
-      </li>
+        <span className="rt">{rating(p)}</span>
+      </div>
     )
   }
 
   return (
-    <section aria-label="Tactics">
-      <TacticButtons session={session} onChange={onChange} />
-      <h3>Side</h3>
-      <div className="row">
-        <button className={selection.autoPick ? 'selected' : ''} onClick={toggleAssistant} aria-pressed={selection.autoPick}>
-          <span>Assistant picks</span>
-        </button>
-        {!selection.autoPick && <button onClick={takeAssistantPick}>Auto-pick now</button>}
-      </div>
-      <p className="muted">
-        {selection.autoPick ? "The assistant's side for this shape. Tap two players to swap them and take the sheet over." : picked === null ? 'Tap a player, then another, to swap them. Injured and banned players are replaced by the assistant at kick-off.' : 'Now tap the player to swap him with.'}
-      </p>
-      <h4>Starting XI</h4>
-      <ul className="plain">{slots.map((slot, i) => row(xi[i] ?? 0, slot, 'xi'))}</ul>
-      <h4>Bench</h4>
-      <ul className="plain">{bench.map((id) => row(id, null, 'bench'))}</ul>
-      <h4>Not in the squad</h4>
-      <ul className="plain">{rest.map((p: Player) => row(p.id, null, 'rest'))}</ul>
-    </section>
-  )
-}
-
-function TacticButtons({ session, onChange }: { session: Session; onChange: (s: Session) => void }) {
-  const tactic = currentTactic(session)
-  return (
     <>
-      <h3>Formation</h3>
-      <div className="row">
-        {FORMATION_NAMES.map((f: Formation) => (
-          <button key={f} className={tactic.formation === f ? 'selected' : ''} onClick={() => onChange(withFormation(session, f))} aria-pressed={tactic.formation === f}>
-            <span>{f}</span>
-          </button>
-        ))}
+      <Head eyebrow={seasonLine(world)} title="Tactics" sub={sub} />
+      <div className="scroll" aria-label="Tactics">
+        <div className="stack g16 pt2">
+          {tacticControls}
+          <div className="stack">
+            <div className="between center" style={{ padding: '4px 0 6px' }}>
+              <div className="label">Starting XI</div>
+              <div style={{ width: 150 }}>
+                <Seg small options={[{ key: 'assistant', label: 'Assistant' }, { key: 'mine', label: 'Mine' }]} value={selection.autoPick ? 'assistant' : 'mine'} onChange={setPicker} testId={(k) => `picker-${k}`} />
+              </div>
+            </div>
+            {slots.map((slot, i) => row(xi[i] ?? 0, slot, 'xi'))}
+          </div>
+          <div className="stack">
+            <div className="label" style={{ padding: '2px 0 4px' }}>
+              Bench
+            </div>
+            {bench.map((id) => row(id, null, 'bench'))}
+          </div>
+          {rest.length > 0 && (
+            <div className="stack">
+              <div className="label" style={{ padding: '2px 0 4px' }}>
+                Not in the squad
+              </div>
+              {rest.map((p: Player) => row(p.id, null, 'rest'))}
+            </div>
+          )}
+          <div className="caption" style={{ paddingBottom: 8 }}>
+            {picked === null ? 'Tap two players to swap them. Injured and banned players are replaced by the assistant at kick-off. The captain is chosen on his page.' : 'Now tap the player to swap him with.'}
+            {selection.autoPick ? ' The assistant picks the side for this shape until you take it over.' : ''}
+          </div>
+        </div>
       </div>
-      <h3>Mentality</h3>
-      <div className="row">
-        {(['defend', 'balanced', 'attack'] as Mentality[]).map((m) => (
-          <button key={m} className={tactic.mentality === m ? 'selected' : ''} onClick={() => onChange(withMentality(session, m))} aria-pressed={tactic.mentality === m}>
-            <span>{m}</span>
-          </button>
-        ))}
-      </div>
-      <h3>Style</h3>
-      <div className="row">
-        {(['possession', 'direct', 'counter', 'pressing'] as Style[]).map((st) => (
-          <button key={st} className={tactic.style === st ? 'selected' : ''} onClick={() => onChange(withStyle(session, st))} aria-pressed={tactic.style === st}>
-            <span>{st}</span>
-          </button>
-        ))}
-      </div>
-      <p className="muted">Midfielders win pressure; forwards against defenders make chances; width opens a narrow back line; a back five concedes less. Attack opens the game up and leans on pressure; defend closes it. Possession: fewer, better chances. Direct: pace and aerial players. Counter: on the break. Pressing: more pressure, more fouls, tired legs. All from the next match.</p>
     </>
   )
 }
