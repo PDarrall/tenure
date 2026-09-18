@@ -45,7 +45,9 @@ export function agentFit(world: World, manager: Manager, vacancy: Vacancy): Agen
 
 /** The vacancy the human is applying for right now, if any. */
 export function applicationInFlight(world: World, manager: Manager): Vacancy | undefined {
-  return openVacancies(world).find((v) => v.applicants.includes(manager.id))
+  // A vacancy whose offer the human turned down keeps them listed but is dead to them: it must not hold the agent back.
+  const declined = world.human?.declinedVacancies ?? []
+  return openVacancies(world).find((v) => v.applicants.includes(manager.id) && !declined.includes(v.id))
 }
 
 /** The agent's pick this week, or null when nothing fits or an application is already in flight. */

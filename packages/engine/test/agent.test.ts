@@ -145,3 +145,24 @@ describe('the agent applies for you', () => {
     expect(checked).toBe(true)
   })
 })
+
+describe('a declined first offer does not hold the agent back', () => {
+  it('the declined vacancy is not an application in flight, so the agent can pick another the same week', () => {
+    // Seed 1, coach: the first-offer club's vacancy stays open for weeks after the decline.
+    const world = createCareer(1, { name: 'Test Player', background: 'coach' })
+    const offer = pendingDecisions(world).find((d) => d.kind === 'offer' && d.payload['firstOffer'] === true)!
+    const vacancyId = offer.payload['vacancyId'] as number
+    advanceTurn(world, { answers: { [offer.id]: 'decline' } })
+    const player = me(world)
+    expect(world.human!.declinedVacancies).toContain(vacancyId)
+    const declined = world.vacancies[vacancyId - 1]!
+    if (declined.filledWeek === null) expect(declined.applicants).toContain(player.id)
+    expect(applicationInFlight(world, player)?.id).not.toBe(vacancyId)
+    const others = openVacancies(world).filter((v) => v.id !== vacancyId && qualifies(world, player, v))
+    if (others.length > 0) {
+      const inFlight = applicationInFlight(world, player)
+      expect(inFlight ?? agentPick(world)).not.toBeNull()
+      if (inFlight) expect(world.log.some((e) => e.type === 'agent.applied' && e.payload['vacancyId'] === inFlight.id)).toBe(true)
+    }
+  })
+})
