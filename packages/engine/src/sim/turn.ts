@@ -36,7 +36,7 @@ export interface TurnOptions {
 
 export type Slot = { kind: 'league'; fixtures: Fixture[] } | { kind: 'cup'; cup: CupState }
 
-/** The human's home club, if they manage one. Spells abroad have no fixtures. */
+/** The club the human manages, if any. */
 export function humanClubId(world: World): ClubId | null {
   if (!world.human) return null
   const player = human(world)
@@ -199,6 +199,7 @@ export function advanceTurn(world: World, inputs: HumanInputs = {}, options: Tur
   const rng = rngFromState(world.rng)
   // Saves from before phase 3(d) have no watched slot.
   if (world.human.watched === undefined) world.human.watched = null
+  if (world.human.agentWithdrawn === undefined) world.human.agentWithdrawn = []
   applyInputs(world, rng, inputs)
   const startStatus = statusKey(world)
   let fixturesPlayed = 0

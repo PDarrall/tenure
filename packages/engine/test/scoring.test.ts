@@ -19,9 +19,6 @@ describe('trophy points', () => {
     expect(promotionPointsFrom(3)).toBe(12)
     expect(promotionPointsFrom(4)).toBe(8)
     expect(promotionPointsFrom(5)).toBe(5)
-    expect(trophyPointsFor({ season: 1, competition: 'foreignLeague', league: 'big' })).toBe(80)
-    expect(trophyPointsFor({ season: 1, competition: 'foreignLeague', league: 'mid' })).toBe(40)
-    expect(trophyPointsFor({ season: 1, competition: 'foreignLeague', league: 'small' })).toBe(20)
   })
 })
 

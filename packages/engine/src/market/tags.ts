@@ -39,7 +39,6 @@ export function reviewTags(world: World, manager: Manager): void {
     if (spenders.length >= rules['big spender'].seasons && spenders.every((s) => s.netSpendRank !== null && s.netSpendRank <= rules['big spender'].rank)) {
       assignTag(world, manager, 'big spender')
     }
-    if (last.post.kind === 'abroad') assignTag(world, manager, 'abroad')
   }
   if (recent(rules.overachiever.window).filter((s) => s.expectation - s.finish >= rules.overachiever.places).length >= rules.overachiever.seasons) {
     assignTag(world, manager, 'overachiever')

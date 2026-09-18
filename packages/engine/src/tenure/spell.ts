@@ -2,7 +2,7 @@ import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import { clamp, round1 } from '../world/gen.js'
-import { clubById, foreignClubById } from '../lookup.js'
+import { clubById } from '../lookup.js'
 import { isElite } from '../managers/reputation.js'
 import { seasonWeek } from '../season/calendar.js'
 import type { Manager, OwnerType, Post, Promise, Spell, SpellEndReason, World } from '../types.js'
@@ -22,10 +22,7 @@ export function ownerTypeOf(world: World, post: Post): OwnerType {
 
 /** £m per season for a post at a reputation. DESIGN: salary by tier × reputation. */
 export function salaryFor(world: World, post: Post, reputation: number): number {
-  const base =
-    post.kind === 'home'
-      ? (T.SALARY_BASE_BY_TIER[clubById(world, post.clubId).tier - 1] as number)
-      : T.SALARY_BASE_ABROAD[post.league]
+  const base = T.SALARY_BASE_BY_TIER[clubById(world, post.clubId).tier - 1] as number
   return round1(base * (T.SALARY_REP_FLOOR + reputation / 100) * 10) / 10
 }
 
@@ -65,7 +62,7 @@ export interface HireTerms {
 /** Create a spell, seat the manager, and log the hire. */
 export function startSpell(world: World, rng: Rng, manager: Manager, post: Post, terms: HireTerms): Spell {
   if (manager.status.kind === 'employed') throw new Error(`startSpell: manager ${manager.id} is already employed`)
-  const occupant = post.kind === 'home' ? clubById(world, post.clubId).managerId : (foreignClubById(world, post.clubId)?.managerId ?? null)
+  const occupant = clubById(world, post.clubId).managerId
   if (occupant !== null) throw new Error(`startSpell: post ${post.clubId} is not vacant`)
   const served = terms.servedSeasons ?? 0
   const ceiling = ceilingFor(served)
@@ -110,12 +107,7 @@ export function startSpell(world: World, rng: Rng, manager: Manager, post: Post,
   world.spells.push(spell)
   manager.status = { kind: 'employed', post, spellId: spell.id }
   manager.history.spellIds.push(spell.id)
-  if (post.kind === 'home') clubById(world, post.clubId).managerId = manager.id
-  else {
-    const club = foreignClubById(world, post.clubId)
-    if (!club) throw new Error(`startSpell: no foreign club ${post.clubId}`)
-    club.managerId = manager.id
-  }
+  clubById(world, post.clubId).managerId = manager.id
   emit(world, 'manager.hired', {
     managerId: manager.id,
     spellId: spell.id,
@@ -146,12 +138,9 @@ export function endSpell(world: World, spell: Spell, reason: SpellEndReason, pay
     emit(world, 'earnings.payout', { managerId: manager.id, spellId: spell.id, amount: spell.payout, reason })
   }
   emit(world, 'earnings.spell', { managerId: manager.id, spellId: spell.id, salaryThisSeason: round1(spell.season.earned) })
-  if (spell.post.kind === 'home') {
+  {
     const club = clubById(world, spell.post.clubId)
     if (club.managerId === manager.id) club.managerId = null
-  } else {
-    const club = foreignClubById(world, spell.post.clubId)
-    if (club && club.managerId === manager.id) club.managerId = null
   }
   manager.status = { kind: 'unemployed', sinceWeek: world.week, activity: 'wait', monthsSinceShortlisted: 0 }
 }

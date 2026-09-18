@@ -148,7 +148,7 @@ export interface Player {
   /** £m. */
   value: number
   traits: Trait[]
-  /** Current club, home or foreign id; 0 when a free agent. */
+  /** Current club id (a European opponent's for its generated squad); 0 when a free agent. */
   clubId: ClubId
   /** Season he became a free agent, while he is one. */
   freeSince?: number | null
@@ -169,7 +169,6 @@ export type Competition =
   | 'nationalCup'
   | 'leagueCup'
   | 'european'
-  | 'foreignLeague'
 
 export interface Owner {
   type: OwnerType
@@ -196,8 +195,6 @@ export interface Honour {
   clubId?: ClubId
   /** Tier the honour was won in (home competitions). */
   tier?: Tier
-  /** Foreign league kind for titles won abroad. */
-  league?: ForeignLeagueKind
 }
 
 export interface Club {
@@ -240,28 +237,13 @@ export interface Club {
   pendingYouthGain: number
 }
 
-export type ForeignLeagueKind = 'big' | 'mid' | 'small'
-
-/** An abstract club abroad: a job slot with a name, not a simulated team. */
-export interface ForeignClub {
+/** A foreign side generated for one European tie (DESIGN.md "World"): a name, a strength drawn by round, a squad while the tie is on. */
+export interface EuropeanOpponent {
   id: ClubId
   name: string
-  league: ForeignLeagueKind
-  prestige: number
   strength: number
-  managerId: ManagerId | null
-  /** Generated on demand, seeded, when the club meets a home club. */
+  /** Generated when the tie is prepared, dropped once it is settled. */
   playerIds: PlayerId[]
-}
-
-export interface ForeignLeague {
-  kind: ForeignLeagueKind
-  name: string
-  /** 0–100. Sets the reputation band that can work there. */
-  prestige: number
-  /** Typical squad strength; used as European opposition. */
-  strength: number
-  clubs: ForeignClub[]
 }
 
 export interface Event {
@@ -279,7 +261,8 @@ export interface World {
   /** 1-based season counter. */
   season: number
   clubs: Club[]
-  foreign: ForeignLeague[]
+  /** This season's European field beyond the home entrants, regenerated each season. */
+  europeanOpponents: EuropeanOpponent[]
   managers: Manager[]
   /** This season's fixtures, every competition. */
   fixtures: Fixture[]
@@ -309,8 +292,8 @@ export interface World {
 
 export type Background = 'ex-pro' | 'coach' | 'analyst'
 
-/** Where a manager is native to: the home pyramid or one of the foreign leagues. */
-export type Nationality = 'home' | ForeignLeagueKind
+/** Where a person is from: the home pyramid or one of three continental name pools. Nothing else reads it. */
+export type Nationality = 'home' | 'big' | 'mid' | 'small'
 
 export type Tag =
   | 'promotion specialist'
@@ -323,7 +306,6 @@ export type Tag =
   | 'in demand'
   | 'mercenary'
   | 'difficult'
-  | 'abroad'
 
 export interface ManagerTag {
   tag: Tag
@@ -339,17 +321,14 @@ export interface Ability {
   dealing: number
 }
 
-/** A job: a home club or an abstract foreign club. */
-export type Post =
-  | { kind: 'home'; clubId: ClubId }
-  | { kind: 'abroad'; league: ForeignLeagueKind; clubId: ClubId }
+/** A job: a home club. There are no posts abroad (DESIGN.md "World"). */
+export type Post = { kind: 'home'; clubId: ClubId }
 
 /** One row per season managed. Tags and validation stats read these. */
 export interface SeasonRecord {
   season: number
   post: Post
-  /** Tier for home posts, null abroad. */
-  tier: Tier | null
+  tier: Tier
   games: number
   finish: number
   expectation: number
@@ -358,7 +337,7 @@ export interface SeasonRecord {
   trophies: number
   /** Sat in the bottom zone at a monthly check and finished outside it. */
   bottomFourEscape: boolean
-  /** 1 = highest net spend in the division; null abroad. */
+  /** 1 = highest net spend in the division. */
   netSpendRank: number | null
   cupFinals: number
   academyInXi: number
@@ -366,7 +345,7 @@ export interface SeasonRecord {
   boardRows: number
 }
 
-export type UnemployedActivity = 'wait' | 'punditry' | 'assistant' | 'abroad'
+export type UnemployedActivity = 'wait' | 'punditry' | 'assistant'
 
 export type RetirementReason = 'no-offers' | 'age' | 'scandal' | 'voluntary'
 
@@ -453,7 +432,7 @@ export interface CupState {
   competition: 'nationalCup' | 'leagueCup' | 'european'
   /** Season weeks of each round; last is the final. */
   roundWeeks: number[]
-  /** Clubs still in. Foreign ids appear in the European competition. */
+  /** Clubs still in. Generated opponents' ids appear in the European competition. */
   remaining: ClubId[]
   /** Rounds already drawn and played. */
   roundsPlayed: number
@@ -637,6 +616,8 @@ export interface HumanState {
   contractChoices: Record<number, 'release' | { years: number; wage: number }>
   /** A match week stopped before kick-off so the human can watch it (phase 3d); null between matches. */
   watched: WatchedWeek | null
+  /** Vacancies the human withdrew from: the agent never puts them forward there again. */
+  agentWithdrawn: VacancyId[]
 }
 
 /** Enough of a fixture to find it again in world.fixtures. */

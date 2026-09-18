@@ -9,7 +9,7 @@ import type { ClubId, Competition, Fixture, Result, Tier, World } from '../types
 import { seasonWeek } from '../season/calendar.js'
 import { drawnCupFixtures } from '../season/season.js'
 import { positionOf } from '../season/table.js'
-import { homeClub, foreignClubById } from '../lookup.js'
+import { homeClub, europeanOpponentById } from '../lookup.js'
 import { clubNameOf } from '../text/render.js'
 import { competitionLabel } from './inbox.js'
 import { humanClubId } from '../sim/turn.js'
@@ -37,11 +37,11 @@ export type NextFixture =
   | (FixtureView & {
       kind: 'fixture'
       opponentForm: Result[]
-      /** League position in the opponent's own tier; null for a foreign club. */
+      /** League position in the opponent's own tier; null for a generated European opponent. */
       opponentPosition: number | null
       opponentTier: Tier | null
-      /** The foreign league's name when the opponent plays abroad. */
-      opponentAbroad: string | null
+      /** Set when the opponent is a side generated for a European tie: what is known of it. */
+      opponentEuropean: string | null
     })
   | {
       /** A cup round the club is in that has not been drawn yet. */
@@ -135,11 +135,10 @@ export function nextFixture(world: World): NextFixture | null {
 function withOpponent(world: World, v: FixtureView): NextFixture {
   const club = homeClub(world, v.opponentId)
   if (club) {
-    return { kind: 'fixture', ...v, opponentForm: [...club.form], opponentPosition: world.tables.length ? positionOf(world, club.id) : null, opponentTier: club.tier, opponentAbroad: null }
+    return { kind: 'fixture', ...v, opponentForm: [...club.form], opponentPosition: world.tables.length ? positionOf(world, club.id) : null, opponentTier: club.tier, opponentEuropean: null }
   }
-  const foreign = foreignClubById(world, v.opponentId)
-  const league = foreign ? world.foreign.find((l) => l.clubs.some((c) => c.id === foreign.id)) : undefined
-  return { kind: 'fixture', ...v, opponentForm: [], opponentPosition: null, opponentTier: null, opponentAbroad: league ? league.name : 'abroad' }
+  const opponent = europeanOpponentById(world, v.opponentId)
+  return { kind: 'fixture', ...v, opponentForm: [], opponentPosition: null, opponentTier: null, opponentEuropean: opponent ? `European opposition, strength ${Math.round(opponent.strength)}` : 'European opposition' }
 }
 
 /** This season's fixtures and results for the human's club, by competition. */

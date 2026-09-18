@@ -13,6 +13,7 @@ import { careerScore, type Score } from '../scoring/score.js'
 import type { Background, Honour, ManagerTag, Nationality, Spell, World } from '../types.js'
 import { human } from './decisions.js'
 import { madePlayers, type MadePlayerSummary } from '../players/made.js'
+import { firstOffer } from '../market/agent.js'
 
 export interface CareerOptions {
   name: string
@@ -39,9 +40,12 @@ export function createCareer(seed: number, options: CareerOptions): World {
     windowChoice: null,
     contractChoices: {},
     watched: null,
+    agentWithdrawn: [],
   }
   world.logPolicy = 'career'
   emit(world, 'career.started', { managerId: player.id, name: player.name, background: player.background, age: player.age, reputation: player.reputation, seed })
+  // Day one: one offer on the table (DESIGN.md "Job market", the start).
+  firstOffer(world, rng)
   return world
 }
 
@@ -72,14 +76,8 @@ export interface CareerSummary {
 }
 
 function postLabel(world: World, spell: Spell): { club: string; where: string } {
-  const post = spell.post
-  if (post.kind === 'home') {
-    const club = world.clubs[post.clubId - 1]
-    return { club: club ? club.name : `Club ${post.clubId}`, where: `tier ${club ? club.tier : '?'}` }
-  }
-  const league = world.foreign.find((l) => l.kind === post.league)
-  const club = league?.clubs.find((c) => c.id === post.clubId)
-  return { club: club ? club.name : `Club ${post.clubId}`, where: league ? league.name : 'abroad' }
+  const club = world.clubs[spell.post.clubId - 1]
+  return { club: club ? club.name : `Club ${spell.post.clubId}`, where: `tier ${club ? club.tier : '?'}` }
 }
 
 /** The career page: who they were, where they went, what they won. */

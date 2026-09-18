@@ -176,6 +176,7 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
   }
   const boughtFinishedShare = madePoints > 0 ? boughtFinished / madePoints : 0
   const match = matchAverages(world)
+  const europe = europeanTitles(world)
   const lines: StatLine[] = [
     line('firstSpellMedianSeasons', 'Median first-spell length (seasons)', median(firstSpellLengths), 'seasons'),
     line('firstSpellInsideSeasonShare', 'First spells ending inside a season', firstSpells.length ? insideSeason / firstSpells.length : 0, 'share'),
@@ -198,6 +199,8 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     line('awayWinShare', 'Away wins (league)', match.away, 'share'),
     line('yellowsPerGame', 'Yellow cards per match', match.yellows, 'number'),
     line('redsPerGame', 'Red cards per match', match.reds, 'number'),
+    line('europeanTitlesHomeShare', 'Seasons the European title came home', europe.homeShare, 'share'),
+    line('europeanTitlesOutsideTopThree', 'European titles won from outside the top three of tier 1', europe.outsideTopThree, 'share'),
   ]
 
   const endReasons: Record<string, number> = {}
@@ -237,12 +240,6 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     'career p90 (seasons)': quantile(careerSeasons, 0.9),
     'median seasons employed': median(employedSeasons),
     'p90 seasons employed': quantile(employedSeasons, 0.9),
-    'games abroad share (1,000+)': (() => {
-      const long = ended.filter((m) => m.history.games >= T.LONG_CAREER_GAMES)
-      const abroad = long.reduce((s, m) => s + m.history.seasons.filter((r) => r.post.kind === 'abroad').reduce((g, r) => g + r.games, 0), 0)
-      const total = long.reduce((s, m) => s + m.history.games, 0)
-      return total ? abroad / total : 0
-    })(),
     'max games (tracked)': ended.length ? Math.max(...ended.map((m) => m.history.games)) : 0,
     'median earnings £m (ended)': median(ended.map((m) => Math.round(m.history.earnings * 10) / 10)),
     'median trophy points (ended)': median(ended.map((m) => m.history.trophyPoints)),
@@ -258,6 +255,8 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     'yellows per game': match.yellows,
     'reds per game': match.reds,
     'league matches': match.leagueMatches,
+    'european titles (home clubs)': europe.homeTitles,
+    'european finals played': europe.seasons,
     'mean age at career end': ended.length ? ended.reduce((s, m) => s + m.age, 0) / ended.length : 0,
     'events logged': world.log.length,
   }
@@ -317,4 +316,21 @@ export function matchAverages(world: World): { goals: number; home: number; draw
     reds: all ? reds / all : 0,
     leagueMatches: league,
   }
+}
+
+/** The European trophy (DESIGN.md "World"): how often a home club lifts it, and from where in the table. */
+export function europeanTitles(world: World): { seasons: number; homeTitles: number; homeShare: number; outsideTopThree: number } {
+  let seasons = 0
+  let homeTitles = 0
+  let outside = 0
+  for (const e of world.log) {
+    if (e.type !== 'trophy' || e.payload['competition'] !== 'european') continue
+    seasons++
+    const clubId = e.payload['clubId'] as number
+    if (clubId >= T.EUROPEAN_OPPONENT_ID_BASE) continue
+    homeTitles++
+    const position = e.payload['position']
+    if (typeof position === 'number' && position > 3) outside++
+  }
+  return { seasons, homeTitles, homeShare: seasons ? homeTitles / seasons : 0, outsideTopThree: homeTitles ? outside / homeTitles : 0 }
 }

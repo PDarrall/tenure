@@ -28,6 +28,8 @@ describe('match aftermath over a season', () => {
     let assists = 0
     const byPosition = { GK: 0, D: 0, M: 0, F: 0 }
     for (const e of matches) {
+      // Two generated European sides meeting each other play on strength alone: no squads, no named scorers.
+      if ((e.payload['homeId'] as number) >= T.EUROPEAN_OPPONENT_ID_BASE && (e.payload['awayId'] as number) >= T.EUROPEAN_OPPONENT_ID_BASE) continue
       goals += (e.payload['homeGoals'] as number) + (e.payload['awayGoals'] as number)
       for (const side of ['homeScorers', 'awayScorers'] as const) {
         for (const s of e.payload[side] as { playerId: number; assistId: number | null }[]) {
@@ -81,7 +83,7 @@ describe('match aftermath over a season', () => {
     expect(bans.some((e) => e.payload['reason'] === 'red')).toBe(true)
     // After the summer everyone is fit, unbanned and at full condition.
     for (const p of live(world)) {
-      if (p.clubId >= T.FOREIGN_CLUB_ID_BASE || p.clubId === 0) continue
+      if (p.clubId >= T.EUROPEAN_OPPONENT_ID_BASE || p.clubId === 0) continue
       expect(p.condition).toBe(T.CONDITION_MAX)
       expect(p.injuryWeeks).toBe(0)
       expect(p.suspension).toBe(0)
@@ -89,7 +91,7 @@ describe('match aftermath over a season', () => {
     }
     const during = createWorld(8)
     runWeeks(during, 12)
-    const players = live(during).filter((p) => p.clubId > 0 && p.clubId < T.FOREIGN_CLUB_ID_BASE)
+    const players = live(during).filter((p) => p.clubId > 0 && p.clubId < T.EUROPEAN_OPPONENT_ID_BASE)
     expect(players.some((p) => p.condition < T.CONDITION_MAX)).toBe(true)
     expect(players.some((p) => p.injuryWeeks > 0)).toBe(true)
     const tired = players.find((p) => p.condition < 60)!
@@ -192,10 +194,11 @@ describe('contracts and requests', () => {
     const asker = squad[1]!
     asker.contract.wage = 1
     const deal = queueNewDeal(world, asker, wageDemand(asker, me.id))
+    const moraleBefore = asker.morale
     const falloutsBefore = spellOf(world, me)?.season.fallouts ?? 0
     // Answered in place: a week's advance could cross into a new season and reset the season's counts.
     resolveDecisions(world, rngFromState(world.rng), { [deal.id]: 'refuse' })
-    expect(asker.morale).toBeLessThan(50)
+    expect(asker.morale).toBeLessThan(moraleBefore)
     expect(spellOf(world, me)?.season.fallouts ?? 1).toBe(falloutsBefore + 1)
     expect(world.log.some((e) => e.type === 'player.refused' && e.payload['playerId'] === asker.id)).toBe(true)
     const leaver = squad[2]!

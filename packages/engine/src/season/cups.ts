@@ -1,6 +1,7 @@
 import type { Rng } from '../rng.js'
 import { T } from '../tunables.js'
 import type { ClubId, CupState, World } from '../types.js'
+import { generateEuropeanField, redrawOpponents } from './europe.js'
 
 /** Matches in a knockout round of n clubs: pare down to a power of two, then halve. */
 export function matchesThisRound(n: number): number {
@@ -20,16 +21,6 @@ export function roundsNeeded(n: number): number {
   return rounds
 }
 
-function foreignEntrants(world: World): ClubId[] {
-  const ids: ClubId[] = []
-  for (const league of world.foreign) {
-    const count = T.EUROPEAN_FOREIGN_ENTRANTS[league.kind]
-    const best = [...league.clubs].sort((a, b) => b.strength - a.strength || a.id - b.id).slice(0, count)
-    ids.push(...best.map((c) => c.id))
-  }
-  return ids
-}
-
 function makeCup(competition: CupState['competition'], roundWeeks: readonly number[], entrants: ClubId[]): CupState {
   const needed = roundsNeeded(entrants.length)
   if (needed !== roundWeeks.length) {
@@ -45,11 +36,11 @@ function makeCup(competition: CupState['competition'], roundWeeks: readonly numb
   }
 }
 
-/** Create this season's three cups from the current clubs. */
-export function seedCups(world: World): void {
+/** Create this season's three cups from the current clubs and a fresh European field. */
+export function seedCups(world: World, rng: Rng): void {
   const national = world.clubs.map((c) => c.id)
   const leagueCup = world.clubs.filter((c) => T.LEAGUE_CUP_TIERS.includes(c.tier)).map((c) => c.id)
-  const european = [...world.europeanEntrants, ...foreignEntrants(world)]
+  const european = [...world.europeanEntrants, ...generateEuropeanField(world, rng).map((o) => o.id)]
   world.cups = [
     makeCup('nationalCup', T.NATIONAL_CUP_ROUND_WEEKS, national),
     makeCup('leagueCup', T.LEAGUE_CUP_ROUND_WEEKS, leagueCup),
@@ -57,8 +48,9 @@ export function seedCups(world: World): void {
   ]
 }
 
-/** Draw the next round: pairs that play now; everyone else has a bye. */
-export function drawRound(rng: Rng, cup: CupState): [ClubId, ClubId][] {
+/** Draw the next round: pairs that play now; everyone else has a bye. Generated opponents are drawn again at the round's strength first. */
+export function drawRound(world: World, rng: Rng, cup: CupState): [ClubId, ClubId][] {
+  if (cup.competition === 'european') redrawOpponents(world, rng, cup.remaining, cup.roundsPlayed)
   const ids = [...cup.remaining]
   rng.shuffle(ids)
   const matches = matchesThisRound(ids.length)

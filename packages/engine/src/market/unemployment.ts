@@ -1,17 +1,11 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
-import { bandIndex, foreignBandIndex } from '../managers/reputation.js'
 import { bumpReputation } from '../tenure/exits.js'
 import type { Manager, UnemployedActivity, World } from '../types.js'
 import { monthsUnemployed } from './shortlist.js'
 import { endCareer } from './retirement.js'
 import { hasPending, queueActivity } from '../play/decisions.js'
-
-function canWorkAbroad(manager: Manager): boolean {
-  const band = bandIndex(manager.reputation)
-  return (['small', 'mid', 'big'] as const).some((kind) => foreignBandIndex(kind) <= band)
-}
 
 /** What an AI manager does with another month out of work. */
 export function chooseActivity(world: World, rng: Rng, manager: Manager): UnemployedActivity {
@@ -19,9 +13,7 @@ export function chooseActivity(world: World, rng: Rng, manager: Manager): Unempl
   const months = monthsUnemployed(world, manager)
   const current = manager.status.activity
   if (current === 'assistant') return 'assistant'
-  if (current === 'abroad') return 'abroad'
   if (months >= T.AI_ASSISTANT_AFTER_MONTHS && manager.reputation < T.AI_ASSISTANT_MAX_REP) return 'assistant'
-  if (months >= T.AI_ABROAD_AFTER_MONTHS && canWorkAbroad(manager) && rng.chance(T.AI_ABROAD_P)) return 'abroad'
   if (months >= T.AI_PUNDITRY_AFTER_MONTHS && manager.reputation >= T.AI_PUNDITRY_MIN_REP) return 'punditry'
   return current === 'punditry' ? 'punditry' : 'wait'
 }

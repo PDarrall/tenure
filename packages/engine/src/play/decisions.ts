@@ -7,7 +7,7 @@ import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import { clamp, round1 } from '../world/gen.js'
-import { clubById, foreignClubById, managerById, spellOf } from '../lookup.js'
+import { clubById, managerById, spellOf } from '../lookup.js'
 import type { Decision, DecisionKind, DecisionOption, HumanState, Manager, Promise, Spell, Vacancy, World } from '../types.js'
 import { expectationAtHire } from '../tenure/expectation.js'
 import { salaryFor } from '../tenure/spell.js'
@@ -70,15 +70,15 @@ export function queueDecision(world: World, draft: DecisionDraft): Decision {
 }
 
 function postName(world: World, vacancy: Vacancy): string {
-  return vacancy.post.kind === 'home' ? clubById(world, vacancy.post.clubId).name : (foreignClubById(world, vacancy.post.clubId)?.name ?? 'a club abroad')
+  return clubById(world, vacancy.post.clubId).name
 }
 
 function postTier(world: World, vacancy: Vacancy): string {
-  return vacancy.post.kind === 'home' ? `tier ${clubById(world, vacancy.post.clubId).tier}` : `${vacancy.post.league} league abroad`
+  return `tier ${clubById(world, vacancy.post.clubId).tier}`
 }
 
 /** The interview: promise and contract length set the terms. */
-export function queueOffer(world: World, vacancy: Vacancy): Decision {
+export function queueOffer(world: World, vacancy: Vacancy, firstOffer = false): Decision {
   const manager = human(world)
   const base = salaryFor(world, vacancy.post, manager.reputation)
   const options: DecisionOption[] = []
@@ -98,12 +98,12 @@ export function queueOffer(world: World, vacancy: Vacancy): Decision {
   return queueDecision(world, {
     kind: 'offer',
     from: 'agent',
-    title: `${postName(world, vacancy)} want to talk`,
-    body: `${postTier(world, vacancy)}, ${vacancy.ownerType} owner, ${vacancy.crisis ? 'a crisis appointment' : 'a planned appointment'}. They are offering ${vacancy.contract.years} years; ask for more or less.`,
+    title: firstOffer ? `Your agent has an offer ready: ${postName(world, vacancy)}` : `${postName(world, vacancy)} want to talk`,
+    body: `${postTier(world, vacancy)}, ${vacancy.ownerType} owner, ${vacancy.crisis ? 'a crisis appointment' : 'a planned appointment'}. They are offering ${vacancy.contract.years} years; ask for more or less.${firstOffer ? ' Take it and manage from the first turn, or start out of work with your agent applying every week.' : ''}`,
     options,
     defaultKey: 'decline',
     blocking: true,
-    payload: { vacancyId: vacancy.id, post: vacancy.post },
+    payload: { vacancyId: vacancy.id, post: vacancy.post, firstOffer, years: vacancy.contract.years, salary: vacancy.contract.salary, budget: vacancy.budget, expectation: vacancy.expectation },
   })
 }
 
@@ -241,12 +241,11 @@ export function queueActivity(world: World): Decision {
     kind: 'activity',
     from: 'agent',
     title: 'Another month out of work',
-    body: 'Waiting is a bet. Punditry halves the slide; an assistant role stops it, at a price; abroad opens foreign vacancies.',
+    body: 'Waiting is a bet. Punditry halves the slide; an assistant role stops it, at a price.',
     options: [
       { key: 'wait', label: 'Wait for the right job' },
       { key: 'punditry', label: 'Punditry' },
       { key: 'assistant', label: 'Take an assistant role' },
-      { key: 'abroad', label: 'Look abroad' },
     ],
     defaultKey: current,
     blocking: false,
@@ -336,7 +335,7 @@ export function applyAnswer(world: World, rng: Rng, decision: Decision, rawKey: 
       break
     }
     case 'activity': {
-      setActivity(world, manager, key as 'wait' | 'punditry' | 'assistant' | 'abroad')
+      setActivity(world, manager, key as 'wait' | 'punditry' | 'assistant')
       break
     }
     case 'newDeal':

@@ -119,4 +119,11 @@ describe('500 AI careers (DESIGN.md validation targets, to verify)', () => {
     const l = line('boughtFinishedShare')
     expect(l.pass, describeLine(l)).toBe(true)
   })
+
+  it('the European trophy is hard: home clubs win a minority of them, rarely from outside the top three', () => {
+    for (const key of ['europeanTitlesHomeShare', 'europeanTitlesOutsideTopThree'] as const) {
+      const l = line(key)
+      expect(l.pass, describeLine(l)).toBe(true)
+    }
+  })
 })

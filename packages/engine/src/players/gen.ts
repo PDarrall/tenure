@@ -1,15 +1,14 @@
 /**
  * Squads (DESIGN.md "Players"): generated to match club strength, the best
  * XI in the club's preferred formation averaging it, and re-anchored each
- * summer. Foreign squads are generated on demand when a club meets a home
- * side.
+ * summer. A European opponent's squad is generated for its tie.
  */
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import { clamp, round1 } from '../world/gen.js'
 import { POOLS } from '../managers/names.js'
-import type { Club, ForeignClub, Formation, Nationality, Player, PlayerId, PlayerSeasonStats, Position, Side, Tier, Trait, World } from '../types.js'
+import type { Club, EuropeanOpponent, Formation, Nationality, Player, PlayerId, PlayerSeasonStats, Position, Side, Tier, Trait, World } from '../types.js'
 import { slotsOf } from './formations.js'
 import { TRAITS } from './traits.js'
 import { bestXiMean } from './select.js'
@@ -69,8 +68,8 @@ export interface PlayerDraft {
 }
 
 /** Create one player at a club. */
-export function makePlayer(world: World, rng: Rng, clubId: number, tier: Tier | null, draft: PlayerDraft, nativeShare = T.HOME_NATIONAL_SHARE): Player {
-  const nationality = draft.nationality ?? (rng.chance(nativeShare) ? 'home' : rng.pick(['big', 'mid', 'small'] as const))
+export function makePlayer(world: World, rng: Rng, clubId: number, tier: Tier | null, draft: PlayerDraft, nativeShare = T.HOME_NATIONAL_SHARE, native: Nationality = 'home'): Player {
+  const nationality = draft.nationality ?? (rng.chance(nativeShare) ? native : rng.pick((['home', 'big', 'mid', 'small'] as const).filter((n) => n !== native)))
   const rating = round1(clamp(draft.rating, 1, 100))
   const player: Player = {
     id: world.nextPlayerId++,
@@ -123,7 +122,7 @@ function sidesFor(rng: Rng, position: Position, count: number, formation: Format
  * backups below, then the anchor shift so the best XI in `formation`
  * averages exactly the club's strength.
  */
-export function generateSquad(world: World, rng: Rng, club: { id: number; playerIds: PlayerId[] }, strength: number, formation: Formation, size: number, tier: Tier | null, nativeShare = T.HOME_NATIONAL_SHARE): void {
+export function generateSquad(world: World, rng: Rng, club: { id: number; playerIds: PlayerId[] }, strength: number, formation: Formation, size: number, tier: Tier | null, nativeShare = T.HOME_NATIONAL_SHARE, native: Nationality = 'home'): void {
   const mix = positionMix(size)
   const slots = slotsOf(formation)
   for (const position of ['GK', 'D', 'M', 'F'] as Position[]) {
@@ -134,7 +133,7 @@ export function generateSquad(world: World, rng: Rng, club: { id: number; player
       const starter = i < starters
       const rating = starter ? strength + rng.normal(0, T.STARTER_RATING_SD) : strength - T.BACKUP_RATING_GAP + rng.normal(0, T.BACKUP_RATING_SD)
       const age = rng.int(T.PLAYER_AGE_RANGE[0], T.PLAYER_AGE_RANGE[1])
-      const p = makePlayer(world, rng, club.id, tier, { position, side: sides[i] as Side, age, rating }, nativeShare)
+      const p = makePlayer(world, rng, club.id, tier, { position, side: sides[i] as Side, age, rating }, nativeShare, native)
       club.playerIds.push(p.id)
     }
   }
@@ -161,12 +160,6 @@ export function anchorSquad(world: World, club: { playerIds: PlayerId[] }, stren
     total += shift
   }
   return total
-}
-
-/** A foreign club's squad, generated the first time it is needed. */
-export function ensureForeignSquad(world: World, rng: Rng, club: ForeignClub): void {
-  if (club.playerIds.length > 0) return
-  generateSquad(world, rng, club, club.strength, T.DEFAULT_FORMATION, T.FOREIGN_SQUAD_SIZE, null, T.FOREIGN_NATIONAL_SHARE)
 }
 
 export function squadSizeFor(tier: Tier): number {
@@ -234,6 +227,6 @@ export function forgetPlayer(world: World, player: Player): void {
 }
 
 /** Replace a club's playerIds array in place (callers keep references). */
-export function setSquad(club: Club | ForeignClub, ids: PlayerId[]): void {
+export function setSquad(club: Club | EuropeanOpponent, ids: PlayerId[]): void {
   club.playerIds = ids
 }

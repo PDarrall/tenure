@@ -1,4 +1,4 @@
-import type { Club, ClubId, ForeignClub, Manager, ManagerId, Player, Post, Spell, SpellId, World } from './types.js'
+import type { Club, ClubId, EuropeanOpponent, Manager, ManagerId, Player, Post, Spell, SpellId, World } from './types.js'
 
 /** Ids are sequential from 1 and never removed, so position is id − 1. */
 export function clubById(world: World, id: ClubId): Club {
@@ -15,12 +15,16 @@ export function homeClub(world: World, id: ClubId): Club | undefined {
   return world.clubs.find((c) => c.id === id)
 }
 
-export function foreignClubById(world: World, id: ClubId): ForeignClub | undefined {
-  for (const league of world.foreign) {
-    const club = league.clubs.find((c) => c.id === id)
-    if (club) return club
-  }
-  return undefined
+/** A generated European opponent in this season's field. */
+export function europeanOpponentById(world: World, id: ClubId): EuropeanOpponent | undefined {
+  return world.europeanOpponents.find((o) => o.id === id)
+}
+
+/** Any side by id: a home club's name, or a generated opponent's. */
+export function anyClubName(world: World, id: ClubId): string {
+  const home = homeClub(world, id)
+  if (home) return home.name
+  return europeanOpponentById(world, id)?.name ?? `Club ${id}`
 }
 
 export function managerById(world: World, id: ManagerId): Manager {
@@ -51,8 +55,7 @@ export function managerAt(world: World, club: Club): Manager | undefined {
 }
 
 export function postClubName(world: World, post: Post): string {
-  if (post.kind === 'home') return clubById(world, post.clubId).name
-  return foreignClubById(world, post.clubId)?.name ?? `Club ${post.clubId}`
+  return clubById(world, post.clubId).name
 }
 
 export function samePost(a: Post, b: Post): boolean {

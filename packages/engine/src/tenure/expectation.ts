@@ -5,8 +5,7 @@ import { clubById } from '../lookup.js'
 import type { Post, Promise, Spell, World } from '../types.js'
 
 export function divisionSize(world: World, post: Post): number {
-  if (post.kind === 'home') return T.TIER_SIZES[clubById(world, post.clubId).tier - 1] as number
-  return world.foreign.find((l) => l.kind === post.league)?.clubs.length ?? 1
+  return T.TIER_SIZES[clubById(world, post.clubId).tier - 1] as number
 }
 
 /** Finish the squad's strength rank implies: 1 = strongest in the division. */
@@ -18,15 +17,11 @@ export function structuralTarget(world: World, post: Post): number {
     ).length
     return stronger + 1
   }
-  const league = world.foreign.find((l) => l.kind === post.league)
-  if (!league) throw new Error(`no foreign league ${post.league}`)
-  const club = league.clubs.find((c) => c.id === post.clubId)
-  if (!club) throw new Error(`no foreign club ${post.clubId}`)
-  return league.clubs.filter((c) => c.strength > club.strength || (c.strength === club.strength && c.id < club.id)).length + 1
+  throw new Error(`structuralTarget: no club ${post.clubId}`)
 }
 
 function ambitionOf(world: World, post: Post): number {
-  return post.kind === 'home' ? clubById(world, post.clubId).owner.ambition : T.ABROAD_AMBITION
+  return clubById(world, post.clubId).owner.ambition
 }
 
 /** Board target at hire: structural rank, lifted by ambition, shifted by the promise. */

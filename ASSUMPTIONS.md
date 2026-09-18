@@ -468,3 +468,28 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
 - The Playwright smoke runs Chromium at an iPad viewport (WebKit is not
   on the runner); tap targets are asserted at 32px or more on the
   buttons, with the stylesheet setting 44px minimum height for controls.
+
+## Jobs and world (DESIGN v0.6)
+
+- There are no foreign leagues, posts, careers or tags. Nationality
+  stays on players and managers as a name pool and nothing else.
+- The European competition is the same 32-club knockout: the five home
+  entrants and 27 opponents generated with the season. Each opponent's
+  strength is drawn afresh before every round from a tunable
+  distribution (means 68, 76, 83, 90, 95 by round), so the later rounds
+  are harder whoever survives; a squad is generated when a tie against a
+  home club is prepared and dropped when it is settled, so a save
+  carries nothing it does not need. Two generated sides meeting each
+  other are settled on strength alone with no named scorers. The trophy
+  event carries the winner's league position at the time; the targets
+  read from it: home clubs win the trophy in 10–60% of seasons, and
+  fewer than a quarter of those wins come from outside the top three.
+- DESIGN's "~400 managers" was written for 170 posts, 54 of them abroad.
+  The abroad posts were also the safe long spells (no match-by-match
+  hazard) that kept careers going, so the same managers per post (280
+  for 116 posts) still left too many without a second job and careers
+  too short. The market was retuned, not the targets: the population is
+  260 (POPULATION) and an AI manager rests six months after losing a
+  job instead of nine (AI_REST_MONTHS_AFTER_EXIT). Every other market
+  rule is untouched.
+- The foreign-title trophy points went with the leagues.

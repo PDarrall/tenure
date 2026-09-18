@@ -1,5 +1,5 @@
 import { T } from '../tunables.js'
-import type { Club, ForeignLeagueKind, Tier, World } from '../types.js'
+import type { Club, Tier, World } from '../types.js'
 
 /** Index into REPUTATION_BANDS for a reputation value. */
 export function bandIndex(reputation: number): number {
@@ -16,11 +16,6 @@ export function clubBandIndex(world: World, club: Club): number {
     return T.REPUTATION_BANDS.findIndex((b) => b.elite)
   }
   return T.REPUTATION_BANDS.findIndex((b) => !b.elite && b.tiers.includes(club.tier))
-}
-
-/** Band a foreign league recruits from. */
-export function foreignBandIndex(kind: ForeignLeagueKind): number {
-  return T.REPUTATION_BANDS.findIndex((b) => b.foreign.includes(kind))
 }
 
 /** Tier-1 clubs in the top ELITE_PRESTIGE_RANK by prestige. */

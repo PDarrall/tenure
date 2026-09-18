@@ -20,8 +20,7 @@ function postName(world: World, post: Post): string {
 }
 
 function postTier(world: World, post: Post): string {
-  if (post.kind === 'home') return `tier ${world.clubs[post.clubId - 1]?.tier ?? '?'}`
-  return `${post.league} league abroad`
+  return `tier ${world.clubs[post.clubId - 1]?.tier ?? '?'}`
 }
 
 /** The competition as a fixture list names it. */
@@ -50,8 +49,6 @@ export function competitionName(c: unknown): string {
       return 'league cup'
     case 'european':
       return 'European title'
-    case 'foreignLeague':
-      return 'league title'
     default:
       return String(c)
   }
@@ -286,6 +283,12 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
         break
       case 'vacancy.applied':
         if (mine(e)) push(e, 'agent', renderText('agent', 'applied', { club: postName(world, p['post'] as Post) }, e.week))
+        break
+      case 'agent.applied':
+        if (mine(e)) push(e, 'agent', renderText('agent', 'agent_applied', { club: postName(world, p['post'] as Post), tier: postTier(world, p['post'] as Post), why: String(p['why']) }, e.week))
+        break
+      case 'agent.firstOffer':
+        if (mine(e)) push(e, 'agent', renderText('agent', 'first_offer', { club: postName(world, p['post'] as Post), tier: postTier(world, p['post'] as Post) }, e.week))
         break
       case 'vacancy.filled': {
         const vacancy = world.vacancies[(p['vacancyId'] as number) - 1]

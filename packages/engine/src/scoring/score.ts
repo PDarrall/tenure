@@ -19,8 +19,6 @@ export function trophyPointsFor(honour: Honour): number {
       return T.TROPHY_POINTS.leagueCup
     case 'league':
       return honour.tier === undefined ? 0 : (T.TROPHY_POINTS.leagueByTier[honour.tier - 1] ?? 0)
-    case 'foreignLeague':
-      return honour.league === undefined ? 0 : T.TROPHY_POINTS.foreign[honour.league]
   }
 }
 
@@ -68,7 +66,6 @@ export function awardTrophyPoints(world: World, manager: Manager, honour: Honour
     managerId: manager.id,
     competition: honour.competition,
     tier: honour.tier ?? null,
-    league: honour.league ?? null,
     points,
     total: manager.history.trophyPoints,
     season: world.season,

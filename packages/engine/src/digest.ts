@@ -21,7 +21,7 @@ export function digestWorld(world: World) {
         `${c.id} ${c.name} [${c.city} r${c.region}] t${c.tier} p${c.prestige} w${c.wealth} s${c.squad.strength} ` +
         `${c.owner.type}/${c.owner.ambition} rivals=${c.rivals.join(',')} mgr=${c.managerId}`,
     ),
-    foreign: world.foreign.map((l) => `${l.kind} ${l.name}: ${l.clubs.map((c) => `${c.id} ${c.name} mgr=${c.managerId}`).join('; ')}`),
+    europe: world.europeanOpponents.map((o) => `${o.id} ${o.name} ${o.strength}`),
     managers: world.managers.map(
       (m) =>
         `${m.id} ${m.name} (${m.nationality}, ${m.age}, ${m.background}) rep=${m.reputation} ` +

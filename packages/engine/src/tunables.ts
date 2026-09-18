@@ -78,33 +78,43 @@ export const T = {
   /** Share of clubs named after their town alone (no "United", "Town" suffix). */
   CLUB_PLAIN_NAME_SHARE: 0.5,
 
-  /** Share of foreign clubs carrying a prefix ("Real", "FC"). */
-  FOREIGN_PREFIX_SHARE: 0.5,
+  // ---------------------------------------------------------------------------
+  // European opponents (DESIGN.md "World"): foreign sides generated for each
+  // tie, strength drawn by round. Serves: the trophy is rare for anyone
+  // outside the top three of tier 1, and home clubs still win it some seasons.
+  // ---------------------------------------------------------------------------
 
-  /** Abroad: three abstracted leagues, a job market and European opposition. */
-  FOREIGN_LEAGUES: [
-    { kind: 'big', clubs: 20, prestige: 90, strength: 78 },
-    { kind: 'mid', clubs: 18, prestige: 60, strength: 58 },
-    { kind: 'small', clubs: 16, prestige: 30, strength: 40 },
-  ] as readonly {
-    kind: 'big' | 'mid' | 'small'
-    clubs: number
-    prestige: number
-    strength: number
-  }[],
-
-  /** Foreign club prestige and strength spread around the league figure. */
-  FOREIGN_CLUB_NOISE_SD: 8,
-
-  /** Id offset for foreign clubs so ids never collide with home clubs. */
-  FOREIGN_CLUB_ID_BASE: 1000,
+  /** Generated opponents in the field: with the five home entrants, a 32-club bracket. */
+  EUROPEAN_OPPONENTS: 27,
+  /** Strength of a generated opponent, drawn afresh before each round (mean, sd), round one first, the final last. */
+  EUROPEAN_OPPONENT_STRENGTH_BY_ROUND: [
+    { mean: 68, sd: 8 },
+    { mean: 76, sd: 7 },
+    { mean: 83, sd: 6 },
+    { mean: 90, sd: 5 },
+    { mean: 95, sd: 3 },
+  ] as readonly { mean: number; sd: number }[],
+  /** Share of generated opponents carrying a prefix ("Real", "FC"), and the share of their squads from their own name pool. */
+  EUROPEAN_OPPONENT_PREFIX_SHARE: 0.5,
+  EUROPEAN_OPPONENT_NATIONAL_SHARE: 0.8,
+  /** Id offset for generated opponents so ids never collide with home clubs. */
+  EUROPEAN_OPPONENT_ID_BASE: 1000,
 
   // ---------------------------------------------------------------------------
   // Managers (DESIGN.md "Managers", "Reputation → employability band")
   // ---------------------------------------------------------------------------
 
-  /** Population size, topped up each summer. Serves: every career target. */
-  POPULATION: 400,
+  /**
+   * Population size, topped up each summer. DESIGN's "~400 managers" was
+   * written for 170 posts, 54 of them abroad. With the foreign leagues gone
+   * (v0.6) the same managers-per-post ratio would be 280 for 116 posts, but
+   * the abroad posts were also the safe long spells that kept careers going,
+   * so the supply is trimmed to 260 (with AI_REST_MONTHS_AFTER_EXIT 6) to put
+   * second jobs and career length back in range on the validation seed.
+   * Serves: every career target, above all 40–50% never getting a second job
+   * and a median career of 6–8 seasons.
+   */
+  POPULATION: 260,
 
   /** Starting age for new entrants, inclusive. DESIGN: 33–38. */
   START_AGE_RANGE: [33, 38] as readonly [number, number],
@@ -127,13 +137,6 @@ export const T = {
     [22, 44],
     [6, 26],
   ] as readonly (readonly [number, number])[],
-
-  /** Genesis incumbents abroad, reputation by league kind. */
-  INCUMBENT_REPUTATION_ABROAD: {
-    big: [72, 92],
-    mid: [50, 72],
-    small: [10, 40],
-  } as Readonly<Record<'big' | 'mid' | 'small', readonly [number, number]>>,
 
   /** Base ability range, uniform per component (0–100). */
   ABILITY_RANGE: [30, 70] as readonly [number, number],
@@ -173,26 +176,23 @@ export const T = {
   /** Share of managers in the home pyramid (and its unemployed pool) who are home nationals. */
   HOME_NATIONAL_SHARE: 0.85,
 
-  /** Share of managers at a foreign club who are nationals of that league. */
-  FOREIGN_NATIONAL_SHARE: 0.8,
 
   /**
-   * Reputation → employability bands. DESIGN: 0–20 non-league / minor abroad ·
+   * Reputation → employability bands. DESIGN: 0–20 non-league ·
    * 20–40 tier 4 · 40–60 tier 3 · 60–75 tier 2 · 75–90 tier 1 · 90+ elite.
-   * `tiers` are the home tiers the band covers; `foreign` the leagues abroad.
+   * `tiers` are the tiers the band covers.
    * Serves: 40–50% never get a second job (typecasting by band).
    */
   REPUTATION_BANDS: [
-    { min: 0, tiers: [5], foreign: ['small'], elite: false },
-    { min: 20, tiers: [4], foreign: [], elite: false },
-    { min: 40, tiers: [3], foreign: [], elite: false },
-    { min: 60, tiers: [2], foreign: ['mid'], elite: false },
-    { min: 75, tiers: [1], foreign: [], elite: false },
-    { min: 90, tiers: [1], foreign: ['big'], elite: true },
+    { min: 0, tiers: [5], elite: false },
+    { min: 20, tiers: [4], elite: false },
+    { min: 40, tiers: [3], elite: false },
+    { min: 60, tiers: [2], elite: false },
+    { min: 75, tiers: [1], elite: false },
+    { min: 90, tiers: [1], elite: true },
   ] as readonly {
     min: number
     tiers: readonly (1 | 2 | 3 | 4 | 5)[]
-    foreign: readonly ('big' | 'mid' | 'small')[]
     elite: boolean
   }[],
 
@@ -237,12 +237,6 @@ export const T = {
   /** European places: top N of tier 1 plus the national cup winner. DESIGN: four. */
   EUROPEAN_LEAGUE_PLACES: 4,
 
-  /** Foreign entrants to the European competition, by league kind. Fills a 32-club bracket with the 5 home clubs. */
-  EUROPEAN_FOREIGN_ENTRANTS: {
-    big: 12,
-    mid: 9,
-    small: 6,
-  } as Readonly<Record<'big' | 'mid' | 'small', number>>,
 
   /** Clubs promoted and relegated across each tier boundary. */
   UP_DOWN_PER_BOUNDARY: 3,
@@ -296,7 +290,7 @@ export const T = {
   /** Players in the first XI; ownership and youth counts are shares of this. */
   FIRST_XI: 11,
 
-  /** Tactical ability assumed for a club with no manager or an abstract foreign side. */
+  /** Tactical ability assumed for a club with no manager or a generated European opponent. */
   CARETAKER_ABILITY: 40,
 
   /** Morale change per result, scaled by the manager's motivation: win × (base + motivation/100), loss × (base − motivation/100). */
@@ -318,7 +312,7 @@ export const T = {
 
   /** Squad size by tier, index 0 = tier 1. DESIGN: 22 in tiers 1–2, 20 in 3–4, 18 in 5. */
   SQUAD_SIZE_BY_TIER: [22, 22, 20, 20, 18] as readonly number[],
-  FOREIGN_SQUAD_SIZE: 22,
+  EUROPEAN_OPPONENT_SQUAD_SIZE: 22,
   /** Keepers in every squad; the outfield splits by these shares. DESIGN: for a 22, about 2 GK, 7 D, 8 M, 4–5 F. */
   SQUAD_KEEPERS: 2,
   SQUAD_OUTFIELD_MIX: { D: 0.35, M: 0.4 } as const,
@@ -692,38 +686,12 @@ export const T = {
   WEALTH_DRIFT_RATE: 0.2,
 
   // ---------------------------------------------------------------------------
-  // Abroad (abstract season for the foreign leagues).
-  // ---------------------------------------------------------------------------
-
-  /** Games credited to a manager for a season abroad (no match sim). */
-  FOREIGN_GAMES_PER_SEASON: 34,
-
-  /** Noise (strength points) added when ranking a foreign league. */
-  FOREIGN_SEASON_NOISE_SD: 6,
-
-  /** Foreign club strength drifts toward its league strength by this share per season. */
-  FOREIGN_GRAVITY_RATE: 0.3,
-
-  /** Random strength shock per season for foreign clubs (sd). */
-  FOREIGN_STRENGTH_SHOCK_SD: 2,
-
-  /**
-   * Abroad there is no match-by-match credit, so each month credit moves by
-   * normal(mean, sd): the same slow erosion and noise a home spell sees.
-   * Serves: careers abroad carry the same hazard as at home.
-   */
-  ABROAD_MONTHLY_CREDIT_MEAN: -1.5,
-  ABROAD_MONTHLY_CREDIT_SD: 4,
-
-  // ---------------------------------------------------------------------------
   // Expectation (DESIGN.md "Expectation"). Serves: median first spell ≈ 1.5
   // seasons and the 30% inside-a-season share, through the season-end delta.
   // ---------------------------------------------------------------------------
 
   /** Owner ambition lifts the target by up to this many places (ambition 1). */
   EXPECT_AMBITION_PLACES: 3,
-  /** Ambition assumed for the abstract foreign clubs. */
-  ABROAD_AMBITION: 0.5,
 
   /** After a missed target, the target eases one place toward the structural one. */
   EXPECT_EASE_PER_MISS: 1,
@@ -875,9 +843,6 @@ export const T = {
     nationalCup: 0.8,
     leagueCup: 0.5,
     european: 1.2,
-    'foreign-big': 0.9,
-    'foreign-mid': 0.5,
-    'foreign-small': 0.3,
   } as Readonly<Record<string, number>>,
   REP_PROMOTION: 5,
   REP_RELEGATION: -6,
@@ -889,7 +854,6 @@ export const T = {
 
   /** £m per season at reputation 50, index 0 = tier 1. */
   SALARY_BASE_BY_TIER: [3, 1, 0.4, 0.2, 0.08] as readonly number[],
-  SALARY_BASE_ABROAD: { big: 3, mid: 1, small: 0.3 } as Readonly<Record<'big' | 'mid' | 'small', number>>,
   /** Salary = base × (SALARY_REP_FLOOR + reputation / 100). */
   SALARY_REP_FLOOR: 0.5,
   /** Genesis incumbents: contract years left and seasons already served, uniform. */
@@ -923,8 +887,13 @@ export const T = {
   AI_APPLY_BANDS_BELOW: 1,
   /** ... until this many months unemployed, after which it applies anywhere it qualifies. */
   AI_APPLY_ANY_AFTER_MONTHS: 24,
-  /** After losing a job an AI manager takes this many months before applying again. Serves: a handful past 1,000 games (immediate rehiring made 10% of careers continuous for 20 years). */
-  AI_REST_MONTHS_AFTER_EXIT: 9,
+  /**
+   * After losing a job an AI manager takes this many months before applying
+   * again. Serves: a handful past 1,000 games (immediate rehiring made 10% of
+   * careers continuous for 20 years). Was 9 with the foreign posts; 6 since
+   * v0.6 so the smaller market still gives 50–60% a second job.
+   */
+  AI_REST_MONTHS_AFTER_EXIT: 6,
   /** Most tags on a vacancy's want-list. */
   WANT_TAGS_MAX: 2,
   /** Contract years offered, weights for 1, 2, 3, 4 years. DESIGN: one to four. */
@@ -972,8 +941,6 @@ export const T = {
   AI_PUNDITRY_MIN_REP: 40,
   AI_ASSISTANT_AFTER_MONTHS: 12,
   AI_ASSISTANT_MAX_REP: 40,
-  AI_ABROAD_AFTER_MONTHS: 9,
-  AI_ABROAD_P: 0.3,
   /** Career ends after this many months without a shortlist. DESIGN: 24. */
   NO_SHORTLIST_MONTHS: 24,
   /** Career ends at this age. DESIGN: 72. */
@@ -1002,7 +969,6 @@ export const T = {
     'in demand': { expiry: 2 },
     mercenary: { walkouts: 2, expiry: 5 },
     difficult: { count: 2, window: 3, expiry: 3 },
-    abroad: { expiry: 4 },
   } as const,
 
   // ---------------------------------------------------------------------------
@@ -1024,6 +990,8 @@ export const T = {
    * few weeks of applying widely; "waiting is a bet" still holds for the job itself.
    */
   HUMAN_SHORTLIST_P: 0.3,
+  /** The agent's fit score (DESIGN.md "Job market"): tier within the band, tag match, the club's need, and what each band below the human's own costs. */
+  AGENT_FIT: { tier: 1, tags: 0.6, need: 0.4, perBandBelow: 0.5, needWidened: 0.7, needNormal: 0.4 } as const,
   /** Contract lengths the human may ask for at interview. DESIGN: one to four. */
   HUMAN_CONTRACT_YEARS_OPTIONS: [1, 2, 3, 4] as readonly number[],
   /** Chance a match week brings a press question. Serves: most weeks zero or one decision. */
@@ -1060,7 +1028,6 @@ export const T = {
     leagueByTier: [100, 40, 25, 15, 10],
     /** Promotion without the title, by the tier promoted from (tier 2 first). */
     promotionFromTier: [20, 12, 8, 5],
-    foreign: { big: 80, mid: 40, small: 20 },
   } as const,
 
   /** Legacy = games × a + earnings(£m) × b + trophy points × c + players made × d. */
@@ -1121,6 +1088,9 @@ export const T = {
     awayWinShare: { target: 0.29, min: 0.24, max: 0.34 },
     yellowsPerGame: { target: 3.5, min: 2.8, max: 4.2 },
     redsPerGame: { target: 0.2, min: 0.1, max: 0.3 },
+    /** The European trophy is hard: home clubs win it in some seasons, and rarely from outside the top three of tier 1. */
+    europeanTitlesHomeShare: { target: 0.3, min: 0.1, max: 0.6 },
+    europeanTitlesOutsideTopThree: { target: 0.1, min: 0, max: 0.25 },
   } as const,
 
   /** How many of each kind the maker-to-winner comparison takes: the ten biggest makers against the ten biggest trophy-winners. */

@@ -333,12 +333,6 @@ describe('the market over seasons', () => {
       expect(manager.status.kind).toBe('employed')
       expect(spellOf(world, manager)!.post).toEqual({ kind: 'home', clubId: club.id })
     }
-    for (const league of world.foreign) {
-      for (const club of league.clubs) {
-        if (club.managerId === null) continue
-        expect(spellOf(world, managerById(world, club.managerId))!.post).toEqual({ kind: 'abroad', league: league.kind, clubId: club.id })
-      }
-    }
     const live = activeSpells(world).map((s) => s.managerId)
     expect(new Set(live).size).toBe(live.length)
     for (const v of openVacancies(world)) {

@@ -3,7 +3,7 @@
  * real club, town or league is reproduced.
  */
 import type { Rng } from '../rng.js'
-import type { ForeignLeagueKind } from '../types.js'
+import type { Nationality } from '../types.js'
 
 const TOWN_PREFIXES = [
   'Ash', 'Bram', 'Cald', 'Dun', 'Eller', 'Fen', 'Gart', 'Hal', 'Ilk', 'Kel',
@@ -22,7 +22,8 @@ const CLUB_SUFFIXES = [
   'Harriers', 'North End', 'Vale', 'Wednesday', 'Forest', 'Dynamo',
 ]
 
-const FOREIGN_SYLLABLES: Record<ForeignLeagueKind, { first: string[]; second: string[]; prefix: string[] }> = {
+/** Continental town names for generated European opponents, by name pool. */
+const OPPONENT_SYLLABLES: Record<Exclude<Nationality, 'home'>, { first: string[]; second: string[]; prefix: string[] }> = {
   big: {
     prefix: ['Real', 'Atlético', 'Sporting', 'Deportivo', 'Unión', 'Racing'],
     first: ['Val', 'Sal', 'Cor', 'Mon', 'Tar', 'Bur', 'Gra', 'Alm', 'Car', 'Log'],
@@ -38,16 +39,6 @@ const FOREIGN_SYLLABLES: Record<ForeignLeagueKind, { first: string[]; second: st
     first: ['Nor', 'Sol', 'Lil', 'Hau', 'Kris', 'Sand', 'Trom', 'Var', 'Brann', 'Hal'],
     second: ['vik', 'strand', 'sund', 'nes', 'berg', 'fjord', 'sø', 'køb', 'holm', 'stad'],
   },
-}
-
-const FOREIGN_LEAGUE_NAMES: Record<ForeignLeagueKind, string> = {
-  big: 'Liga Primera',
-  mid: 'Bundesland Liga',
-  small: 'Nordisk Serien',
-}
-
-export function foreignLeagueName(kind: ForeignLeagueKind): string {
-  return FOREIGN_LEAGUE_NAMES[kind]
 }
 
 /** A generator that hands out unique town names in seed order. */
@@ -72,12 +63,13 @@ export function clubName(rng: Rng, town: string, plainShare: number): string {
   return rng.chance(plainShare) ? town : `${town} ${rng.pick(CLUB_SUFFIXES)}`
 }
 
-export class ForeignNamer {
+/** Unique names for generated European opponents. */
+export class OpponentNamer {
   private readonly used = new Set<string>()
   constructor(private readonly rng: Rng) {}
 
-  next(kind: ForeignLeagueKind, prefixShare: number): string {
-    const pools = FOREIGN_SYLLABLES[kind]
+  next(kind: Exclude<Nationality, 'home'>, prefixShare: number): string {
+    const pools = OPPONENT_SYLLABLES[kind]
     for (let attempt = 0; attempt < 1000; attempt++) {
       const town = this.rng.pick(pools.first) + this.rng.pick(pools.second)
       const name = this.rng.chance(prefixShare) ? `${this.rng.pick(pools.prefix)} ${town}` : town
@@ -86,6 +78,6 @@ export class ForeignNamer {
         return name
       }
     }
-    throw new Error('ForeignNamer: exhausted name space')
+    throw new Error('OpponentNamer: exhausted name space')
   }
 }

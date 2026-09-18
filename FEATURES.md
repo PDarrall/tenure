@@ -54,6 +54,7 @@ Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · �
 - Board expectation, credit, patience, shocks, sackings — ✓ (deeper than either game)
 - Job market, interviews, contracts, approaches, unemployment, age, permadeath — ✓
 - Reputation and tags — ✓
+- Your agent applies for you each week out of work; a guaranteed offer on day one — ✓
 - International management — 8
 - Holiday mode — ✗ (the point of the game is that you cannot hand over the season)
 

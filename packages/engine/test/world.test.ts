@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createWorld } from '../src/world/gen.js'
+import { runWeeks } from '../src/sim/advance.js'
 import { digestWorld } from '../src/digest.js'
 import { T } from '../src/tunables.js'
 
@@ -66,23 +67,20 @@ describe('world generation', () => {
     expect(withRivals).toBeGreaterThan(world.clubs.length * 0.8)
   })
 
-  it('creates the three foreign leagues with unique names and ids', () => {
+  it('has no foreign leagues: every post is a home club, and the European field is generated with the season', () => {
     const world = createWorld(1)
-    expect(world.foreign.map((l) => l.kind)).toEqual(['big', 'mid', 'small'])
-    const names = new Set<string>()
-    const ids = new Set<number>()
-    for (const league of world.foreign) {
-      const spec = T.FOREIGN_LEAGUES.find((s) => s.kind === league.kind)!
-      expect(league.clubs).toHaveLength(spec.clubs)
-      for (const club of league.clubs) {
-        names.add(club.name)
-        ids.add(club.id)
-        expect(club.id).toBeGreaterThanOrEqual(T.FOREIGN_CLUB_ID_BASE)
-      }
+    expect(world.europeanOpponents).toEqual([])
+    runWeeks(world, 1)
+    expect(world.europeanOpponents).toHaveLength(T.EUROPEAN_OPPONENTS)
+    const names = new Set(world.europeanOpponents.map((o) => o.name))
+    expect(names.size).toBe(T.EUROPEAN_OPPONENTS)
+    for (const o of world.europeanOpponents) {
+      expect(o.id).toBeGreaterThanOrEqual(T.EUROPEAN_OPPONENT_ID_BASE)
+      expect(o.strength).toBeGreaterThan(20)
+      expect(o.playerIds).toEqual([])
     }
-    const total = T.FOREIGN_LEAGUES.reduce((n, s) => n + s.clubs, 0)
-    expect(names.size).toBe(total)
-    expect(ids.size).toBe(total)
+    const european = world.cups.find((c) => c.competition === 'european')!
+    expect(european.remaining).toHaveLength(T.EUROPEAN_LEAGUE_PLACES + 1 + T.EUROPEAN_OPPONENTS)
   })
 
   it('logs a world.created event at week 0', () => {

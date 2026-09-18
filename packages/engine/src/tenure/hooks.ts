@@ -86,13 +86,6 @@ export function weekly(world: World, rng: Rng): void {
 /** Monthly: erratic re-rolls, the position gap, shocks, mutual consent, AI resignations. */
 export function monthly(world: World, rng: Rng): void {
   for (const spell of activeSpells(world)) {
-    if (spell.post.kind !== 'home') {
-      const drift = addCredit(spell, rng.normal(T.ABROAD_MONTHLY_CREDIT_MEAN, T.ABROAD_MONTHLY_CREDIT_SD))
-      emit(world, 'credit.monthly', { spellId: spell.id, managerId: spell.managerId, abroad: true, delta: drift, credit: spell.credit })
-      if (monthlyMutualConsent(world, rng, spell)) continue
-      monthlyResignation(world, rng, spell)
-      continue
-    }
     const club = homeClub(world, spell.post.clubId)
     if (!club) continue
     if (club.owner.type === 'erratic') {
@@ -145,7 +138,7 @@ export function queueWindowDecision(world: World, summer: boolean): void {
 }
 
 function trophyWeight(h: Honour): number {
-  const key = h.competition === 'league' ? `league-${h.tier}` : h.competition === 'foreignLeague' ? `foreign-${h.league}` : h.competition
+  const key = h.competition === 'league' ? `league-${h.tier}` : h.competition
   return T.REP_TROPHY_WEIGHT[key] ?? 0
 }
 
@@ -173,16 +166,9 @@ function seasonReputation(world: World, manager: Manager, spell: Spell, finish: 
 export function seasonEnd(world: World, outcome: SeasonEnd): void {
   for (const spell of activeSpells(world)) {
     const manager = managerById(world, spell.managerId)
-    let finish: number | undefined
-    let promoted = false
-    let relegated = false
-    if (spell.post.kind === 'home') {
-      finish = outcome.finish.get(spell.post.clubId)
-      promoted = outcome.promoted.has(spell.post.clubId)
-      relegated = outcome.relegated.has(spell.post.clubId)
-    } else {
-      finish = outcome.foreignFinish.get(spell.post.clubId)
-    }
+    const finish = outcome.finish.get(spell.post.clubId)
+    const promoted = outcome.promoted.has(spell.post.clubId)
+    const relegated = outcome.relegated.has(spell.post.clubId)
     if (finish === undefined) continue
     const trophies = spellHonours(world, manager, spell).length
     const delta = seasonEndDelta(spell, { finish, promoted, relegated, trophies })

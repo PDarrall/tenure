@@ -1,14 +1,14 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
-import { clubById, foreignClubById, spellOf } from '../lookup.js'
-import { bandIndex, clubBandIndex, foreignBandIndex } from '../managers/reputation.js'
+import { clubById, spellOf } from '../lookup.js'
+import { bandIndex, clubBandIndex } from '../managers/reputation.js'
 import type { Manager, Vacancy, World } from '../types.js'
 import { vacancyPrestige } from './vacancies.js'
 
 /** Band the vacancy recruits from. */
 export function vacancyBand(world: World, vacancy: Vacancy): number {
-  return vacancy.post.kind === 'home' ? clubBandIndex(world, clubById(world, vacancy.post.clubId)) : foreignBandIndex(vacancy.post.league)
+  return clubBandIndex(world, clubById(world, vacancy.post.clubId))
 }
 
 export function monthsUnemployed(world: World, manager: Manager): number {
@@ -36,10 +36,6 @@ export function wouldApply(world: World, manager: Manager, vacancy: Vacancy): bo
   if (manager.status.kind === 'retired') return false
   if (manager.status.kind === 'employed') return false
   if (manager.history.spellIds.length > 0 && monthsUnemployed(world, manager) < T.AI_REST_MONTHS_AFTER_EXIT) return false
-  if (vacancy.post.kind === 'abroad') {
-    const native = manager.nationality === vacancy.post.league
-    if (!native && manager.status.activity !== 'abroad') return false
-  }
   if (monthsUnemployed(world, manager) >= T.AI_APPLY_ANY_AFTER_MONTHS) return true
   return bandIndex(manager.reputation) - T.AI_APPLY_BANDS_BELOW <= vacancyBand(world, vacancy)
 }
@@ -50,8 +46,7 @@ export function poachable(world: World, manager: Manager, vacancy: Vacancy): boo
   const spell = spellOf(world, manager)
   if (!spell) return false
   if (world.week - spell.startWeek < T.POACH_MIN_WEEKS) return false
-  const current =
-    spell.post.kind === 'home' ? clubById(world, spell.post.clubId).prestige : (foreignClubById(world, spell.post.clubId)?.prestige ?? 0)
+  const current = clubById(world, spell.post.clubId).prestige
   return vacancyPrestige(world, vacancy) >= current + T.POACH_PRESTIGE_GAP
 }
 
