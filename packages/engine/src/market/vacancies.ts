@@ -1,7 +1,7 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
-import { clubById, foreignClubById } from '../lookup.js'
+import { clubById } from '../lookup.js'
 import { isElite } from '../managers/reputation.js'
 import { positionOf } from '../season/table.js'
 import { seasonWeek } from '../season/calendar.js'
@@ -19,7 +19,7 @@ function hasOpenVacancy(world: World, post: Post): boolean {
 }
 
 /** Why the last manager left, from the most recent ended spell at the post. */
-function lastReason(world: World, post: Post): VacancyReason {
+export function lastReason(world: World, post: Post): VacancyReason {
   for (let i = world.spells.length - 1; i >= 0; i--) {
     const s = world.spells[i] as { post: Post; endReason: VacancyReason | null }
     if (s.post.kind === post.kind && s.post.clubId === post.clubId && s.endReason) return s.endReason
@@ -122,16 +122,9 @@ export function openNewVacancies(world: World, rng: Rng): Vacancy[] {
     const post: Post = { kind: 'home', clubId: club.id }
     if (club.managerId === null && !hasOpenVacancy(world, post)) opened.push(openVacancy(world, rng, post))
   }
-  for (const league of world.foreign) {
-    for (const club of league.clubs) {
-      const post: Post = { kind: 'abroad', league: league.kind, clubId: club.id }
-      if (club.managerId === null && !hasOpenVacancy(world, post)) opened.push(openVacancy(world, rng, post))
-    }
-  }
   return opened
 }
 
 export function vacancyPrestige(world: World, vacancy: Vacancy): number {
-  if (vacancy.post.kind === 'home') return clubById(world, vacancy.post.clubId).prestige
-  return foreignClubById(world, vacancy.post.clubId)?.prestige ?? 0
+  return clubById(world, vacancy.post.clubId).prestige
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createWorld } from '../src/world/gen.js'
-import { bandIndex, clubBandIndex, foreignBandIndex, isElite, tiersForReputation } from '../src/managers/reputation.js'
+import { bandIndex, clubBandIndex, isElite, tiersForReputation } from '../src/managers/reputation.js'
 import { T } from '../src/tunables.js'
 
 describe('manager population', () => {
@@ -12,30 +12,19 @@ describe('manager population', () => {
     expect(new Set(world.managers.map((m) => m.name)).size).toBe(T.POPULATION)
   })
 
-  it('seats exactly one incumbent at every home and foreign club', () => {
+  it('seats exactly one incumbent at every club, and nobody anywhere else', () => {
     for (const club of world.clubs) {
       const manager = world.managers.find((m) => m.id === club.managerId)
       expect(manager).toBeDefined()
       expect(manager!.status).toMatchObject({ kind: 'employed', post: { kind: 'home', clubId: club.id } })
     }
-    for (const league of world.foreign) {
-      for (const club of league.clubs) {
-        const manager = world.managers.find((m) => m.id === club.managerId)
-        expect(manager).toBeDefined()
-        expect(manager!.status).toMatchObject({
-          kind: 'employed',
-          post: { kind: 'abroad', league: league.kind, clubId: club.id },
-        })
-      }
-    }
     const employed = world.managers.filter((m) => m.status.kind === 'employed')
-    const posts = world.clubs.length + world.foreign.reduce((n, l) => n + l.clubs.length, 0)
-    expect(employed).toHaveLength(posts)
+    expect(employed).toHaveLength(world.clubs.length)
   })
 
   it('starts everyone else unemployed at entry age with no record', () => {
     const entrants = world.managers.filter((m) => m.status.kind === 'unemployed')
-    expect(entrants.length).toBe(T.POPULATION - world.clubs.length - world.foreign.reduce((n, l) => n + l.clubs.length, 0))
+    expect(entrants.length).toBe(T.POPULATION - world.clubs.length)
     for (const m of entrants) {
       expect(m.age).toBeGreaterThanOrEqual(T.START_AGE_RANGE[0])
       expect(m.age).toBeLessThanOrEqual(T.START_AGE_RANGE[1])
@@ -115,12 +104,6 @@ describe('reputation bands', () => {
     expect(tiersForReputation(95)).toEqual([1])
     expect(bandIndex(95)).toBe(5)
     expect(T.REPUTATION_BANDS[bandIndex(95)]!.elite).toBe(true)
-  })
-
-  it('maps foreign leagues to bands', () => {
-    expect(foreignBandIndex('small')).toBe(0)
-    expect(foreignBandIndex('mid')).toBe(3)
-    expect(foreignBandIndex('big')).toBe(5)
   })
 
   it('marks the top tier-1 clubs by prestige as elite', () => {

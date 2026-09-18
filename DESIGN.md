@@ -1,4 +1,4 @@
-# TENURE — design bible v0.5
+# TENURE — design bible v0.6
 
 Working title. A football management game about surviving a career. Depth of Football Chairman Pro 2; texture of Championship Manager 01/02.
 FEATURES.md lists what that means system by system, and what is deliberately out. It is the target; this document is the rules.
@@ -24,16 +24,15 @@ Nothing is ever deducted. Unemployment scores zero — that is the real cost of 
 Age caps a career at a little under 40 seasons (see Age), so "longest" has a ceiling and Legacy stays comparable across careers.
 
 Trophy points (starting values): European title 120 · tier-1 title 100 · national cup 50 · league cup 25 ·
-tier-2 title 40 · tier-3/4/5 titles 25/15/10 · promotion without the title 20/12/8/5 by tier ·
-foreign titles by league prestige (big 80, mid 40, small 20).
+tier-2 title 40 · tier-3/4/5 titles 25/15/10 · promotion without the title 20/12/8/5 by tier.
 
 ## World
 
 Fictional, generated, English-style pyramid. A 30-year world is fictional after year three anyway.
 
 - Tier 1: 20 clubs. Tiers 2–4: 24 clubs each. Tier 5 ("non-league"): abstracted pool of 24.
-- Abroad: three abstracted foreign leagues (big, mid, small). They exist as a job market and as European opposition; not simulated match by match in v1.
-- Cups: one national cup (all tiers), one league cup (tiers 1–2), one European competition (top four of tier 1 plus the cup winner).
+- No foreign leagues. There are no jobs, careers or clubs abroad. The one European competition (top four of tier 1 plus the cup winner) is played against foreign opponents generated for each tie, squad included, with strength drawn by round from a tunable distribution so the trophy is hard.
+- Cups: one national cup (all tiers), one league cup (tiers 1–2), the European competition above.
 
 Club: name, city, tier, prestige (0–100, slow-moving), wealth (0–100), owner {type: patient | normal | impatient | erratic, ambition}, fan patience, squad {strength 0–100, age profile, size}, wage budget, honours, rivals[].
 
@@ -96,7 +95,7 @@ State per spell: expectation, credit, staleness, ownership, contract.
 
 ### Reputation → employability band
 
-0–20 non-league / minor abroad · 20–40 tier 4 · 40–60 tier 3 · 60–75 tier 2 · 75–90 tier 1 · 90+ elite.
+0–20 non-league · 20–40 tier 4 · 40–60 tier 3 · 60–75 tier 2 · 75–90 tier 1 · 90+ elite.
 A club shortlists you if your band covers its tier, or one band below with a matching tag.
 
 Reputation moves: season end vs expectation (±2 per place, clamped ±8); trophy +6 (tier-weighted); promotion +5; relegation −6; sacking as above; walking out on a contract −3 and "mercenary"; unemployment −1/month after month three (halved by punditry); stepping down to an assistant/coaching role −5 once, then decay stops.
@@ -113,7 +112,6 @@ Reputation moves: season end vs expectation (±2 per place, clamped ±8); trophy
 - in demand — poached within the last two seasons
 - mercenary — walked out twice
 - difficult — two dressing-room fallouts or board rows within three seasons
-- abroad — one or more seasons outside the home pyramid
 
 Vacancies carry a want-list of tags. This is typecasting: the survival specialist gets the relegation jobs, the big-club failure rarely gets a second big club.
 
@@ -123,7 +121,9 @@ Vacancies carry a want-list of tags. This is typecasting: the survival specialis
 - The player sees every vacancy, can apply to any, is told when shortlisted, and interviews.
 - Interview: three choices set the terms. Promise "top half" → normal budget. Promise "promotion" → +30% budget, expectation +3 places. Promise "stability" → −10% budget, expectation −2 places. Ask for a longer contract → lower salary; shorter → higher salary.
 - Approaches while employed: a bigger club calls. Accept (buy-out paid by them, "in demand") or decline (credit +3 at your club, loyalty progress).
-- Unemployed, each month: wait | punditry (small income, halves decay) | assistant role (income, −5 once, decay stops) | abroad (opens foreign vacancies; "abroad" tag after a season). Waiting is a bet.
+- Your agent applies for you. Every week you are out of work he puts you forward for the most relevant vacancy — the best fit of tier within your band, tag match and the club's need — and the application appears in your inbox. You can withdraw it, or apply to other vacancies yourself.
+- Unemployed, each month: wait | punditry (small income, halves decay) | assistant role (income, −5 once, decay stops). Waiting is a bet.
+- The start: on day one your agent has one offer ready — a club at the bottom of your band, or one in crisis, with its terms on the table. Take it and manage from the first turn, or decline and start unemployed with the agent applying weekly. This guarantee holds only at the start of a career; after that the market decides, which is what makes permadeath possible.
 
 ### Age
 
@@ -151,7 +151,7 @@ Target pace: a match in about a minute at full speed; a season in under an hour;
 
 ## Players
 
-Every home club has a squad: 22 players in tiers 1–2, 20 in tiers 3–4, 18 in tier 5. Foreign clubs get a squad generated on demand, seeded, when they meet a home club.
+Every club has a squad: 22 players in tiers 1–2, 20 in tiers 3–4, 18 in tier 5. Foreign opponents in the European competition are generated for the tie, squad included.
 
 A player: name, age, nationality, position and side, rating 1–100, hidden potential, condition 0–100, morale, injury (weeks out), suspension (matches), yellow cards this season, contract (years, wage), value, up to two traits, season and career statistics, history.
 
@@ -251,7 +251,7 @@ These are starting targets from memory, to verify against the LMA's end-of-seaso
 5. Club levels, youth, money.
 6. Media, awards, histories; the obituary's three names and the makers' list.
 7. Claude Design, then the designed web app replaces the unstyled one; JSON saves, shareable career page.
-8. Meta and world: Hall of Fame across careers, the obituary from the event log, shared leaderboard, international management, foreign leagues simulated.
+8. Meta and world: Hall of Fame across careers, the obituary from the event log, shared leaderboard, international management.
 
 ## Tunables
 

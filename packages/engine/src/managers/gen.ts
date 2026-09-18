@@ -102,9 +102,9 @@ export interface Assignment {
 }
 
 /**
- * Populate the world at genesis: an incumbent for every home and foreign
- * club (returned as assignments for the tenure system to seat), then
- * entrants up to POPULATION. Everyone starts unemployed here.
+ * Populate the world at genesis: an incumbent for every club (returned as
+ * assignments for the tenure system to seat), then entrants up to
+ * POPULATION. Everyone starts unemployed here.
  */
 export function createManagers(world: World, rng: Rng): Assignment[] {
   const namer = new ManagerNamer(rng)
@@ -128,26 +128,6 @@ export function createManagers(world: World, rng: Rng): Assignment[] {
     )
     assignments.push({ managerId: manager.id, post: { kind: 'home', clubId: club.id } })
     world.managers.push(manager)
-  }
-
-  for (const league of world.foreign) {
-    const range = T.INCUMBENT_REPUTATION_ABROAD[league.kind]
-    for (const club of league.clubs) {
-      const manager = makeManager(
-        rng,
-        namer,
-        id++,
-        {
-          nationality: drawNationality(rng, league.kind, T.FOREIGN_NATIONAL_SHARE),
-          age: rng.int(T.INCUMBENT_AGE_RANGE[0], T.INCUMBENT_AGE_RANGE[1]),
-          reputation: rng.int(range[0], range[1]),
-          abilityBonus: 0,
-        },
-        0,
-      )
-      assignments.push({ managerId: manager.id, post: { kind: 'abroad', league: league.kind, clubId: club.id } })
-      world.managers.push(manager)
-    }
   }
 
   while (world.managers.length < T.POPULATION) {

@@ -54,6 +54,7 @@ Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · �
 - Board expectation, credit, patience, shocks, sackings — ✓ (deeper than either game)
 - Job market, interviews, contracts, approaches, unemployment, age, permadeath — ✓
 - Reputation and tags — ✓
+- Your agent applies for you each week out of work; a guaranteed offer on day one — ✓
 - International management — 8
 - Holiday mode — ✗ (the point of the game is that you cannot hand over the season)
 
@@ -64,6 +65,7 @@ Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · �
 - Hall of Fame across careers, obituary, shared leaderboard — 8
 
 ## World
-- Fictional five-tier pyramid, three abstract foreign leagues, regens and cohorts — ✓
-- Foreign leagues simulated — 8
+- Fictional five-tier pyramid, regens and cohorts — ✓
+- European competition against generated foreign opponents — ✓
+- Foreign leagues, jobs or careers abroad — ✗
 - Real players, real clubs, datapacks — ✗

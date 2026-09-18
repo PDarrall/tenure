@@ -56,6 +56,22 @@ async function applyEverywhere(page: Page): Promise<void> {
   await page.getByTestId('tab-inbox').click()
 }
 
+/** Out of work: apply to everything until an offer stops the turn and is taken. False if the career ends first. */
+async function getAJob(page: Page): Promise<boolean> {
+  for (let i = 0; i < 200; i++) {
+    const header = await page.locator('header').innerText()
+    if (header.includes('Target') || (await inMatch(page))) return true
+    if (header.includes('career is over')) return false
+    await applyEverywhere(page)
+    await continueTurn(page)
+  }
+  return false
+}
+
+function clubOf(header: string): string | null {
+  return header.match(/\n([^\n]+?) \(tier \d\), /)?.[1] ?? null
+}
+
 test.describe.configure({ mode: 'serial' })
 
 test('a season on an iPad: the match view, subs, mentality, a cup tie, a contract, a debut', async ({ page }) => {
@@ -63,6 +79,8 @@ test('a season on an iPad: the match view, subs, mentality, a cup tie, a contrac
   await page.getByLabel('World seed').fill(String(SEED))
   await page.getByLabel('Your name').fill('Smoke Tester')
   await page.getByRole('button', { name: 'Start the career' }).click()
+  // Day one: the agent's offer. This smoke goes through the market instead (jobs.spec.ts takes it).
+  await page.getByTestId('start-unemployed').click()
   await expect(page.getByTestId('continue')).toBeVisible()
 
   // Tap targets on the first screen.
@@ -72,19 +90,10 @@ test('a season on an iPad: the match view, subs, mentality, a cup tie, a contrac
   }
 
   // Get a job: apply to everything until an offer stops the turn, then take it.
-  let hired = false
-  for (let i = 0; i < 200 && !hired; i++) {
-    hired = (await page.locator('header').innerText()).includes('Target')
-    if (hired) break
-    if (await inMatch(page)) {
-      hired = true
-      break
-    }
-    await applyEverywhere(page)
-    await continueTurn(page)
-  }
+  const hired = await getAJob(page)
   console.log(`hired after ${hired ? 'some' : 'no'} weeks`)
   expect(hired).toBe(true)
+  const firstClub = clubOf(await page.locator('header').innerText())
   let matches = await settleIfInMatch(page)
 
   // Renew a contract: open the squad, the first player in his last year, talk terms.
@@ -132,7 +141,13 @@ test('a season on an iPad: the match view, subs, mentality, a cup tie, a contrac
     // A season's worth of matches, at least one cup tie, and into the next season.
     if (season && startSeason && Number(season) > Number(startSeason) && matches > 30 && cupTies >= 1) break
     if (matches > 110) break
-    if (header.includes('Out of work') || header.includes('career is over')) break
+    if (header.includes('career is over')) break
+    // Sacked or released: that is the game; get another job and play on.
+    if (header.includes('Out of work')) {
+      console.log(`turn ${turn}: out of work after ${matches} matches, looking again`)
+      if (!(await getAJob(page))) break
+      continue
+    }
     if (seasonStartWeek === null) seasonStartWeek = header
 
     if (await inMatch(page)) {
@@ -200,14 +215,25 @@ test('a season on an iPad: the match view, subs, mentality, a cup tie, a contrac
   expect(timedSeconds!).toBeGreaterThan(40)
   expect(timedSeconds!).toBeLessThan(150)
 
-  // The youngster made his debut and grew.
-  await page.getByTestId('tab-squad').click()
-  const row = page.getByTestId('squad-row', { hasText: youngName }).first()
-  if ((await row.count()) > 0) {
-    const apps = Number((await row.locator('td').nth(7).innerText()).trim().split(' ')[0])
-    const ratingNow = Number((await row.locator('td').nth(3).innerText()).trim().split(' ')[0])
-    expect(apps).toBeGreaterThanOrEqual(1)
-    expect(ratingNow).toBeGreaterThanOrEqual(youngRatingBefore)
+  // The youngster made his debut and grew: checked at the club he was noted at, by his exact name.
+  const clubNow = clubOf(await page.locator('header').innerText())
+  if (clubNow === firstClub) {
+    await page.getByTestId('tab-squad').click()
+    const all = page.getByTestId('squad-row')
+    const n = await all.count()
+    let found = false
+    for (let i = 0; i < n && !found; i++) {
+      const r = all.nth(i)
+      if ((await r.locator('button.link').innerText()).replace('★ ', '').trim() !== youngName) continue
+      found = true
+      const apps = Number((await r.locator('td').nth(7).innerText()).trim().split(' ')[0])
+      const ratingNow = Number((await r.locator('td').nth(3).innerText()).trim().split(' ')[0])
+      expect(apps).toBeGreaterThanOrEqual(1)
+      expect(ratingNow).toBeGreaterThanOrEqual(youngRatingBefore)
+    }
+    console.log(`youngster ${youngName}: ${found ? 'debut and growth checked' : 'no longer at the club'}`)
+  } else {
+    console.log(`moved on from ${firstClub} to ${clubNow}: the youngster check is skipped`)
   }
   // The career page shows the four score lines and the players made.
   await page.getByTestId('tab-career').click()

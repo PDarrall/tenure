@@ -17,9 +17,15 @@ function me(world: World) {
   return world.managers[world.human!.managerId - 1]!
 }
 
-/** Apply to everything the human qualifies for until an offer arrives, then take it. */
+/**
+ * Apply to everything the human qualifies for until an offer arrives, then take it.
+ * The agent's day-one offer is its own path (agent.test.ts); these careers turn it
+ * down and go through the market.
+ */
 function getFirstJob(world: World, answer: (offer: Decision) => string): Decision {
   const player = me(world)
+  const first = pendingDecisions(world).find((d) => d.kind === 'offer' && d.payload['firstOffer'] === true)
+  if (first) advanceWeek(world, { answers: { [first.id]: 'decline' } })
   let offer: Decision | undefined
   for (let i = 0; i < 400 && !offer; i++) {
     const apply = openVacancies(world)
@@ -44,7 +50,10 @@ describe('a human career', () => {
     expect(player.history.spellIds).toEqual([])
     expect(world.managers).toHaveLength(T.POPULATION + 1)
     expect(world.logPolicy).toBe('career')
-    expect(world.log.at(-1)!.type).toBe('career.started')
+    expect(world.log.some((e) => e.type === 'career.started')).toBe(true)
+    // Day one: the agent's offer is the last thing logged and waits as a decision.
+    expect(world.log.at(-1)!.type).toBe('agent.firstOffer')
+    expect(pendingDecisions(world).some((d) => d.kind === 'offer' && d.payload['firstOffer'] === true)).toBe(true)
   })
 
   it('gets a first job by applying and negotiating at interview, then picks a tactic', () => {

@@ -3,7 +3,7 @@ import { anchorSquad } from '../players/gen.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import { clamp } from '../world/gen.js'
-import { clubById, foreignClubById, managerById, spellOf } from '../lookup.js'
+import { clubById, managerById, spellOf } from '../lookup.js'
 import { structuralTarget } from '../tenure/expectation.js'
 import { bumpReputation } from '../tenure/exits.js'
 import { endSpell, remainingValue, salaryFor, startSpell } from '../tenure/spell.js'
@@ -16,7 +16,6 @@ import { hasPending, queueApproach, queueOffer } from '../play/decisions.js'
 
 /** The AI's interview promise: promotion when the squad is a contender, stability when it is a struggler. */
 export function aiPromise(world: World, vacancy: Vacancy): Promise {
-  if (vacancy.post.kind !== 'home') return 'top-half'
   const club = clubById(world, vacancy.post.clubId)
   const size = T.TIER_SIZES[club.tier - 1] as number
   const structural = structuralTarget(world, vacancy.post)
@@ -27,16 +26,15 @@ export function aiPromise(world: World, vacancy: Vacancy): Promise {
 
 /** Can the hiring club afford the buy-out, or must the manager walk out? */
 export function buyoutAffordable(world: World, vacancy: Vacancy, buyout: number): boolean {
-  if (vacancy.post.kind !== 'home') return true
   return buyout <= T.BUYOUT_AFFORD_SHARE * clubById(world, vacancy.post.clubId).wageBudget
 }
 
 function prestigeOf(world: World, spell: Spell): number {
-  return spell.post.kind === 'home' ? clubById(world, spell.post.clubId).prestige : (foreignClubById(world, spell.post.clubId)?.prestige ?? 0)
+  return clubById(world, spell.post.clubId).prestige
 }
 
 function vacancyPrestigeOf(world: World, vacancy: Vacancy): number {
-  return vacancy.post.kind === 'home' ? clubById(world, vacancy.post.clubId).prestige : (foreignClubById(world, vacancy.post.clubId)?.prestige ?? 0)
+  return clubById(world, vacancy.post.clubId).prestige
 }
 
 export type ApproachOutcome = 'accepted' | 'declined' | 'pending'

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { openVacancies, pendingDecisions, qualifies, tunables } from '@tenure/engine'
+import { applicationInFlight, openVacancies, pendingDecisions, qualifies, tunables } from '@tenure/engine'
 import {
   blockingUnanswered,
   canAdvance,
@@ -90,6 +90,36 @@ describe('the web controller', () => {
     s = nextTurn(s)
     expect(me(s).status.kind).toBe('employed')
     expect(pendingDecisions(s.world).some((d) => d.kind === 'offer')).toBe(false)
+  })
+
+  it('the day-one offer: taken, the human manages from the first turn; declined, the agent applies and a withdrawal sticks', () => {
+    // Accepting: the answer travels with the session into the turn (a re-render is not waited for).
+    const a = newSession(1, 'Paul', 'coach')
+    const offer = pendingDecisions(a.world).find((d) => d.kind === 'offer' && d.payload['firstOffer'] === true)
+    expect(offer).toBeDefined()
+    expect(canAdvance(a)).toBe(false)
+    const key = offer!.options.find((o) => o.key.startsWith('promotion:'))!.key
+    const hired = nextTurn(withAnswer(a, offer!.id, key))
+    expect(me(hired).status.kind).toBe('employed')
+    // The first turn already stops at their first match.
+    expect(hired.world.human!.watched).not.toBeNull()
+
+    // Declining: unemployed, the agent's application is in flight within a week, and a withdrawal is not resubmitted.
+    let d = newSession(1, 'Paul', 'coach')
+    const first = pendingDecisions(d.world).find((dd) => dd.kind === 'offer' && dd.payload['firstOffer'] === true)!
+    d = nextTurn(withAnswer(d, first.id, 'decline'))
+    expect(me(d).status.kind).toBe('unemployed')
+    expect(canAdvance(d)).toBe(true)
+    // Within a few weeks something fits and the agent has put the name in.
+    for (let i = 0; i < 16 && !applicationInFlight(d.world, me(d)); i++) d = nextTurn(d)
+    const inFlight = applicationInFlight(d.world, me(d))
+    expect(inFlight).toBeDefined()
+    expect(d.world.log.some((e) => e.type === 'agent.applied' && e.payload['vacancyId'] === inFlight!.id)).toBe(true)
+    d = nextTurn(withWithdraw(d, inFlight!.id))
+    expect(inFlight!.applicants).not.toContain(me(d).id)
+    expect(d.world.human!.agentWithdrawn).toContain(inFlight!.id)
+    const next = applicationInFlight(d.world, me(d))
+    expect(next?.id).not.toBe(inFlight!.id)
   })
 
   it('round-trips a save through JSON and rejects things that are not saves', () => {

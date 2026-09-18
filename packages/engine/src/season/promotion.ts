@@ -2,7 +2,7 @@ import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import { clamp, round1 } from '../world/gen.js'
 import type { Club, ClubId, Tier, World } from '../types.js'
-import { tableFor } from './table.js'
+import { positionOf, tableFor } from './table.js'
 import { managerAt } from '../lookup.js'
 import { awardPromotionPoints, awardTrophyPoints } from '../scoring/score.js'
 
@@ -29,6 +29,8 @@ export function awardHonour(world: World, club: Club, competition: 'league' | 'n
     managerId: manager ? manager.id : null,
     competition,
     tier: tier ?? null,
+    // Where the winner stands in its league when the trophy is lifted (the European target reads this).
+    position: world.tables.length ? positionOf(world, club.id) : null,
     season: world.season,
   })
 }

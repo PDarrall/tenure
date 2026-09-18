@@ -13,6 +13,7 @@ import { human, humanState, resolveDecisions } from './decisions.js'
 import { queueContract } from '../players/contracts.js'
 import { playerById } from '../lookup.js'
 import { humanClubId } from '../sim/turn.js'
+import { noteWithdrawal } from '../market/agent.js'
 
 export function applyInputs(world: World, rng: Rng, inputs: HumanInputs): void {
   const state = humanState(world)
@@ -26,6 +27,7 @@ export function applyInputs(world: World, rng: Rng, inputs: HumanInputs): void {
   for (const id of inputs.withdraw ?? []) {
     const vacancy = world.vacancies[id - 1]
     if (vacancy) vacancy.applicants = vacancy.applicants.filter((a) => a !== player.id)
+    noteWithdrawal(world, id)
   }
   for (const id of inputs.apply ?? []) {
     const vacancy = world.vacancies[id - 1]

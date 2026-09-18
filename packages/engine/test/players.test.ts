@@ -7,7 +7,8 @@ import { runSeasons, runWeeks } from '../src/sim/advance.js'
 import { FORMATIONS, FORMATION_NAMES, slotsOf, structureOf } from '../src/players/formations.js'
 import { TRAITS, TRAIT_RULES } from '../src/players/traits.js'
 import { autoPick, bestXiMean, effectiveRating, enforceSelection, positionPenalty, squadOf, xiBands } from '../src/players/select.js'
-import { anchorSquad, ensureForeignSquad, generateSquad, positionMix } from '../src/players/gen.js'
+import { anchorSquad, generateSquad, positionMix } from '../src/players/gen.js'
+import { ensureOpponentSquad, generateEuropeanField } from '../src/season/europe.js'
 import { playerById } from '../src/lookup.js'
 import { digestWorld } from '../src/digest.js'
 import { T } from '../src/tunables.js'
@@ -40,7 +41,7 @@ describe('formations', () => {
 describe('squads', () => {
   const world = createWorld(1)
 
-  it('gives every home club the tier size, two keepers and a spread of positions; foreign clubs wait', () => {
+  it('gives every club the tier size, two keepers and a spread of positions; European opponents wait for their tie', () => {
     for (const club of world.clubs) {
       const squad = squadOf(world, club)
       expect(squad).toHaveLength(T.SQUAD_SIZE_BY_TIER[club.tier - 1] as number)
@@ -57,7 +58,7 @@ describe('squads', () => {
         expect(p.value).toBeGreaterThan(0)
       }
     }
-    for (const league of world.foreign) for (const club of league.clubs) expect(club.playerIds).toHaveLength(0)
+    for (const o of world.europeanOpponents) expect(o.playerIds).toHaveLength(0)
   })
 
   it('anchors: the best XI in the preferred formation averages the club strength', () => {
@@ -72,15 +73,20 @@ describe('squads', () => {
     expect(checked).toBeGreaterThanOrEqual(100)
   })
 
-  it('re-anchors after any strength change, and a foreign squad appears on demand at its strength', () => {
+  it('re-anchors after any strength change, and a European opponent gets a squad at its strength for the tie', () => {
     const club = world.clubs[0]!
     club.squad.strength = 40
     anchorSquad(world, club, 40, '4-4-2')
     expect(Math.abs(bestXiMean(world, club, '4-4-2') - 40)).toBeLessThanOrEqual(T.ANCHOR_TOLERANCE)
-    const foreign = world.foreign[0]!.clubs[0]!
-    ensureForeignSquad(world, createRng(3), foreign)
-    expect(foreign.playerIds).toHaveLength(T.FOREIGN_SQUAD_SIZE)
-    expect(Math.abs(bestXiMean(world, foreign, T.DEFAULT_FORMATION) - foreign.strength)).toBeLessThanOrEqual(T.ANCHOR_TOLERANCE)
+    const rng = createRng(3)
+    const field = generateEuropeanField(world, rng)
+    expect(field).toHaveLength(T.EUROPEAN_OPPONENTS)
+    const opponent = field[0]!
+    ensureOpponentSquad(world, rng, opponent)
+    expect(opponent.playerIds).toHaveLength(T.EUROPEAN_OPPONENT_SQUAD_SIZE)
+    expect(Math.abs(bestXiMean(world, opponent, T.DEFAULT_FORMATION) - opponent.strength)).toBeLessThanOrEqual(T.ANCHOR_TOLERANCE)
+    // Its players are named from its own pool and belong to it.
+    for (const id of opponent.playerIds) expect(world.players[id - 1]!.clubId).toBe(opponent.id)
   })
 
   it('is deterministic and JSON-safe with players in the world', () => {
@@ -225,7 +231,7 @@ describe('players over seasons', () => {
     }
     const kept = world.players.filter((p) => p !== null).length
     const live = livePlayers(world).length
-    const inClubs = world.clubs.reduce((n, c) => n + c.playerIds.length, 0) + world.foreign.reduce((n, l) => n + l.clubs.reduce((m, c) => m + c.playerIds.length, 0), 0)
+    const inClubs = world.clubs.reduce((n, c) => n + c.playerIds.length, 0) + world.europeanOpponents.reduce((n, o) => n + o.playerIds.length, 0)
     const pool = livePlayers(world).filter((p) => p.clubId === 0).length
     expect(live).toBe(inClubs + pool)
     // Dropped records leave holes, not ghosts: a retired player is kept only if somebody made him, and only made players wait in the pool.

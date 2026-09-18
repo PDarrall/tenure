@@ -298,10 +298,12 @@ describe('decisions during a match', () => {
     // The same player cannot come back, and a used sub cannot be re-used.
     expect(substitute(state, 'home', sub.id, starter.id)).toBe(false)
     expect(substitute(state, 'home', state.home.players.find((p) => p.on && p.id !== sub.id)!.id, starter.id)).toBe(false)
-    setMentality(state, 'home', 'attack')
-    expect(state.home.mentality).toBe('attack')
+    // Whatever the side started on, a change is recorded once and a repeat is not.
+    const target = state.home.mentality === 'attack' ? 'defend' : 'attack'
+    setMentality(state, 'home', target)
+    expect(state.home.mentality).toBe(target)
     expect(state.events[state.events.length - 1]!.kind).toBe('mentality')
-    setMentality(state, 'home', 'attack')
+    setMentality(state, 'home', target)
     expect(state.events[state.events.length - 1]!.kind).toBe('mentality')
     // The human's side is not managed by the AI rules.
     state.away.goals = state.home.goals + 3

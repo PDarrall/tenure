@@ -185,7 +185,7 @@ describe('cups', () => {
     expect(matchesThisRound(44)).toBe(12)
     expect(roundsNeeded(116)).toBe(T.NATIONAL_CUP_ROUND_WEEKS.length)
     expect(roundsNeeded(44)).toBe(T.LEAGUE_CUP_ROUND_WEEKS.length)
-    const euro = T.EUROPEAN_LEAGUE_PLACES + 1 + Object.values(T.EUROPEAN_FOREIGN_ENTRANTS).reduce((a, b) => a + b, 0)
+    const euro = T.EUROPEAN_LEAGUE_PLACES + 1 + T.EUROPEAN_OPPONENTS
     expect(roundsNeeded(euro)).toBe(T.EUROPEAN_ROUND_WEEKS.length)
   })
 })
@@ -240,8 +240,8 @@ describe('a full season', () => {
       expect(exits).toHaveLength(entrants - 1)
     }
     const trophies = world.log.filter((e) => e.type === 'trophy')
-    // Five league titles, three cups, three foreign titles.
-    expect(trophies).toHaveLength(5 + 3 + 3)
+    // Five league titles, three cups.
+    expect(trophies).toHaveLength(5 + 3)
   })
 
   it('promotes and relegates three per boundary and keeps tier sizes', () => {
@@ -264,21 +264,12 @@ describe('a full season', () => {
       expect(manager.history.seasons).toHaveLength(1)
       const record = manager.history.seasons[0]!
       // Genesis managers played the whole season; later hires carry games from wherever they were.
-      if (spell.startWeek <= 0) expect(record.games).toBeGreaterThanOrEqual(T.LEAGUE_ROUNDS_BY_TIER[record.tier! - 1] as number)
+      if (spell.startWeek <= 0) expect(record.games).toBeGreaterThanOrEqual(T.LEAGUE_ROUNDS_BY_TIER[record.tier - 1] as number)
       expect(record.games).toBeGreaterThanOrEqual(0)
       expect(record.finish).toBeGreaterThanOrEqual(1)
       expect(record.netSpendRank).toBeGreaterThanOrEqual(1)
       expect(manager.history.games).toBe(record.games)
       expect(manager.seasonGames).toBe(0)
-    }
-    for (const league of world.foreign) {
-      for (const club of league.clubs) {
-        if (club.managerId === null) continue
-        const manager = world.managers.find((m) => m.id === club.managerId)!
-        const spell = world.spells.find((s) => s.id === manager.history.spellIds.at(-1))!
-        if (spell.startWeek > 0) continue // hired during the season or summer: not a full season abroad
-        expect(manager.history.seasons[0]!.games).toBe(T.FOREIGN_GAMES_PER_SEASON)
-      }
     }
     const fresh = createWorld(1)
     for (const m of world.managers) {

@@ -3,6 +3,8 @@
   "shortlisted": ["You are on the shortlist at {club}. Sit tight; they will call if it goes further.", "{club} have you on their list."],
   "missed_out": ["{club} have gone with someone else. Their loss, allegedly."],
   "applied": ["Your name has gone in for {club}."],
+  "agent_applied": ["I have put your name in at {club} ({tier}): {why}. Withdraw it if you would rather not.", "Your name is in at {club} ({tier}); {why}."],
+  "first_offer": ["I have one offer ready for you: {club} ({tier}). Their terms are on the table; take it, or we start from nothing and I apply every week."],
   "approach_taken": ["Done. You are the new manager of {club}; your old club got £{buyout}m for you."],
   "walked_out": ["You have walked out to join {club}. That is a mark on the record, and the second would make you a mercenary."],
   "approach_declined": ["You have turned {club} down. Your board have noticed, and approve."],
@@ -11,7 +13,6 @@
   "activity_wait": ["You are waiting for the right job."],
   "activity_punditry": ["The television work keeps your name in circulation, and pays a little."],
   "activity_assistant": ["You have taken an assistant's role. It stops the slide, but it is a step down and everyone knows it."],
-  "activity_abroad": ["You have told clubs abroad you are available."],
   "default_taken": ["You let that one pass; your agent took the usual line: {key}."],
   "clock": ["A word of warning: {monthsLeft} months more without a shortlist and the game is up."]
 }

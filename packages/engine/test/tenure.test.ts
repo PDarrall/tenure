@@ -31,7 +31,7 @@ describe('genesis spells', () => {
     const live = activeSpells(world)
     const employed = world.managers.filter((m) => m.status.kind === 'employed')
     expect(live).toHaveLength(employed.length)
-    expect(live).toHaveLength(world.clubs.length + world.foreign.reduce((n, l) => n + l.clubs.length, 0))
+    expect(live).toHaveLength(world.clubs.length)
     for (const spell of live) {
       const manager = managerById(world, spell.managerId)
       expect(manager.status).toEqual({ kind: 'employed', post: spell.post, spellId: spell.id })

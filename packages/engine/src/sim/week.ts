@@ -14,6 +14,7 @@ import * as tenure from '../tenure/hooks.js'
 import * as market from '../market/hooks.js'
 import { playersWeekly } from '../match/aftermath.js'
 import { queuePlayerRequests, queueExpiringContracts } from '../players/contracts.js'
+import { agentWeekly } from '../market/agent.js'
 
 export function extrasFor(world: World) {
   return (managerId: number) => {
@@ -43,4 +44,5 @@ export function closeWeekHooks(world: World, rng: Rng, sw: number): void {
   if (sw === T.SUMMER_WINDOW_WEEK) tenure.afterSummerWindow(world, summerWindow(world, rng, (clubId) => tenure.budgetMultiplierFor(world, clubId)))
   tenure.weekly(world, rng)
   market.weekly(world, rng)
+  if (world.human) agentWeekly(world)
 }

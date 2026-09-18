@@ -51,11 +51,8 @@ export function matchTemplateKey(homeGoals: number, awayGoals: number, shootout:
 export function clubNameOf(world: World, clubId: number): string {
   const home = world.clubs.find((c) => c.id === clubId)
   if (home) return home.name
-  for (const league of world.foreign) {
-    const club = league.clubs.find((c) => c.id === clubId)
-    if (club) return club.name
-  }
-  return `Club ${clubId}`
+  const opponent = world.europeanOpponents.find((o) => o.id === clubId)
+  return opponent ? opponent.name : `Club ${clubId}`
 }
 
 function fill(template: string, vars: Record<string, string | number>): string {

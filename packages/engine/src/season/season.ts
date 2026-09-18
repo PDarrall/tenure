@@ -8,7 +8,6 @@ import { leagueFixtures } from './fixtures.js'
 import { applyResult, positionOf, resetTables, tableFor } from './table.js'
 import { knockoutExpected, matchOdds, plainBands, playMatch, type MatchOdds, type Participant } from './match.js'
 import { autoPick, clubFormation, enforceSelection, xiBands, type MatchContext } from '../players/select.js'
-import { ensureForeignSquad } from '../players/gen.js'
 import { playerById } from '../lookup.js'
 import { structureOf } from '../players/formations.js'
 import { applyFacts, applySide, type SideFacts, type SideInput } from '../match/aftermath.js'
@@ -18,12 +17,13 @@ import { milestone, seasonMilestones, settleSeasonGrowth, tierAboveMilestones } 
 import { drawRound, isFinal, seedCups } from './cups.js'
 import { decayMorale, runHumanWindow, runWindow, summerFreeAgents, summerSquad, updateMorale, type WindowSummary } from './squad.js'
 import { awardHonour, settleLeagues } from './promotion.js'
-import { settleForeignLeagues } from './abroad.js'
+import { dropOpponentSquad, ensureOpponentSquad } from './europe.js'
+import { europeanOpponentById } from '../lookup.js'
 
 export function startSeason(world: World, rng: Rng): void {
   world.fixtures = leagueFixtures(world, rng)
   resetTables(world)
-  seedCups(world)
+  seedCups(world, rng)
   for (const club of world.clubs) {
     club.thisSeason = { cupFinals: 0, inBottomZone: false, academyPromoted: club.thisSeason.academyPromoted }
     club.form = []
@@ -53,7 +53,7 @@ export interface Lineup {
   changed: number[]
 }
 
-export function lineupFor(world: World, rng: Rng, id: ClubId, ctx: MatchContext): { lineup: Lineup; participant: Participant } {
+export function lineupFor(world: World, rng: Rng, id: ClubId, ctx: MatchContext, withSquad = true): { lineup: Lineup; participant: Participant } {
   const club = clubById(world, id)
   if (club) {
     const manager = managerAt(world, club)
@@ -84,27 +84,16 @@ export function lineupFor(world: World, rng: Rng, id: ClubId, ctx: MatchContext)
       participant: { id, strength: bands.strength, tactical, form: club.form, morale, mentality: club.mentality, style: club.style, bands },
     }
   }
-  for (const league of world.foreign) {
-    const foreign = league.clubs.find((c) => c.id === id)
-    if (foreign) {
-      ensureForeignSquad(world, rng, foreign)
-      const manager = world.managers.find((m) => m.id === foreign.managerId)
-      const formation = manager ? manager.preferredFormation : T.DEFAULT_FORMATION
-      const picked = autoPick(world, foreign, formation, 'results-first', ctx)
-      const bands = picked.xi.length === 11 ? xiBands(world, picked.xi, formation, ctx) : plainBands(foreign.strength, structureOf(formation))
-      return {
-        lineup: { ...picked, changed: [] },
-        participant: {
-          id,
-          strength: bands.strength,
-          tactical: manager ? manager.ability.tactical : T.CARETAKER_ABILITY,
-          form: [],
-          morale: T.MORALE_INITIAL,
-          mentality: 'balanced',
-          style: manager ? manager.style : 'possession',
-          bands,
-        },
-      }
+  const opponent = europeanOpponentById(world, id)
+  if (opponent) {
+    // A generated side: a squad when a home club is across the pitch (withSquad), strength alone otherwise.
+    if (withSquad) ensureOpponentSquad(world, rng, opponent)
+    const formation = T.DEFAULT_FORMATION as Formation
+    const picked = opponent.playerIds.length > 0 ? autoPick(world, opponent, formation, 'results-first', ctx) : { xi: [], bench: [] }
+    const bands = picked.xi.length === 11 ? xiBands(world, picked.xi, formation, ctx) : plainBands(opponent.strength, structureOf(formation))
+    return {
+      lineup: { ...picked, changed: [] },
+      participant: { id, strength: bands.strength, tactical: T.CARETAKER_ABILITY, form: [], morale: T.MORALE_INITIAL, mentality: 'balanced', style: 'possession', bands },
     }
   }
   throw new Error(`lineupFor: unknown club ${id}`)
@@ -131,10 +120,8 @@ function isBigGame(world: World, fixture: Fixture, id: ClubId, opponentId: ClubI
 function strengthOf(world: World, id: ClubId): number {
   const club = clubById(world, id)
   if (club) return club.squad.strength
-  for (const league of world.foreign) {
-    const foreign = league.clubs.find((c) => c.id === id)
-    if (foreign) return foreign.strength
-  }
+  const opponent = europeanOpponentById(world, id)
+  if (opponent) return opponent.strength
   throw new Error(`strengthOf: unknown club ${id}`)
 }
 
@@ -192,8 +179,10 @@ export function prepareFixture(world: World, rng: Rng, fixture: Fixture): Prepar
   aiMentality(world, fixture.awayId, strengthOf(world, fixture.homeId))
   const homeBigGame = isBigGame(world, fixture, fixture.homeId, fixture.awayId)
   const awayBigGame = isBigGame(world, fixture, fixture.awayId, fixture.homeId)
-  const homeSide = lineupFor(world, rng, fixture.homeId, { bigGame: homeBigGame })
-  const awaySide = lineupFor(world, rng, fixture.awayId, { bigGame: awayBigGame })
+  // Two generated opponents meeting each other need no squads; a home club across the pitch does.
+  const withSquad = clubById(world, fixture.homeId) !== undefined || clubById(world, fixture.awayId) !== undefined
+  const homeSide = lineupFor(world, rng, fixture.homeId, { bigGame: homeBigGame }, withSquad)
+  const awaySide = lineupFor(world, rng, fixture.awayId, { bigGame: awayBigGame }, withSquad)
   const homeClub = clubById(world, fixture.homeId)
   const awayClub = clubById(world, fixture.awayId)
   const homeManager = homeClub ? managerAt(world, homeClub) : undefined
@@ -299,7 +288,7 @@ export function settleFixture(world: World, rng: Rng, prepared: PreparedFixture,
   const awayPoints = awayResult === 'W' ? T.POINTS_WIN : awayResult === 'D' ? T.POINTS_DRAW : 0
 
   // The players: goals, ratings, condition, cards, injuries, morale.
-  const squadIdsOf = (id: ClubId): readonly number[] => clubById(world, id)?.playerIds ?? foreignSquadIds(world, id)
+  const squadIdsOf = (id: ClubId): readonly number[] => clubById(world, id)?.playerIds ?? europeanOpponentById(world, id)?.playerIds ?? []
   const homeInput = sideInputFor(world, prepared, 'home', result, homeResult)
   const awayInput = sideInputFor(world, prepared, 'away', result, awayResult)
   let homeAfter: SideFacts
@@ -360,11 +349,7 @@ export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFix
 function clubNameOf(world: World, id: ClubId): string {
   const club = clubById(world, id)
   if (club) return club.name
-  for (const league of world.foreign) {
-    const c = league.clubs.find((x) => x.id === id)
-    if (c) return c.name
-  }
-  return `Club ${id}`
+  return europeanOpponentById(world, id)?.name ?? `Club ${id}`
 }
 
 /** A prepared fixture as a minute-engine match, for the ones somebody watches. */
@@ -398,24 +383,7 @@ export function commitFixtureMatch(world: World, rng: Rng, prepared: PreparedFix
 function homeFormation(world: World, id: ClubId, participant: Participant): Formation {
   const club = clubById(world, id)
   if (club) return club.formation
-  const manager = world.managers.find((m) => m.id === foreignClubIdManager(world, id))
-  return manager ? manager.preferredFormation : (T.DEFAULT_FORMATION as Formation)
-}
-
-function foreignClubIdManager(world: World, id: ClubId): number | null {
-  for (const league of world.foreign) {
-    const c = league.clubs.find((x) => x.id === id)
-    if (c) return c.managerId
-  }
-  return null
-}
-
-function foreignSquadIds(world: World, id: ClubId): readonly number[] {
-  for (const league of world.foreign) {
-    const c = league.clubs.find((x) => x.id === id)
-    if (c) return c.playerIds
-  }
-  return []
+  return T.DEFAULT_FORMATION as Formation
 }
 
 function tierOfClub(world: World, id: ClubId): Tier | null {
@@ -435,7 +403,7 @@ export function drawnCupFixtures(world: World, cup: CupState): Fixture[] {
  */
 export function drawCupRound(world: World, rng: Rng, cup: CupState, seasonWk: number): Fixture[] {
   const final = isFinal(cup)
-  const pairs = drawRound(rng, cup)
+  const pairs = drawRound(world, rng, cup)
   const round = cup.roundsPlayed + 1
   if (final) {
     cup.finalistIds = [...cup.remaining]
@@ -502,6 +470,15 @@ export function settleCupRound(world: World, cup: CupState, played: PlayedFixtur
   }
   cup.remaining = cup.remaining.filter((id) => !out.has(id))
   cup.roundsPlayed++
+  // A generated opponent's squad lasts one tie.
+  if (cup.competition === 'european') {
+    for (const result of played) {
+      for (const id of [result.fixture.homeId, result.fixture.awayId]) {
+        const o = europeanOpponentById(world, id)
+        if (o) dropOpponentSquad(world, o)
+      }
+    }
+  }
   if (cup.remaining.length === 1) {
     cup.winnerId = cup.remaining[0] as ClubId
     const club = clubById(world, cup.winnerId)
@@ -532,8 +509,6 @@ export interface SeasonEnd {
   playedTier: Map<ClubId, Tier>
   promoted: Set<ClubId>
   relegated: Set<ClubId>
-  /** Finish per foreign club. */
-  foreignFinish: Map<ClubId, number>
 }
 
 /** What the season needs from the tenure system to complete a season record. */
@@ -552,9 +527,8 @@ function netSpendRank(world: World, club: Club, tier: Tier): number {
   return sorted.findIndex((c) => c.id === club.id) + 1
 }
 
-/** Close the season: foreign leagues, home divisions, season records, ageing, drift. */
+/** Close the season: home divisions, season records, ageing, drift. */
 export function endSeason(world: World, rng: Rng, extrasFor: ExtrasFor = noExtras): SeasonEnd {
-  const foreign = settleForeignLeagues(world, rng, extrasFor)
   // Net-spend ranks are taken against the tiers as played, before any swap.
   const spendRank = new Map<ClubId, number>()
   for (const club of world.clubs) spendRank.set(club.id, netSpendRank(world, club, club.tier))
@@ -611,7 +585,7 @@ export function endSeason(world: World, rng: Rng, extrasFor: ExtrasFor = noExtra
     promoted: [...outcome.promoted],
     relegated: [...outcome.relegated],
   })
-  return { ...outcome, foreignFinish: foreign.finish }
+  return outcome
 }
 
 export type BudgetMultiplierFor = (clubId: ClubId) => number

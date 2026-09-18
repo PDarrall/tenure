@@ -152,7 +152,8 @@ export interface MadePlayerSummary {
 function clubName(world: World, clubId: number): string {
   const home = world.clubs[clubId - 1]
   if (home && home.id === clubId) return home.name
-  for (const league of world.foreign) for (const c of league.clubs) if (c.id === clubId) return c.name
+  const opponent = world.europeanOpponents.find((o) => o.id === clubId)
+  if (opponent) return opponent.name
   return clubId === 0 ? 'no club' : `Club ${clubId}`
 }
 
@@ -170,7 +171,7 @@ export function madePlayers(world: World, managerId: ManagerId): MadePlayerSumma
     const tag = tagOf(p, managerId)
     if (!tag) continue
     const club = world.clubs[p.clubId - 1]
-    const now = p.retired ? 'retired' : p.clubId === 0 ? 'without a club' : club && club.id === p.clubId ? `${club.name} (tier ${club.tier})` : `${clubName(world, p.clubId)} (abroad)`
+    const now = p.retired ? 'retired' : p.clubId === 0 ? 'without a club' : club && club.id === p.clubId ? `${club.name} (tier ${club.tier})` : clubName(world, p.clubId)
     const growthUnder = (p.season.growth + p.history.reduce((s, h) => s + h.growth, 0)) // all growth; per-manager share is in points
     out.push({
       playerId: p.id,

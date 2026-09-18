@@ -83,8 +83,6 @@ function header(world: World): string {
       const pos = table.findIndex((r) => r.clubId === club.id) + 1
       lines.push(`${club.name} (tier ${club.tier}), ${ordinal(pos)} of ${table.length}.  Target ${ordinal(spell.expectation)}.  Board: ${boardMood(spell)}.  ${world.human!.tactic.formation}, ${world.human!.tactic.style}, ${world.human!.tactic.mentality}.  Contract to season ${Math.floor(spell.contract.endWeek / tunables.SEASON_WEEKS) + 1}.`)
       lines.push(nextFixtureLine(world))
-    } else {
-      lines.push(`Abroad in the ${spell.post.league} league.  Target ${ordinal(spell.expectation)}.  Board: ${boardMood(spell)}.`)
     }
   } else if (me.status.kind === 'unemployed') {
     const months = Math.floor((world.week - me.status.sinceWeek) / tunables.MONTH_WEEKS)
@@ -100,7 +98,7 @@ function nextFixtureLine(world: World): string {
   if (!next) return sw >= tunables.MATCH_WEEKS ? 'Next: the summer; fixtures come out with the new season.' : 'Next: no more fixtures this season.'
   const when = next.seasonWeek === sw ? 'this week' : `week ${next.seasonWeek + 1}`
   if (next.kind === 'draw') return `Next: ${next.competitionLabel} round ${next.round}, ${when}, draw to come.`
-  const where = next.opponentAbroad ?? `${next.opponentPosition !== null ? ordinal(next.opponentPosition) : '?'} in tier ${next.opponentTier}`
+  const where = next.opponentEuropean ?? `${next.opponentPosition !== null ? ordinal(next.opponentPosition) : '?'} in tier ${next.opponentTier}`
   const form = next.opponentForm.length ? next.opponentForm.join('') : 'no games yet'
   return `Next: ${next.opponent} (${next.home ? 'H' : 'A'}), ${next.competitionLabel}${next.competition === 'league' ? '' : ` round ${next.round}`}, ${when}.  They are ${where}, form ${form}.`
 }
@@ -155,8 +153,8 @@ function showVacancies(world: World): void {
     return
   }
   for (const v of open) {
-    const name = v.post.kind === 'home' ? world.clubs[v.post.clubId - 1]!.name : (world.foreign.find((l) => l.kind === (v.post.kind === 'abroad' ? v.post.league : ''))?.clubs.find((c) => c.id === v.post.clubId)?.name ?? 'abroad')
-    const where = v.post.kind === 'home' ? `tier ${world.clubs[v.post.clubId - 1]!.tier}` : `${v.post.league} league abroad`
+    const name = world.clubs[v.post.clubId - 1]!.name
+    const where = `tier ${world.clubs[v.post.clubId - 1]!.tier}`
     const applied = v.applicants.includes(me.id) ? ' (applied)' : ''
     const fits = qualifies(world, me, v) ? ' *' : ''
     console.log(`  #${v.id} ${name} (${where}) ${v.ownerType} owner, ${v.contract.years}y, target ${ordinal(v.expectation)}${v.crisis ? ', crisis' : ''}${fits}${applied}`)
@@ -195,7 +193,7 @@ function help(): void {
   a <id>         apply for vacancy    w <id>         withdraw an application
   form <name>    formation (e.g. form 4-4-2)   style possession|direct|counter|pressing
   m attack|balanced|defend   mentality
-  act <what>     wait|punditry|assistant|abroad       v   vacancies   f   fixtures   t   table   c   career page
+  act <what>     wait|punditry|assistant       v   vacancies   f   fixtures   t   table   c   career page
   resign         resign now           retire         end the career and bank the score
   save [file]    save                 q              quit (autosaves if --save given)   h   help`)
 }
@@ -307,7 +305,7 @@ async function main(): Promise<void> {
       } else if (cmd === 'm' && ['attack', 'balanced', 'defend'].includes(arg)) {
         inputs.tactic = { ...(inputs.tactic ?? {}), mentality: arg as Mentality }
         console.log(`  Mentality ${arg} from the next match.`)
-      } else if (cmd === 'act' && ['wait', 'punditry', 'assistant', 'abroad'].includes(arg)) {
+      } else if (cmd === 'act' && ['wait', 'punditry', 'assistant'].includes(arg)) {
         inputs.activity = arg as UnemployedActivity
         console.log(`  ${arg} from this week.`)
       } else if (cmd === 'v') showVacancies(world)

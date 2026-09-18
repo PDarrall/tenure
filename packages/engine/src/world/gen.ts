@@ -1,16 +1,8 @@
 import { rngFromState, seedState, type Rng } from '../rng.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
-import type {
-  Club,
-  ForeignClub,
-  ForeignLeague,
-  ForeignLeagueKind,
-  OwnerType,
-  Tier,
-  World,
-} from '../types.js'
-import { clubName, ForeignNamer, foreignLeagueName, TownNamer } from './names.js'
+import type { Club, OwnerType, Tier, World } from '../types.js'
+import { clubName, TownNamer } from './names.js'
 import { createManagers } from '../managers/gen.js'
 import { seatIncumbents } from '../tenure/spell.js'
 import { resetTables } from '../season/table.js'
@@ -102,30 +94,6 @@ function assignRivals(rng: Rng, clubs: Club[]): void {
   for (const club of clubs) club.rivals.sort((a, b) => a - b)
 }
 
-function makeForeign(rng: Rng, namer: ForeignNamer, nextId: { value: number }): ForeignLeague[] {
-  return T.FOREIGN_LEAGUES.map((spec) => {
-    const clubs: ForeignClub[] = []
-    for (let i = 0; i < spec.clubs; i++) {
-      clubs.push({
-        id: nextId.value++,
-        name: namer.next(spec.kind as ForeignLeagueKind, T.FOREIGN_PREFIX_SHARE),
-        league: spec.kind,
-        prestige: Math.round(clamp(spec.prestige + rng.normal(0, T.FOREIGN_CLUB_NOISE_SD), 0, 100)),
-        strength: round1(clamp(spec.strength + rng.normal(0, T.FOREIGN_CLUB_NOISE_SD), 1, 100)),
-        managerId: null,
-        playerIds: [],
-      })
-    }
-    return {
-      kind: spec.kind,
-      name: foreignLeagueName(spec.kind),
-      prestige: spec.prestige,
-      strength: spec.strength,
-      clubs,
-    }
-  })
-}
-
 /** Build a fresh world from a seed. Same seed, same world. */
 export function createWorld(seed: number): World {
   const world: World = {
@@ -134,7 +102,7 @@ export function createWorld(seed: number): World {
     week: 0,
     season: 1,
     clubs: [],
-    foreign: [],
+    europeanOpponents: [],
     managers: [],
     fixtures: [],
     tables: [],
@@ -160,12 +128,7 @@ export function createWorld(seed: number): World {
   })
   assignRivals(rng, world.clubs)
   resetTables(world)
-  world.foreign = makeForeign(rng, new ForeignNamer(rng), { value: T.FOREIGN_CLUB_ID_BASE })
-  emit(world, 'world.created', {
-    seed,
-    clubs: world.clubs.length,
-    foreignClubs: world.foreign.reduce((n, l) => n + l.clubs.length, 0),
-  })
+  emit(world, 'world.created', { seed, clubs: world.clubs.length })
   const assignments = createManagers(world, rng)
   world.nextManagerId = world.managers.length + 1
   seatIncumbents(world, rng, assignments)

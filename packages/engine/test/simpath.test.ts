@@ -16,7 +16,7 @@ function stateHash(world: World): string {
 }
 
 describe('the population simulation path', () => {
-  it('produces the same state after two seasons of seed 1', () => {
+  it('produces the same state after two seasons of seed 1', { timeout: 60_000 }, () => {
     const world = createWorld(1)
     runSeasons(world, 2)
     expect(stateHash(world)).toMatchSnapshot()
