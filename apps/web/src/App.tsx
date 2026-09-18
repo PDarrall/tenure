@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { Background } from '@tenure/engine'
+import type { Background, World } from '@tenure/engine'
 import './styles.css'
 import { newSession, nextTurn, parseSave, serialize, sessionFromWorld, type Session } from './controller.js'
 import { clearSave, downloadText, loadSave, storeSave } from './storage.js'
@@ -20,15 +20,23 @@ function restore(): Session | null {
   }
 }
 
-function savedState(): SaveState {
+function savedWorld(): { state: SaveState; world: World | null } {
   const text = loadSave()
-  if (text === null) return 'none'
+  if (text === null) return { state: 'none', world: null }
   try {
-    parseSave(text)
-    return 'ok'
+    return { state: 'ok', world: parseSave(text) }
   } catch {
-    return 'broken'
+    return { state: 'broken', world: null }
   }
+}
+
+/** "Neil Garside · Kelford Town · season 3" */
+function saveLineOf(world: World | null): string | null {
+  if (!world || !world.human) return null
+  const me = world.managers[world.human.managerId - 1]
+  if (!me) return null
+  const where = me.status.kind === 'employed' && me.status.post.kind === 'home' ? (world.clubs[me.status.post.clubId - 1]?.name ?? 'a club') : me.status.kind === 'unemployed' ? 'out of work' : 'retired'
+  return `${me.name} · ${where} · season ${world.season}`
 }
 
 export function App() {
@@ -37,7 +45,7 @@ export function App() {
     return restored ? { kind: 'game', session: restored, careerKey: 1 } : { kind: 'new' }
   })
   const [saveNote, setSaveNote] = useState<string | null>(null)
-  const [save, setSave] = useState<SaveState>(() => savedState())
+  const [save, setSave] = useState<{ state: SaveState; world: World | null }>(() => savedWorld())
 
   // Autosave whenever the world changes: a new, restored or imported world (object identity) or a played week (turn).
   const world = screen.kind === 'game' ? screen.session.world : null
@@ -46,7 +54,7 @@ export function App() {
     if (!world) return
     const ok = storeSave(serialize(world))
     setSaveNote(ok ? null : 'Autosave failed on this device; export a file to keep your career.')
-    setSave(ok ? 'ok' : savedState())
+    setSave(ok ? { state: 'ok', world } : savedWorld())
   }, [world, turn])
 
   const open = (session: Session) => {
@@ -78,7 +86,7 @@ export function App() {
 
   const discard = () => {
     clearSave()
-    setSave('none')
+    setSave({ state: 'none', world: null })
   }
 
   const reset = () => {
@@ -88,32 +96,20 @@ export function App() {
 
   if (screen.kind === 'new') {
     return (
-      <>
-        <NewCareer
-          onStart={start}
-          save={save}
-          onResume={() => {
-            const s = restore()
-            if (s) open(s)
-            else setSave(savedState())
-          }}
-          onExportBroken={exportBroken}
-          onDiscard={discard}
-        />
-        <main>
-          <h2>Import a save</h2>
-          <input
-            type="file"
-            accept="application/json,.json"
-            onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) void importSave(file)
-              e.target.value = ''
-            }}
-          />
-          {saveNote && <p className="notice">{saveNote}</p>}
-        </main>
-      </>
+      <NewCareer
+        onStart={start}
+        save={save.state}
+        saveLine={saveLineOf(save.world)}
+        onResume={() => {
+          const s = restore()
+          if (s) open(s)
+          else setSave(savedWorld())
+        }}
+        onExportBroken={exportBroken}
+        onDiscard={discard}
+        onImport={(file) => void importSave(file)}
+        note={saveNote}
+      />
     )
   }
 

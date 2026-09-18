@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
+import { clubOf, continueTurn, inMatch, playMatchQuickly, startCareer, state } from './helpers.js'
 
 /**
  * Jobs and world (DESIGN.md "Job market", the start): on day one the agent
@@ -9,126 +10,74 @@ import { expect, test, type Page } from '@playwright/test'
 
 const SEED = 5
 
-async function startCareer(page: Page, name: string): Promise<void> {
-  await page.goto('./')
-  await page.getByLabel('World seed').fill(String(SEED))
-  await page.getByLabel('Your name').fill(name)
-  await page.getByRole('button', { name: 'Start the career' }).click()
-  // The offer card: club and tier, the terms, the board's expectation.
-  const card = page.getByLabel('Your first offer')
-  await expect(card).toBeVisible()
-  const text = await card.innerText()
-  expect(text).toMatch(/\(tier [1-5]\)/)
-  expect(text).toContain('-year contract')
-  expect(text).toContain('budget')
-  expect(text).toContain('the board expects')
-}
-
-async function answerBlocking(page: Page): Promise<void> {
-  const cards = page.locator('.decision.blocking')
-  const n = await cards.count()
-  for (let i = 0; i < n; i++) {
-    const card = cards.nth(i)
-    // A job offer's default is to decline; the smoke takes the first set of terms.
-    if ((await card.innerText()).includes('want to talk')) {
-      await card.getByRole('button', { name: /^(?!Decline)/ }).first().click()
-      continue
-    }
-    const preferred = card.getByRole('button', { name: /\(default\)/ })
-    if (await preferred.count()) await preferred.first().click()
-    else await card.getByRole('button').first().click()
-  }
-}
-
-async function continueTurn(page: Page): Promise<void> {
-  await answerBlocking(page)
-  await page.getByTestId('continue').click()
-}
-
-async function inMatch(page: Page): Promise<boolean> {
-  return (await page.getByTestId('kick-off').count()) > 0 || (await page.getByTestId('score').count()) > 0
-}
-
-/** Play the match the turn stopped at straight through to the whistle. */
-async function playMatch(page: Page): Promise<void> {
-  if ((await page.getByTestId('kick-off').count()) > 0) await page.getByTestId('kick-off').click()
-  await expect(page.getByTestId('score')).toBeVisible()
-  await page.getByTestId('to-full-time').click()
-  await expect(page.getByTestId('continue-after-match')).toBeVisible()
-  await page.getByTestId('continue-after-match').click()
-}
-
-function clubOf(header: string): string | null {
-  const m = header.match(/\n([^\n]+?) \(tier \d\), .*Target/)
-  return m ? m[1]! : null
-}
-
 test.describe.configure({ mode: 'serial' })
 
 test('accept the offer: employed from the first turn, five matches played', async ({ page }) => {
-  await startCareer(page, 'Day One')
+  await startCareer(page, SEED, 'Day One')
+  // The offer card: club and tier, the terms, the board's expectation.
+  const text = await page.locator('main[aria-label="Your first offer"]').innerText()
+  expect(text).toMatch(/Tier [1-5]/)
+  expect(text).toContain('-year contract')
+  expect(text).toContain('budget')
+  expect(text).toContain('the board expects')
   await page.getByTestId('promise-stability').click()
   await page.getByTestId('accept-offer').click()
 
   let matches = 0
   for (let turn = 0; turn < 40 && matches < 5; turn++) {
     if (await inMatch(page)) {
-      await playMatch(page)
+      await playMatchQuickly(page)
       matches++
       continue
     }
-    const header = await page.locator('header').innerText()
-    expect(header, 'employed from the first turn').toContain('Target')
+    const s = await state(page)
+    expect(s, 'employed from the first turn').toBe('employed')
     await continueTurn(page)
   }
   expect(matches).toBe(5)
-  const header = await page.locator('header').innerText()
-  expect(header).toContain('Target')
-  console.log(`accepted: ${clubOf(header)}, five matches played`)
+  const club = await clubOf(page)
+  expect(club).not.toBeNull()
+  console.log(`accepted: ${club}, five matches played`)
 })
 
 test('decline the offer: unemployed, the agent applies weekly, one withdrawn, hired through his application', async ({ page }) => {
-  await startCareer(page, 'Free Agent')
+  await startCareer(page, SEED, 'Free Agent')
   await page.getByTestId('start-unemployed').click()
   await expect(page.getByTestId('continue')).toBeVisible()
-  expect(await page.locator('header').innerText()).toContain('Out of work')
+  expect(await state(page)).toBe('unemployed')
 
   const appliedAt = new Set<string>()
   let withdrawn: string | null = null
   let hiredAt: string | null = null
   for (let turn = 0; turn < 260 && hiredAt === null; turn++) {
-    if (await inMatch(page)) {
-      // Hired and straight into a match week.
-      hiredAt = clubOf(await page.locator('header').innerText())
-      break
+    const s = await state(page)
+    if (s === 'over') break
+    if (s === 'match') {
+      // Hired and straight into a match week: play it, then read the club off Home.
+      await playMatchQuickly(page)
+      continue
     }
-    const header = await page.locator('header').innerText()
-    if (header.includes('career is over')) break
-    const club = clubOf(header)
-    if (club) {
-      hiredAt = club
+    if (s === 'employed') {
+      hiredAt = await clubOf(page)
       break
     }
     // The agent's application of the week sits above the vacancies.
-    await page.getByTestId('tab-vacancies').click()
     const panel = page.getByTestId('agent-application')
     await expect(panel).toBeVisible()
     const text = await panel.innerText()
-    const m = text.match(/Your name is in at (.+?) \(/)
+    const m = text.match(/Your name is in at (.+)\n/)
     if (m) {
-      appliedAt.add(m[1]!)
+      appliedAt.add(m[1]!.trim())
       if (withdrawn === null) {
         await panel.getByTestId('withdraw-agent').click()
         await expect(panel.getByText('Withdrawing when you continue.')).toBeVisible()
-        withdrawn = m[1]!
-        await page.getByTestId('tab-inbox').click()
+        withdrawn = m[1]!.trim()
         await continueTurn(page)
         // Not resubmitted to the club just withdrawn from.
-        await page.getByTestId('tab-vacancies').click()
-        expect(await page.getByTestId('agent-application').innerText()).not.toContain(`in at ${withdrawn} (`)
+        if ((await state(page)) === 'unemployed') expect(await page.getByTestId('agent-application').innerText()).not.toContain(`in at ${withdrawn}\n`)
+        continue
       }
     }
-    await page.getByTestId('tab-inbox').click()
     await continueTurn(page)
   }
   console.log(`agent applied at: ${[...appliedAt].join(', ')}; withdrawn: ${withdrawn}; hired at: ${hiredAt}`)
