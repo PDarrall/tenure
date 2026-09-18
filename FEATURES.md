@@ -64,6 +64,7 @@ Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · �
 - Hall of Fame across careers, obituary, shared leaderboard — 8
 
 ## World
-- Fictional five-tier pyramid, three abstract foreign leagues, regens and cohorts — ✓
-- Foreign leagues simulated — 8
+- Fictional five-tier pyramid, regens and cohorts — ✓
+- European competition against generated foreign opponents — ✓
+- Foreign leagues, jobs or careers abroad — ✗
 - Real players, real clubs, datapacks — ✗
