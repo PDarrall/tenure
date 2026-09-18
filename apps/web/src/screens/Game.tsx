@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import {
+  applicationInFlight,
   boardMood,
   careerSummary,
   clubNameOf,
@@ -44,13 +45,15 @@ import { PlayerProfile } from './PlayerProfile.js'
 import { Tactics } from './Tactics.js'
 import { PreMatch } from './PreMatch.js'
 import { MatchView } from './MatchView.js'
+import { FirstOffer } from './FirstOffer.js'
 
 type Tab = 'inbox' | 'squad' | 'tactics' | 'fixtures' | 'vacancies' | 'career'
 
 interface Props {
   session: Session
   onChange: (s: Session) => void
-  onContinue: () => void
+  /** Take the turn; with a session, take it with those inputs instead of the current ones (the first offer answers and continues in one tap). */
+  onContinue: (s?: Session) => void
   onExport: () => void
   onImport: (file: File) => void
   onReset: () => void
@@ -75,7 +78,7 @@ function vacancyName(world: World, v: Vacancy): string {
 }
 
 function vacancyWhere(world: World, v: Vacancy): string {
-  return v.post.kind === 'home' ? `tier ${world.clubs[v.post.clubId - 1]?.tier ?? '?'}` : `${v.post.league} league abroad`
+  return `tier ${world.clubs[v.post.clubId - 1]?.tier ?? '?'}`
 }
 
 function weekLabel(sw: number): string {
@@ -102,6 +105,17 @@ export function Game({ session, onChange, onContinue, onExport, onImport, onRese
   const blocked = blockingUnanswered(session)
   const answers = session.inputs.answers ?? {}
 
+  // Day one: the agent's offer, before anything else.
+  const firstOffer = world.week === 0 && me.status.kind === 'unemployed' ? decisions.find((d) => d.kind === 'offer' && d.payload['firstOffer'] === true && answers[d.id] === undefined) : undefined
+  if (firstOffer) {
+    return (
+      <main>
+        <Header session={session} />
+        <FirstOffer session={session} offer={firstOffer} onContinue={onContinue} />
+      </main>
+    )
+  }
+
   // A match week stopped before kick-off: the pre-match screen, then the match view, then Continue.
   const match = humanMatch(session)
   if (watched(session) && match) {
@@ -110,7 +124,7 @@ export function Game({ session, onChange, onContinue, onExport, onImport, onRese
       <main>
         <Header session={session} />
         {started ? (
-          <MatchView session={session} onContinue={onContinue} />
+          <MatchView session={session} onContinue={() => onContinue()} />
         ) : (
           <PreMatch
             session={session}
@@ -133,7 +147,7 @@ export function Game({ session, onChange, onContinue, onExport, onImport, onRese
 
       <section aria-label="This turn">
         <p>
-          <button className="primary" disabled={!canAdvance(session)} onClick={onContinue} data-testid="continue">
+          <button className="primary" disabled={!canAdvance(session)} onClick={() => onContinue()} data-testid="continue">
             Continue
           </button>
           {session.inputs.resign && <span className="notice">You will resign this turn.</span>}
@@ -230,8 +244,6 @@ function Header({ session }: { session: Session }) {
     const table = tableFor(world, club.tier)
     const pos = table.findIndex((r) => r.clubId === club.id) + 1
     line = `${club.name} (tier ${club.tier}), ${ordinal(pos)} of ${table.length}. Target ${ordinal(spell.expectation)}. Board: ${boardMood(spell)}. Contract to season ${Math.floor(spell.contract.endWeek / tunables.SEASON_WEEKS) + 1}.`
-  } else if (spell && spell.post.kind === 'abroad') {
-    line = `Abroad in the ${spell.post.league} league. Target ${ordinal(spell.expectation)}. Board: ${boardMood(spell)}.`
   } else if (me.status.kind === 'unemployed') {
     const months = Math.floor((world.week - me.status.sinceWeek) / tunables.MONTH_WEEKS)
     line = `Out of work ${months} month${months === 1 ? '' : 's'} (${me.status.activity}). Reputation band: ${bandName(me.reputation)}. ${tunables.NO_SHORTLIST_MONTHS - me.status.monthsSinceShortlisted} months before the phone stops ringing for good.`
@@ -265,8 +277,6 @@ function NextFixtureCard({ world }: { world: World }) {
   let body: ReactNode
   if (me.status.kind === 'unemployed') {
     body = <p>No fixture: you are out of work. Continue passes a week.</p>
-  } else if (me.status.kind === 'employed' && me.status.post.kind === 'abroad') {
-    body = <p>Abroad the season is settled at its end. Continue passes a week.</p>
   } else if (me.status.kind === 'retired') {
     body = <p>The career is over.</p>
   } else {
@@ -280,7 +290,7 @@ function NextFixtureCard({ world }: { world: World }) {
         </p>
       )
     } else {
-      const where = next.opponentAbroad ? `${next.opponentAbroad}` : `${next.opponentPosition !== null ? ordinal(next.opponentPosition) : '?'} in tier ${next.opponentTier}`
+      const where = next.opponentEuropean ? next.opponentEuropean : `${next.opponentPosition !== null ? ordinal(next.opponentPosition) : '?'} in tier ${next.opponentTier}`
       const when = next.seasonWeek === sw ? 'this week' : `${weekLabel(next.seasonWeek)}`
       body = (
         <>
@@ -348,13 +358,13 @@ function Controls({ session, onChange, confirm, setConfirm }: { session: Session
         <>
           <h3>This month</h3>
           <div className="row">
-            {(['wait', 'punditry', 'assistant', 'abroad'] as UnemployedActivity[]).map((a) => (
+            {(['wait', 'punditry', 'assistant'] as UnemployedActivity[]).map((a) => (
               <button key={a} className={activity === a ? 'selected' : ''} onClick={() => chooseActivity(a)} aria-pressed={activity === a}>
                 <span>{a}</span>
               </button>
             ))}
           </div>
-          <p className="muted">Waiting is a bet. Punditry halves the slide; an assistant role stops it, at a price; abroad opens foreign vacancies.</p>
+          <p className="muted">Waiting is a bet. Punditry halves the slide; an assistant role stops it, at a price. Your agent puts your name in for the best fit every week.</p>
         </>
       )}
       <div className="row">
@@ -456,8 +466,40 @@ function Vacancies({ session, onChange }: { session: Session; onChange: (s: Sess
   const world = session.world
   const me = player(world)
   const open = openVacancies(world)
+  // The agent's application of the week: the one in flight that he put in, unless the human is withdrawing it.
+  const inFlight = me.status.kind === 'unemployed' ? applicationInFlight(world, me) : undefined
+  const agentEvent = inFlight ? [...world.log].reverse().find((e) => e.type === 'agent.applied' && e.payload['vacancyId'] === inFlight.id) : undefined
+  const withdrawing = inFlight ? (session.inputs.withdraw ?? []).includes(inFlight.id) : false
   return (
     <section aria-label="Vacancies">
+      {me.status.kind === 'unemployed' && (
+        <div className="decision" aria-label="Your agent" data-testid="agent-application">
+          <p className="from">Your agent</p>
+          {inFlight && agentEvent ? (
+            <>
+              <p>
+                Your name is in at <strong>{vacancyName(world, inFlight)}</strong> ({vacancyWhere(world, inFlight)}): {String(agentEvent.payload['why'])}.
+              </p>
+              <div className="row">
+                {withdrawing ? (
+                  <>
+                    <span className="muted">Withdrawing when you continue.</span>
+                    <button onClick={() => onChange(withApply(session, inFlight.id))}>Keep it in</button>
+                  </>
+                ) : (
+                  <button onClick={() => onChange(withWithdraw(session, inFlight.id))} data-testid="withdraw-agent">
+                    Withdraw
+                  </button>
+                )}
+              </div>
+            </>
+          ) : inFlight ? (
+            <p>Your own application at {vacancyName(world, inFlight)} is in; the agent waits on it.</p>
+          ) : (
+            <p className="muted">Nothing in flight. The agent puts your name in for the best fit at the end of each week.</p>
+          )}
+        </div>
+      )}
       {open.length === 0 && <p className="muted">No vacancies open this week.</p>}
       {open.map((v) => {
         const fits = qualifies(world, me, v)

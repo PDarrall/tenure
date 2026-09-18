@@ -128,7 +128,7 @@ export function App() {
       key={careerKey}
       session={screen.session}
       onChange={(session) => setScreen({ kind: 'game', session, careerKey })}
-      onContinue={() => setScreen({ kind: 'game', session: nextTurn(screen.session), careerKey })}
+      onContinue={(s) => setScreen({ kind: 'game', session: nextTurn(s ?? screen.session), careerKey })}
       onExport={exportSave}
       onImport={(file) => void importSave(file)}
       onReset={reset}
