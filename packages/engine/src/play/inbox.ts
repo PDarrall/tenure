@@ -310,6 +310,15 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
       case 'human.decided':
         if (p['byDefault'] === true) push(e, 'agent', renderText('agent', 'default_taken', { key: String(p['key']) }, e.week))
         break
+      case 'decision.rolled': {
+        // Only the bold rolls are news; the cautious ones come up even by design.
+        if (!mine(e) || p['bold'] !== true) break
+        const effect = p['effect'] as number
+        const unit = String(p['unit'])
+        const outcome = effect > 0.5 ? 'paid' : effect < -0.5 ? 'cost' : 'even'
+        push(e, 'staff', renderText('decisions', `rolled_${outcome}`, { label: String(p['label'] ?? p['key']), effect: `${effect > 0 ? '+' : ''}${effect}`, unit }, e.week))
+        break
+      }
       case 'career.ended':
         if (mine(e)) {
           // One message per ending; the generic line covers any reason without its own template.

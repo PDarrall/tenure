@@ -567,10 +567,37 @@ export type DecisionKind =
   | 'newDeal'
   | 'wantsAway'
 
+/** How sure the adviser is of an option, in words (DESIGN.md "Decisions are bets"). */
+export type Confidence = 'sure thing' | 'likely' | 'gamble'
+
+/** What an option's roll moves: the spell's credit, the manager's reputation, or morale (a player's or the squad's). */
+export type BetUnit = 'credit' | 'reputation' | 'morale'
+
+/**
+ * The hidden dice behind an option: the roll is mean + sd × z, in `unit`.
+ * The words on the card (likely, downside, confidence) are drawn from these.
+ */
+export interface Bet {
+  mean: number
+  sd: number
+  unit: BetUnit
+}
+
 export interface DecisionOption {
   key: string
   label: string
   detail?: string
+  /** What it will likely do, in words. */
+  likely?: string
+  /** What could go wrong, in words. */
+  downside?: string
+  confidence?: Confidence
+  /** The dice; absent when the option has no roll of its own (it is settled by another system, or is a plain refusal). */
+  bet?: Bet
+  /** The cautious option: lowest variance, what Continue applies. */
+  isDefault?: boolean
+  /** A bold option: higher variance than the default. Counted for the fairness target. */
+  bold?: boolean
 }
 
 export interface Decision {

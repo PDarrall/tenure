@@ -7,12 +7,12 @@ import { clubById, managerById, spellOf } from '../lookup.js'
 import { structuralTarget } from '../tenure/expectation.js'
 import { bumpReputation } from '../tenure/exits.js'
 import { endSpell, remainingValue, salaryFor, startSpell } from '../tenure/spell.js'
-import { addCredit } from '../tenure/credit.js'
 import type { Manager, Promise, Spell, Vacancy, World } from '../types.js'
 import { salaryForYears } from './vacancies.js'
 import { poachable } from './shortlist.js'
 import { assignTag } from './tags.js'
 import { hasPending, queueApproach, queueOffer } from '../play/decisions.js'
+import { rollKind } from '../play/bets.js'
 
 /** The AI's interview promise: promotion when the squad is a contender, stability when it is a struggler. */
 export function aiPromise(world: World, vacancy: Vacancy): Promise {
@@ -39,9 +39,9 @@ function vacancyPrestigeOf(world: World, vacancy: Vacancy): number {
 
 export type ApproachOutcome = 'accepted' | 'declined' | 'pending'
 
-/** Turn an approach down: credit and loyalty at the current club. */
-export function declineApproach(world: World, spell: Spell, vacancy: Vacancy): void {
-  const applied = addCredit(spell, T.DECLINE_APPROACH_CREDIT)
+/** Turn an approach down: credit (the dice, mean DESIGN's +3) and loyalty at the current club. */
+export function declineApproach(world: World, rng: Rng, spell: Spell, vacancy: Vacancy): void {
+  const applied = rollKind(world, rng, 'approach', 'decline', { managerId: spell.managerId, spellId: spell.id, label: 'stay where you are' })
   spell.loyaltyBonus += T.LOYALTY_PER_DECLINE
   emit(world, 'approach.declined', { managerId: spell.managerId, spellId: spell.id, vacancyId: vacancy.id, creditDelta: applied, credit: spell.credit, season: world.season })
 }
@@ -63,7 +63,10 @@ export function acceptApproach(world: World, rng: Rng, manager: Manager, vacancy
     bumpReputation(world, manager.id, T.REP_WALKOUT, 'walked out')
     emit(world, 'manager.walkedOut', { managerId: manager.id, spellId: spell.id, from: spell.post, to: vacancy.post, walkouts: manager.history.walkouts, season: world.season })
   }
-  return hire(world, rng, manager, vacancy)
+  const next = hire(world, rng, manager, vacancy)
+  // The new board's welcome: the dice on the new spell's credit.
+  rollKind(world, rng, 'approach', 'accept', { managerId: manager.id, spellId: next.id, label: paid ? 'accept the move' : 'walk out and go' })
+  return next
 }
 
 /**
@@ -90,7 +93,7 @@ export function approach(world: World, rng: Rng, manager: Manager, vacancy: Vaca
     accept = gap >= T.WALKOUT_MIN_PRESTIGE_GAP && rng.chance(T.AI_WALKOUT_P)
   }
   if (!accept) {
-    declineApproach(world, spell, vacancy)
+    declineApproach(world, rng, spell, vacancy)
     return 'declined'
   }
   acceptApproach(world, rng, manager, vacancy, paid)
@@ -115,6 +118,8 @@ export function hire(world: World, rng: Rng, manager: Manager, vacancy: Vacancy,
   const years = chosen ? chosen.years : contractYearsFor(rng, manager, vacancy)
   const salary = salaryForYears(salaryFor(world, vacancy.post, manager.reputation), years)
   const spell = startSpell(world, rng, manager, vacancy.post, { years, promise, crisis: vacancy.crisis, salary })
+  // The promise is a bet: how the board read it, rolled onto credit at hire.
+  rollKind(world, rng, 'offer', promise, { managerId: manager.id, spellId: spell.id, label: `promise ${promise}` })
   // The squad is the club's strength in the new manager's formation: re-anchor so nobody inherits a side that does not fit.
   if (vacancy.post.kind === 'home') {
     const club = clubById(world, vacancy.post.clubId)

@@ -177,6 +177,7 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
   const boughtFinishedShare = madePoints > 0 ? boughtFinished / madePoints : 0
   const match = matchAverages(world)
   const europe = europeanTitles(world)
+  const decisions = decisionFairness(world)
   const lines: StatLine[] = [
     line('firstSpellMedianSeasons', 'Median first-spell length (seasons)', median(firstSpellLengths), 'seasons'),
     line('firstSpellInsideSeasonShare', 'First spells ending inside a season', firstSpells.length ? insideSeason / firstSpells.length : 0, 'share'),
@@ -201,6 +202,8 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     line('redsPerGame', 'Red cards per match', match.reds, 'number'),
     line('europeanTitlesHomeShare', 'Seasons the European title came home', europe.homeShare, 'share'),
     line('europeanTitlesOutsideTopThree', 'European titles won from outside the top three of tier 1', europe.outsideTopThree, 'share'),
+    line('decisionFairnessGap', `Decisions: worst gap between bold and cautious means net of sampling noise, in bold spreads (${decisions.worstGapKind})`, decisions.worstGap, 'number'),
+    line('decisionVarianceRatio', `Decisions: lowest bold-to-cautious variance ratio (${decisions.worstRatioKind})`, decisions.worstRatio, 'number'),
   ]
 
   const endReasons: Record<string, number> = {}
@@ -259,6 +262,15 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     'european finals played': europe.seasons,
     'mean age at career end': ended.length ? ended.reduce((s, m) => s + m.age, 0) / ended.length : 0,
     'events logged': world.log.length,
+  }
+  for (const k of decisions.kinds) {
+    extras[`decision ${k.kind}: bold rolls`] = k.boldN
+    extras[`decision ${k.kind}: cautious rolls`] = k.cautiousN
+    extras[`decision ${k.kind}: bold mean`] = k.boldMean
+    extras[`decision ${k.kind}: cautious mean`] = k.cautiousMean
+    extras[`decision ${k.kind}: gap observed`] = k.gapObserved
+    extras[`decision ${k.kind}: gap net of noise`] = k.gap
+    extras[`decision ${k.kind}: variance ratio`] = k.ratio
   }
 
   return {
@@ -333,4 +345,80 @@ export function europeanTitles(world: World): { seasons: number; homeTitles: num
     if (typeof position === 'number' && position > 3) outside++
   }
   return { seasons, homeTitles, homeShare: seasons ? homeTitles / seasons : 0, outsideTopThree: homeTitles ? outside / homeTitles : 0 }
+}
+
+export interface DecisionKindFairness {
+  kind: string
+  boldN: number
+  cautiousN: number
+  boldMean: number
+  cautiousMean: number
+  boldSd: number
+  cautiousSd: number
+  /** |bold mean − cautious mean| in units of the bold spread, as observed. */
+  gapObserved: number
+  /** The same gap net of sampling noise (BET_GAP_SE_ALLOWANCE standard errors): what the line tests. */
+  gap: number
+  /** Bold variance over cautious variance. */
+  ratio: number
+}
+
+function meanSd(values: number[]): { mean: number; sd: number } {
+  if (values.length === 0) return { mean: 0, sd: 0 }
+  const mean = values.reduce((a, b) => a + b, 0) / values.length
+  const sd = Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length)
+  return { mean, sd }
+}
+
+/**
+ * DESIGN.md "Decisions are bets": per decision kind, across the AI
+ * population, the bold options' mean effect against the cautious options',
+ * and the variance ratio. Only AI rolls count; a kind needs BET_MIN_ROLLS on
+ * each side to be measured. The worst kind sets each line.
+ */
+export function decisionFairness(world: World): { kinds: DecisionKindFairness[]; worstGap: number; worstGapKind: string; worstRatio: number; worstRatioKind: string } {
+  const byKind = new Map<string, { bold: number[]; cautious: number[] }>()
+  for (const e of world.log) {
+    if (e.type !== 'decision.rolled' || e.payload['human'] === true) continue
+    const kind = String(e.payload['kind'])
+    const bucket = byKind.get(kind) ?? { bold: [], cautious: [] }
+    ;(e.payload['bold'] === true ? bucket.bold : bucket.cautious).push(e.payload['effect'] as number)
+    byKind.set(kind, bucket)
+  }
+  const kinds: DecisionKindFairness[] = []
+  for (const [kind, { bold, cautious }] of [...byKind.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const b = meanSd(bold)
+    const c = meanSd(cautious)
+    const diff = Math.abs(b.mean - c.mean)
+    const se = Math.sqrt((bold.length ? (b.sd * b.sd) / bold.length : 0) + (cautious.length ? (c.sd * c.sd) / cautious.length : 0))
+    kinds.push({
+      kind,
+      boldN: bold.length,
+      cautiousN: cautious.length,
+      boldMean: Math.round(b.mean * 1000) / 1000,
+      cautiousMean: Math.round(c.mean * 1000) / 1000,
+      boldSd: Math.round(b.sd * 1000) / 1000,
+      cautiousSd: Math.round(c.sd * 1000) / 1000,
+      gapObserved: b.sd > 0 ? Math.round((diff / b.sd) * 1000) / 1000 : 0,
+      gap: b.sd > 0 ? Math.round((Math.max(0, diff - T.BET_GAP_SE_ALLOWANCE * se) / b.sd) * 1000) / 1000 : 0,
+      ratio: c.sd > 0 ? Math.round(((b.sd * b.sd) / (c.sd * c.sd)) * 100) / 100 : bold.length > 0 ? 1000 : 0,
+    })
+  }
+  const measured = kinds.filter((k) => k.boldN >= T.BET_MIN_ROLLS && k.cautiousN >= T.BET_MIN_ROLLS)
+  let worstGap = 0
+  let worstGapKind = 'none'
+  let worstRatio = measured.length ? Infinity : 0
+  let worstRatioKind = 'none'
+  for (const k of measured) {
+    if (k.gap > worstGap) {
+      worstGap = k.gap
+      worstGapKind = k.kind
+    }
+    if (k.ratio < worstRatio) {
+      worstRatio = k.ratio
+      worstRatioKind = k.kind
+    }
+  }
+  if (worstRatio === Infinity) worstRatio = 0
+  return { kinds, worstGap, worstGapKind, worstRatio, worstRatioKind }
 }

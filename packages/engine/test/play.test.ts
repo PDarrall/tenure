@@ -67,9 +67,12 @@ describe('a human career', () => {
     const spell = spellOf(world, player)!
     expect(spell.contract.promise).toBe('stability')
     expect(spell.contract.yearsAtSigning).toBe(2)
-    expect(world.log.some((e) => e.type === 'vacancy.applied' && e.payload['managerId'] === player.id)).toBe(true)
+    // The application was the human's own or the agent's weekly one: either lands the interview.
+    expect(world.log.some((e) => (e.type === 'vacancy.applied' || e.type === 'agent.applied') && e.payload['managerId'] === player.id)).toBe(true)
     expect(world.log.some((e) => e.type === 'manager.hired' && e.payload['managerId'] === player.id)).toBe(true)
     expect(pendingDecisions(world).some((d) => d.kind === 'offer')).toBe(false)
+    // The promise is a bet: its roll on credit at hire is in the log.
+    expect(world.log.some((e) => e.type === 'decision.rolled' && e.payload['kind'] === 'offer' && e.payload['key'] === 'stability' && e.payload['managerId'] === player.id)).toBe(true)
 
     if (spell.post.kind === 'home') {
       advanceWeek(world, { tactic: { formation: '4-3-3', mentality: 'attack', style: 'pressing' } })

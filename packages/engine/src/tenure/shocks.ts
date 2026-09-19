@@ -8,6 +8,7 @@ import { addCredit } from './credit.js'
 import { easeExpectation } from './expectation.js'
 import { thresholdFor } from './spell.js'
 import { queueFallout } from '../play/decisions.js'
+import { rollKind } from '../play/bets.js'
 import { anchorSquad } from '../players/gen.js'
 import { clubFormation, squadOf } from '../players/select.js'
 import { releasePlayer } from '../players/gen.js'
@@ -104,13 +105,14 @@ export function maybeFallout(world: World, rng: Rng, spell: Spell): void {
   resolveFallout(world, spell, rng, manager.ability.motivation < T.AI_FALLOUT_SELL_BELOW_MOTIVATION)
 }
 
-/** Settle a fallout: sell the player (ownership up, strength down) or back down (morale down). */
+/** Settle a fallout: sell the player (ownership up, strength down) or back down; either way the dressing room's morale is the roll. */
 export function resolveFallout(world: World, spell: Spell, rng: Rng, sell: boolean): void {
   if (spell.post.kind !== 'home') return
   const club = clubById(world, spell.post.clubId)
   const manager = managerById(world, spell.managerId)
   const senior = spell.falloutPlayerId === null || spell.falloutPlayerId === undefined ? undefined : playerById(world, spell.falloutPlayerId)
   spell.falloutPlayerId = null
+  rollKind(world, rng, 'fallout', sell ? 'sell' : 'back-down', { managerId: manager.id, spellId: spell.id, clubId: club.id, label: sell ? 'sell him' : 'back down' })
   if (sell) {
     spell.ownership = round1(clamp(spell.ownership + T.FALLOUT_OWNERSHIP_GAIN, 0, 1) * 100) / 100
     club.squad.strength = round1(clamp(club.squad.strength - T.FALLOUT_STRENGTH_LOSS, 1, 100))
@@ -121,7 +123,6 @@ export function resolveFallout(world: World, spell: Spell, rng: Rng, sell: boole
     }
     anchorSquad(world, club, club.squad.strength, clubFormation(world, club))
   } else {
-    club.squad.morale = round1(clamp(club.squad.morale - T.FALLOUT_MORALE_LOSS, 0, 100))
     // Backing down is taking his side: the bond deepens if he is one of yours.
     if (senior) {
       const tag = tagOf(senior, manager.id)

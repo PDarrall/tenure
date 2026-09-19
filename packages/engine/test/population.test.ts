@@ -126,4 +126,16 @@ describe('500 AI careers (DESIGN.md validation targets, to verify)', () => {
       expect(l.pass, describeLine(l)).toBe(true)
     }
   })
+
+  it('decisions are bets: per kind, bold options land within 10% of cautious ones with at least 1.5× the variance', () => {
+    const gap = line('decisionFairnessGap')
+    const ratio = line('decisionVarianceRatio')
+    expect(gap.pass, describeLine(gap)).toBe(true)
+    expect(ratio.pass, describeLine(ratio)).toBe(true)
+    // Every kind with dice is rolled by the AI on both sides; the rare ones (a renewal declined) are present but too few to measure.
+    for (const kind of Object.keys(T.BETS)) {
+      expect(stats.extras[`decision ${kind}: bold rolls`] ?? 0, `${kind} bold rolls`).toBeGreaterThanOrEqual(T.BET_PRESENT_ROLLS)
+      expect(stats.extras[`decision ${kind}: cautious rolls`] ?? 0, `${kind} cautious rolls`).toBeGreaterThanOrEqual(T.BET_PRESENT_ROLLS)
+    }
+  })
 })

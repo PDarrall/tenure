@@ -7,7 +7,7 @@ import type { Club, Formation, FormationSlot, Manager, Player, Position, Result,
 import { anchorSquad, forgetPlayer, makePlayer, pickFreeAgent, positionMix, releasePlayer, signFreeAgent, squadSizeFor, valueFor, freeAgents } from '../players/gen.js'
 import { clubFormation, squadOf, autoPick } from '../players/select.js'
 import { slotsOf } from '../players/formations.js'
-import { wageDemand as contractWageDemand } from '../players/contracts.js'
+import { rollContract, wageDemand as contractWageDemand } from '../players/contracts.js'
 import { milestone, tagPlayer } from '../players/made.js'
 
 export function managerOf(world: World, club: Club): Manager | undefined {
@@ -288,7 +288,10 @@ export function summerPlayers(world: World, rng: Rng, club: Club): void {
       const choice = world.human && club.managerId === world.human.managerId ? world.human.contractChoices[p.id] : undefined
       if (choice !== undefined) delete world.human!.contractChoices[p.id]
       // Out of contract: the human's answer, else the club keeps anyone near its level and lets the rest go.
-      const keep = choice === undefined ? p.rating >= club.squad.strength - T.RELEASE_BELOW_STRENGTH : choice !== 'release'
+      const ruleKeep = p.rating >= club.squad.strength - T.RELEASE_BELOW_STRENGTH
+      // The AI follows its rule, and gambles against it now and then so the population rolls both sides.
+      const keep = choice === undefined ? (rng.chance(T.AI_CONTRACT_GAMBLE_P) ? !ruleKeep : ruleKeep) : choice !== 'release'
+      if (choice === undefined && club.managerId !== null) rollContract(world, rng, p, keep, ruleKeep, club.managerId)
       if (keep) {
         if (choice !== undefined && choice !== 'release') p.contract = { years: choice.years, wage: choice.wage }
         else p.contract = { years: rng.int(T.PLAYER_CONTRACT_YEARS[0], T.PLAYER_CONTRACT_YEARS[1]), wage: wageDemand(p) }

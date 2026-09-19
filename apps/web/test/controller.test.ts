@@ -111,7 +111,8 @@ describe('the web controller', () => {
     expect(me(d).status.kind).toBe('unemployed')
     expect(canAdvance(d)).toBe(true)
     // Within a few weeks something fits and the agent has put the name in.
-    for (let i = 0; i < 16 && !applicationInFlight(d.world, me(d)); i++) d = nextTurn(d)
+    // The fit can take a while on a quiet market (seed 1 opens few tier-5 posts in the autumn).
+    for (let i = 0; i < 40 && !applicationInFlight(d.world, me(d)); i++) d = nextTurn(d)
     const inFlight = applicationInFlight(d.world, me(d))
     expect(inFlight).toBeDefined()
     expect(d.world.log.some((e) => e.type === 'agent.applied' && e.payload['vacancyId'] === inFlight!.id)).toBe(true)

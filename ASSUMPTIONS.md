@@ -502,3 +502,58 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   job instead of nine (AI_REST_MONTHS_AFTER_EXIT). Every other market
   rule is untouched.
 - The foreign-title trophy points went with the leagues.
+
+## Decisions are bets (DESIGN v0.7)
+
+- One unit per decision kind. A kind's dice all move the same thing so
+  bold and cautious can be compared: the press and the fallout move the
+  squad's morale (the club's number and every player in it, so the match
+  feels it), a new deal or an expiring contract the player's, the board's
+  warning and the interview promise the spell's credit, an approach the
+  credit where you end up (declining, at this club; accepting, the new
+  board's welcome on the new spell), the month out of work, a renewal
+  and mutual consent the manager's reputation. Means are equal inside a
+  kind by construction (BETS in tunables.ts), so the population test
+  checks the implementation rolls as designed, not whether the designer
+  balanced the numbers.
+- Fixed trades stay outside the dice. A promise to the board still buys
+  credit now for a target a place harder (BOARD_PROMISE); selling the
+  player in a fallout still moves ownership and strength; a refused
+  player still loses the fixed morale and counts as a fallout; declining
+  an approach still earns loyalty. The card's detail names the trade;
+  the roll is on top of it, and only the roll is in the fairness lines.
+- "Within 10%" is read in units of the bold option's own spread, since
+  most cautious means are zero. The line tests the gap net of sampling
+  noise (two standard errors of the difference, BET_GAP_SE_ALLOWANCE):
+  a kind the AI rolls 150 times a run cannot resolve a 10% gap
+  otherwise. The observed gap is reported beside it. Kinds under
+  BET_MIN_ROLLS on either side are reported and not measured; every
+  kind must still show BET_PRESENT_ROLLS on both sides.
+- The AI rolls every kind so the lines can be measured: it answers the
+  press (bold half the time, on morale, mean zero) and the board's
+  warning (AI_BOARD_ANSWER_WEIGHTS; a promise 5% of the time, since at
+  20% the credit it buys cut sackings by a third), it rolls the promise
+  at hire, the approach both ways, the fallout, mutual consent, the
+  month out of work, a renewal (declining 15% of the time when its
+  reputation band is above the club's; at 30% careers shortened), and
+  its clubs answer their players' requests (a new deal when the wage
+  bill allows, a wants-away sold 30% of the time) and settle expiring
+  contracts against their own rule one time in ten (AI_CONTRACT_GAMBLE_P).
+- The default is the lowest-variance option on every card but two. The
+  month out of work keeps the standing activity as its default: the
+  lowest-variance option is the assistant role, and stepping down by
+  default would be a trap. The window plan's default is Hold (its dice
+  are the window itself, so the options carry words and confidence but
+  no roll). The interview's default is still to turn the job down,
+  which has no variance at all.
+- The substitution and the kid in the eleven are bets whose dice are the
+  match engine. They carry the three words (selectionWords) from the
+  rating gap, the condition and whether it is a debut, and no roll of
+  their own.
+- Population on the day: over seeds 1–3 the bets leave every existing
+  line where main had it (means within the seed-to-seed noise). On seed
+  1 alone, three lines that passed by a hair on main now fail by a hair
+  (never a second job 51.6% against 50%, median career 5.97 against 6,
+  1,000-game careers 17 against 15) and clubs per career stays red as it
+  has been since phase 1; the flip retunes the population through the
+  directors' trading, and the numbers are in the PR.

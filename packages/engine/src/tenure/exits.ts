@@ -2,10 +2,12 @@ import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import { clamp } from '../world/gen.js'
-import { managerById } from '../lookup.js'
+import { clubById, managerById } from '../lookup.js'
+import { bandIndex, clubBandIndex } from '../managers/reputation.js'
 import type { Spell, World } from '../types.js'
 import { contractEndWeek, endSpell, salaryFor } from './spell.js'
 import { hasPending, queueMutualConsent, queueRenewal } from '../play/decisions.js'
+import { rollKind } from '../play/bets.js'
 
 function bumpReputation(world: World, managerId: number, delta: number, reason: string): number {
   const manager = managerById(world, managerId)
@@ -40,11 +42,22 @@ export function monthlyMutualConsent(world: World, rng: Rng, spell: Spell): bool
     if (!hasPending(world, 'mutualConsent')) queueMutualConsent(world, spell)
     return false
   }
-  if (rng.chance(T.AI_MUTUAL_ACCEPT_P)) {
-    leaveByMutualConsent(world, spell)
-    return true
-  }
-  return false
+  return answerMutualConsent(world, rng, spell, rng.chance(T.AI_MUTUAL_ACCEPT_P))
+}
+
+/** Mutual consent answered: the dice on reputation (leaving quietly or fighting on), then the exit if accepted. Returns true if the spell ended. */
+export function answerMutualConsent(world: World, rng: Rng, spell: Spell, accept: boolean): boolean {
+  rollKind(world, rng, 'mutualConsent', accept ? 'accept' : 'decline', { managerId: spell.managerId, spellId: spell.id, label: accept ? 'accept and leave' : 'fight on' })
+  if (!accept) return false
+  leaveByMutualConsent(world, spell)
+  return true
+}
+
+/** A renewal answered: the dice on reputation (the market's read), then the renewal or the exit at expiry. */
+export function answerRenewal(world: World, rng: Rng, spell: Spell, accept: boolean, years: number): void {
+  rollKind(world, rng, 'renewal', accept ? 'accept' : 'decline', { managerId: spell.managerId, spellId: spell.id, label: accept ? 'sign the renewal' : 'let it run out' })
+  if (accept) renewContract(world, spell, years)
+  else leaveAtExpiry(world, spell)
 }
 
 /** AI managers sometimes jump before they are pushed. */
@@ -76,8 +89,8 @@ export function leaveAtExpiry(world: World, spell: Spell): void {
   emit(world, 'contract.declined', { managerId: spell.managerId, spellId: spell.id, post: spell.post, credit: spell.credit, season: world.season })
 }
 
-/** Contract expiry: renewed on good credit, otherwise released. The human is offered the renewal. Returns true if the spell ended. */
-export function checkExpiry(world: World, spell: Spell): boolean {
+/** Contract expiry: renewed on good credit, otherwise released. The human is offered the renewal; an AI above the club's band sometimes lets it run. Returns true if the spell ended. */
+export function checkExpiry(world: World, rng: Rng, spell: Spell): boolean {
   if (world.week !== spell.contract.endWeek) return false
   const manager = managerById(world, spell.managerId)
   if (spell.credit > T.EXPIRY_RENEW_CREDIT) {
@@ -85,8 +98,10 @@ export function checkExpiry(world: World, spell: Spell): boolean {
       queueRenewal(world, spell, T.RENEW_YEARS, salaryFor(world, spell.post, manager.reputation))
       return false
     }
-    renewContract(world, spell, T.RENEW_YEARS)
-    return false
+    const aboveBand = spell.post.kind === 'home' && bandIndex(manager.reputation) > clubBandIndex(world, clubById(world, spell.post.clubId))
+    const decline = aboveBand && rng.chance(T.AI_DECLINE_RENEWAL_P)
+    answerRenewal(world, rng, spell, !decline, T.RENEW_YEARS)
+    return decline
   }
   endSpell(world, spell, 'expired', 0)
   bumpReputation(world, manager.id, T.REP_RELEASED, 'released at expiry')

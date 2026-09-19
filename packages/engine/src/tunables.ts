@@ -790,8 +790,7 @@ export const T = {
   /** Dressing-room fallout rolls once per losing run of this length. */
   FALLOUT_TRIGGER_DEFEATS: 4,
   FALLOUT_P: 0.25,
-  /** Back down: squad morale falls. Sell: ownership up, strength down, "difficult" progress. */
-  FALLOUT_MORALE_LOSS: 10,
+  /** Back down or sell: the squad's morale is the roll in BETS.fallout. Sell: ownership up, strength down, "difficult" progress. */
   FALLOUT_STRENGTH_LOSS: 3,
   FALLOUT_OWNERSHIP_GAIN: 1 / 11,
   /** AI sells the player when its motivation ability is below this. */
@@ -911,8 +910,7 @@ export const T = {
   /** A manager must have been in post this many weeks before a bigger club calls. Serves: a handful past 1,000 games. */
   POACH_MIN_WEEKS: 46,
   AI_ACCEPT_APPROACH_P: 0.5,
-  /** Declining an approach. DESIGN: credit +3, loyalty progress. */
-  DECLINE_APPROACH_CREDIT: 3,
+  /** Declining an approach. DESIGN: credit +3 (the mean of BETS.approach.decline), loyalty progress. */
   LOYALTY_PER_DECLINE: 1,
   REP_POACHED: 2,
   /** The new club pays the buy-out if it is under this share of its wage budget; otherwise the manager must walk out. */
@@ -996,20 +994,86 @@ export const T = {
   HUMAN_CONTRACT_YEARS_OPTIONS: [1, 2, 3, 4] as readonly number[],
   /** Chance a match week brings a press question. Serves: most weeks zero or one decision. */
   PRESS_QUESTION_P: 0.3,
-  /** Press responses: confident lifts morale, defiant buys a little credit at morale's expense. */
-  PRESS_RESPONSE_EFFECTS: {
-    confident: { morale: 2, credit: 0 },
-    measured: { morale: 0, credit: 0 },
-    defiant: { morale: -2, credit: 1 },
-  } as const,
   /** The board writes when credit is within this of the threshold. */
   BOARD_WARN_MARGIN: 10,
-  /** Board responses: push back is a coin flip on credit; a promise buys credit and tightens the target. */
-  BOARD_RESPONSE_EFFECTS: {
-    pushBackSwing: 3,
-    promiseCredit: 3,
-    promisePlaces: 1,
+  /** A promise to the board: credit now, a harder target. The trade is fixed; the dice on top are in BETS.board.promise. */
+  BOARD_PROMISE: { credit: 3, places: 1 } as const,
+
+  // ---------------------------------------------------------------------------
+  // Decisions are bets (DESIGN.md "Decisions are bets"). Every option rolls
+  // mean + sd × z on the seeded RNG. Within a kind every option has the same
+  // mean, so a gamble is fair and not free. Serves: decisionFairnessGap and
+  // decisionVarianceRatio.
+  // ---------------------------------------------------------------------------
+
+  /** z is clamped to ±this: no roll is a career in itself. */
+  BET_ROLL_CLAMP: 2.5,
+  /** Confidence in words by sd, per unit: up to the first is a sure thing, up to the second likely, beyond a gamble. */
+  BET_CONFIDENCE_BANDS: {
+    credit: [1, 2.5],
+    reputation: [0.4, 1],
+    morale: [1.5, 3.5],
+  } as Record<'credit' | 'reputation' | 'morale', readonly [number, number]>,
+  /**
+   * The dice behind every option, by decision kind and key. Means are equal
+   * inside a kind; the cautious option has the lowest sd and is the default.
+   * Credit moves the spell's credit, reputation the manager's, morale the
+   * player's or the squad's.
+   */
+  BETS: {
+    /** The press: what the room makes of the answer. */
+    press: { unit: 'morale', options: { measured: { mean: 0, sd: 1 }, confident: { mean: 0, sd: 3 }, defiant: { mean: 0, sd: 3 } } },
+    /** The board's warning: how the answer lands with them. A promise also trades credit now for a harder target (BOARD_PROMISE). */
+    board: { unit: 'credit', options: { accept: { mean: 0, sd: 0.5 }, pushBack: { mean: 0, sd: 3 }, promise: { mean: 0, sd: 2 } } },
+    /** A fallout: the dressing room after you back down or sell him. Selling also moves ownership and strength. */
+    fallout: { unit: 'morale', options: { 'back-down': { mean: -5, sd: 2 }, sell: { mean: -5, sd: 6 } } },
+    /** An approach: declining earns credit here; accepting rolls the new board's welcome onto the new spell's credit. */
+    approach: { unit: 'credit', options: { decline: { mean: 3, sd: 0.5 }, accept: { mean: 3, sd: 4 } } },
+    /** The interview promise: how the board read it, rolled onto credit at hire. */
+    offer: { unit: 'credit', options: { 'top-half': { mean: 0, sd: 0.5 }, promotion: { mean: 0, sd: 2.5 }, stability: { mean: 0, sd: 1.5 } } },
+    /** A month out of work: waiting keeps your name in play or out of it; the slide itself is UNEMPLOYED_DECAY. */
+    activity: { unit: 'reputation', options: { wait: { mean: 0, sd: 0.8 }, punditry: { mean: 0, sd: 0.3 }, assistant: { mean: 0, sd: 0.15 } } },
+    /** A renewal: the market's read of signing on or letting it run. */
+    renewal: { unit: 'reputation', options: { accept: { mean: 0, sd: 0.3 }, decline: { mean: 0, sd: 1.5 } } },
+    /** Mutual consent offered: leaving quietly or fighting on. */
+    mutualConsent: { unit: 'reputation', options: { accept: { mean: 0, sd: 0.3 }, decline: { mean: 0, sd: 1.5 } } },
+    /** A player asks for a new deal: his morale after the answer, on top of the fixed gain or loss. */
+    newDeal: { unit: 'morale', options: { accept: { mean: 0, sd: 1 }, refuse: { mean: 0, sd: 4 } } },
+    /** A player wants away: the squad's morale after he stays or goes. */
+    wantsAway: { unit: 'morale', options: { keep: { mean: 0, sd: 1 }, sell: { mean: 0, sd: 4 } } },
+    /** An expiring contract: the assistant's advice is the safe path; the other is the gamble (his morale renewed, the squad's on a release). */
+    playerContract: { unit: 'morale', options: { safe: { mean: 0, sd: 1 }, risky: { mean: 0, sd: 3 } } },
   } as const,
+  /**
+   * AI managers answer the board's warning with these weights, so the
+   * population rolls the board kind on both sides. A promise props credit
+   * (+BOARD_PROMISE.credit a time): at 0.2 it cut sackings a third and
+   * pushed neverSecondJobShare and thousandGameCount out of band; at 0.05
+   * the population matches main over seeds 1–3. Serves: sackings per season,
+   * neverSecondJobShare, thousandGameCount.
+   */
+  AI_BOARD_ANSWER_WEIGHTS: { accept: 0.7, pushBack: 0.25, promise: 0.05 } as const,
+  /** AI managers give the press a bold answer (confident or defiant) this often; the roll is on morale, mean zero. */
+  AI_PRESS_BOLD_P: 0.5,
+  /** AI managers decline a renewal with this chance when their reputation band is above the club's tier (they think they can do better). At 0.3 careers shortened (neverSecondJobShare +0.02, careerMedianSeasons −0.3 over seeds 1–3); 0.15 leaves them where main had them. Serves: the renewal kind rolled on both sides. */
+  AI_DECLINE_RENEWAL_P: 0.15,
+  /** AI clubs answer their players' requests too: a new deal is given if the wage bill allows, a wants-away is sold with this chance. Serves: newDeal and wantsAway rolls in the population. */
+  AI_SELL_WANTS_AWAY_P: 0.3,
+  /** AI clubs settle an expiring contract against their own rule with this chance, so the population rolls the risky side too. */
+  AI_CONTRACT_GAMBLE_P: 0.1,
+  /** Weeks a wage is paid in a year, for the wage bill against the wage budget (£k a week × this / 1000 = £m a year). */
+  WAGE_WEEKS_PER_YEAR: 52,
+  /** Rolls a kind needs on both sides before it counts toward the fairness lines: under this the 10% gap is inside the sampling noise. */
+  BET_MIN_ROLLS: 50,
+  /** Rolls a kind must show on each side over 500 careers to prove the AI rolls it at all (rare kinds are reported, not measured). */
+  BET_PRESENT_ROLLS: 20,
+  /** The fairness gap is tested net of sampling noise: this many standard errors of the difference are allowed before a gap counts. A kind rolled 150 times cannot resolve a 10% gap otherwise. */
+  BET_GAP_SE_ALLOWANCE: 2,
+  /** Rolls the career page keeps in view. */
+  CAREER_RECENT_ROLLS: 8,
+  /** The team sheet's words: a player under this condition is a gamble; a rating gap under this is "likely", beyond it a gamble. */
+  SELECTION_WORDS_TIRED_BELOW: 60,
+  SELECTION_WORDS_GAP: 5,
   /** Selling a senior player: strength lost and £m raised (scaled by the club's normal budget). */
   SELL_STRENGTH_PER_PLAYER: 3,
   SELL_CASH_SHARE_OF_BUDGET: 0.4,
@@ -1091,6 +1155,9 @@ export const T = {
     /** The European trophy is hard: home clubs win it in some seasons, and rarely from outside the top three of tier 1. */
     europeanTitlesHomeShare: { target: 0.3, min: 0.1, max: 0.6 },
     europeanTitlesOutsideTopThree: { target: 0.1, min: 0, max: 0.25 },
+    /** Decisions (DESIGN.md "Decisions are bets"): per kind, the bold options' mean effect within 10% of the cautious options' (in units of the bold spread), with at least 1.5× the variance. The lines report the worst kind. */
+    decisionFairnessGap: { target: 0, min: 0, max: 0.1 },
+    decisionVarianceRatio: { target: 3, min: 1.5, max: 1000 },
   } as const,
 
   /** How many of each kind the maker-to-winner comparison takes: the ten biggest makers against the ten biggest trophy-winners. */

@@ -13,7 +13,7 @@ import { managerById, spellOf } from '../lookup.js'
 import * as tenure from '../tenure/hooks.js'
 import * as market from '../market/hooks.js'
 import { playersWeekly } from '../match/aftermath.js'
-import { queuePlayerRequests, queueExpiringContracts } from '../players/contracts.js'
+import { aiPlayerRequests, queuePlayerRequests, queueExpiringContracts } from '../players/contracts.js'
 import { agentWeekly } from '../market/agent.js'
 
 export function extrasFor(world: World) {
@@ -32,7 +32,10 @@ export function closeWeekHooks(world: World, rng: Rng, sw: number): void {
     market.monthly(world, rng)
   }
   if (sw < T.MATCH_WEEKS) playersWeekly(world)
-  if (world.human && isMonthly(sw)) queuePlayerRequests(world, rng)
+  if (isMonthly(sw)) {
+    aiPlayerRequests(world, rng)
+    if (world.human) queuePlayerRequests(world, rng)
+  }
   if (world.human && sw === T.MATCH_WEEKS - 1) queueExpiringContracts(world)
   if (sw === T.WINTER_WINDOW_WEEK - 1) tenure.queueWindowDecision(world, false)
   if (sw === T.WINTER_WINDOW_WEEK) tenure.afterWinterWindow(world, winterWindow(world, rng))

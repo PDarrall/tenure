@@ -6,6 +6,7 @@ import type { Manager, UnemployedActivity, World } from '../types.js'
 import { monthsUnemployed } from './shortlist.js'
 import { endCareer } from './retirement.js'
 import { hasPending, queueActivity } from '../play/decisions.js'
+import { rollKind } from '../play/bets.js'
 
 /** What an AI manager does with another month out of work. */
 export function chooseActivity(world: World, rng: Rng, manager: Manager): UnemployedActivity {
@@ -40,6 +41,8 @@ export function monthlyUnemployed(world: World, rng: Rng, manager: Manager): voi
   } else {
     setActivity(world, manager, chooseActivity(world, rng, manager))
   }
+  // Waiting is a bet: the month's dice on reputation, on whatever the manager is doing.
+  rollKind(world, rng, 'activity', status.activity, { managerId: manager.id, label: status.activity === 'wait' ? 'wait for the right job' : status.activity })
   const income = status.activity === 'punditry' ? T.PUNDITRY_INCOME_PER_MONTH : status.activity === 'assistant' ? T.ASSISTANT_INCOME_PER_MONTH : 0
   if (income > 0) {
     manager.history.earnings += income

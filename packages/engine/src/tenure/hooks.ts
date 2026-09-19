@@ -17,7 +17,7 @@ import { weeklySackingCheck } from './sacking.js'
 import { maybeFallout, monthlyShocks } from './shocks.js'
 import { bumpReputation, checkExpiry, monthlyMutualConsent, monthlyResignation } from './exits.js'
 import { activeSpells } from './spell.js'
-import { hasPending, queueBoard, queuePress, queueWindow } from '../play/decisions.js'
+import { answerBoard, answerPress, hasPending, queueBoard, queuePress, queueWindow } from '../play/decisions.js'
 import { normalBudget } from '../season/squad.js'
 import { matchTemplateKey } from '../text/render.js'
 
@@ -45,13 +45,25 @@ function creditForSide(world: World, rng: Rng, played: PlayedFixture, home: bool
   return applied
 }
 
-/** Credit for every match of the week, written onto the match events; the press may want a word with the human. */
+/** The AI's answer to the press: bold (confident or defiant) with AI_PRESS_BOLD_P, else measured. */
+function aiPress(world: World, rng: Rng, manager: Manager | undefined): void {
+  if (!manager || manager.isHuman) return
+  const spell = spellOf(world, manager)
+  if (!spell || spell.post.kind !== 'home') return
+  if (!rng.chance(T.PRESS_QUESTION_P)) return
+  const key = rng.chance(T.AI_PRESS_BOLD_P) ? (rng.chance(0.5) ? 'confident' : 'defiant') : 'measured'
+  answerPress(world, rng, spell, key)
+}
+
+/** Credit for every match of the week, written onto the match events; the press want a word with every manager, the human by a card. */
 export function afterMatches(world: World, rng: Rng, played: PlayedFixture[]): void {
   for (const p of played) {
     const homeDelta = creditForSide(world, rng, p, true)
     const awayDelta = creditForSide(world, rng, p, false)
     p.event.payload['homeCredit'] = homeDelta
     p.event.payload['awayCredit'] = awayDelta
+    aiPress(world, rng, p.homeManager)
+    aiPress(world, rng, p.awayManager)
   }
   const state = world.human
   if (!state) return
@@ -78,7 +90,7 @@ export function weekly(world: World, rng: Rng): void {
     const pay = spell.contract.salary / T.SEASON_WEEKS
     spell.season.earned += pay
     manager.history.earnings += pay
-    if (checkExpiry(world, spell)) continue
+    if (checkExpiry(world, rng, spell)) continue
     weeklySackingCheck(world, rng, spell)
   }
 }
@@ -108,6 +120,10 @@ export function monthly(world: World, rng: Rng): void {
       const mood = boardMood(spell)
       emit(world, 'board.note', { spellId: spell.id, managerId: spell.managerId, mood, position, expectation: spell.expectation, season: world.season })
       if (spell.credit < spell.threshold + T.BOARD_WARN_MARGIN && !hasPending(world, 'board')) queueBoard(world, spell)
+    } else if (spell.credit < spell.threshold + T.BOARD_WARN_MARGIN) {
+      // The AI answers the same warning with the same dice.
+      const keys = Object.keys(T.AI_BOARD_ANSWER_WEIGHTS) as (keyof typeof T.AI_BOARD_ANSWER_WEIGHTS)[]
+      answerBoard(world, rng, spell, rng.weighted(keys, keys.map((k) => T.AI_BOARD_ANSWER_WEIGHTS[k])))
     }
   }
 }
