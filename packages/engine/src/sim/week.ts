@@ -18,6 +18,7 @@ import { aiPlayerRequests, queuePlayerRequests, queueExpiringContracts } from '.
 import { agentWeekly } from '../market/agent.js'
 import { closeWindow, humanClub, isCardClose, isDeadlineWeek, refreshPot, resolveBids, settleSoldShines, windowAt } from '../market/director.js'
 import { directorWeek } from '../play/transfers.js'
+import { checkPromises, returnLoans } from '../play/requests.js'
 
 export function extrasFor(world: World) {
   return (managerId: number) => {
@@ -41,7 +42,9 @@ export function closeWeekHooks(world: World, rng: Rng, sw: number): void {
   }
   if (world.human && sw === T.MATCH_WEEKS - 1) queueExpiringContracts(world)
   if (sw === T.WINTER_WINDOW_WEEK) tenure.afterWinterWindow(world, winterWindow(world, rng))
+  if (world.human) checkPromises(world)
   if (sw === T.MATCH_WEEKS) {
+    returnLoans(world)
     settleSoldShines(world)
     tenure.seasonEnd(world, endSeason(world, rng, extrasFor(world)))
     market.seasonEnd(world, rng)

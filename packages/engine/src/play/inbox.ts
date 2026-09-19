@@ -344,6 +344,28 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
       case 'director.note':
         if (mine(e)) push(e, 'staff', renderText('director', String(p['note']), {}, e.week))
         break
+      case 'request.answered': {
+        if (!mine(e)) break
+        const ask = String(p['ask'])
+        const vars: Record<string, string | number> = { name: String(p['name'] ?? ''), amount: (p['amount'] as number) ?? 0, pot: (p['pot'] as number) ?? 0, budget: (p['wageBudget'] as number) ?? 0, expectation: ordinal((p['expectation'] as number) ?? 0), refusals: (p['refusals'] as number) ?? 0, profile: String(p['profile'] ?? ''), fee: (p['fee'] as number) ?? 0, club: String(p['buyer'] ?? ''), starts: (p['starts'] as number) ?? 0, weeks: (p['weeks'] as number) ?? 0 }
+        const granted = p['granted'] === true
+        const key = ask === 'profile' ? 'profile_set' : ask === 'named' ? 'named_card' : ask === 'sell' ? (granted ? 'sell_found' : 'sell_none') : ask === 'loan' ? (granted ? 'loan_found' : 'loan_none') : `${ask}_${granted ? 'granted' : 'refused'}`
+        push(e, ask === 'budget' || ask === 'wages' || ask === 'backing' ? 'board' : ask === 'profile' || ask === 'named' || ask === 'sell' || ask === 'loan' ? 'staff' : 'players', renderText('requests', key, vars, e.week))
+        if (p['third'] === true) push(e, 'board', renderText('requests', 'third_refusal', {}, e.week))
+        break
+      }
+      case 'request.unavailable':
+        if (mine(e)) push(e, 'staff', renderText('requests', 'named_unavailable', { name: String(p['name'] ?? 'him'), why: renderText('requests', String(p['why']), {}, e.week) }, e.week))
+        break
+      case 'player.loanReturned':
+        if (mine(e)) push(e, 'staff', renderText('requests', 'loan_returned', { name: String(p['name']), club: clubNameOf(world, p['fromClubId'] as number) }, e.week))
+        break
+      case 'promise.kept':
+        if (mine(e)) push(e, 'players', renderText('requests', 'promise_kept', { name: String(p['name']) }, e.week))
+        break
+      case 'promise.broken':
+        if (mine(e)) push(e, 'players', renderText('requests', 'promise_broken', { name: String(p['name']) }, e.week))
+        break
       case 'decision.rolled': {
         // Only the bold rolls are news; the cautious ones come up even by design.
         if (!mine(e) || p['bold'] !== true) break

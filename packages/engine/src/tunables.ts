@@ -1165,6 +1165,56 @@ export const T = {
   ABROAD_CLUB_ID: -1,
 
   // ---------------------------------------------------------------------------
+  // Requests (DESIGN.md "Requests"): each a bet with a stated likelihood.
+  // Serves: the player's asks cost something and pay something.
+  // ---------------------------------------------------------------------------
+
+  /** The board: base chance, moved by credit over the threshold (per 30 credit, clamped ±1) and each refusal already this season. */
+  REQUEST_BOARD_BASE_P: 0.4,
+  REQUEST_BOARD_CREDIT_SWING: 0.35,
+  REQUEST_BOARD_CREDIT_SCALE: 30,
+  REQUEST_BOARD_PER_REFUSAL: -0.1,
+  REQUEST_BACKING_BONUS_P: 0.1,
+  REQUEST_P_RANGE: [0.05, 0.9] as readonly [number, number],
+  /** What a grant is worth: this share of the normal budget on the pot, this share of the wage budget, this much credit for backing. */
+  REQUEST_BUDGET_SHARE: 0.25,
+  REQUEST_WAGE_SHARE: 0.15,
+  REQUEST_BACKING_CREDIT: 3,
+  /** Granted raises expectation by this many places; refused costs this much credit; the third refusal in a season is a board row (difficult progress). */
+  REQUEST_GRANT_PLACES: 1,
+  REQUEST_REFUSAL_CREDIT: -2,
+  REQUEST_THIRD_REFUSAL: 3,
+  /** The director finds a buyer or a loan club at these chances in a window. */
+  REQUEST_SELL_P: 0.6,
+  REQUEST_LOAN_P: 0.55,
+  /** A buyer pays value × this. */
+  REQUEST_SELL_PREMIUM: 1.0,
+  /** Players: a contract talk from morale and bond; the captaincy from standing (top of the squad, a leader, seniority); playing time from morale. */
+  REQUEST_CONTRACT_BASE_P: 0.5,
+  REQUEST_CONTRACT_MORALE_SWING: 0.4,
+  REQUEST_CONTRACT_BOND_BONUS: 0.2,
+  REQUEST_CAPTAIN_BASE_P: 0.45,
+  REQUEST_CAPTAIN_TOP_RANK: 5,
+  REQUEST_CAPTAIN_TOP_BONUS: 0.3,
+  REQUEST_CAPTAIN_LEADER_BONUS: 0.2,
+  REQUEST_CAPTAIN_SENIOR_AGE: 27,
+  REQUEST_CAPTAIN_SENIOR_BONUS: 0.1,
+  REQUEST_PLAYING_BASE_P: 0.6,
+  REQUEST_PLAYING_MORALE_SWING: 0.3,
+  /** Morale on a player's yes or no. */
+  REQUEST_PLAYER_GRANT_MORALE: 6,
+  REQUEST_PLAYER_REFUSE_MORALE: -4,
+  /** A promise of playing time: this many starts within this many weeks, or it is a fallout (morale, bond, the count). */
+  PROMISE_STARTS: 3,
+  PROMISE_WEEKS: 6,
+  PROMISE_BROKEN_MORALE: -15,
+  PROMISE_KEPT_MORALE: 4,
+  /** Likelihood in words: a sure thing from this chance up, likely from the second. */
+  REQUEST_WORDS: [0.7, 0.45] as readonly [number, number],
+  /** Rows a search returns at most. */
+  SEARCH_LIMIT: 40,
+
+  // ---------------------------------------------------------------------------
   // The score (DESIGN.md "The score"). Serves: Legacy calibration — a 30-year
   // mid-table career and a 12-year trophy-laden career within ~20%.
   // ---------------------------------------------------------------------------

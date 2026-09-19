@@ -1,0 +1,86 @@
+{
+  "budget_granted": [
+    "The board have found £{amount}m more for the pot: £{pot}m now. They will expect it to show: the target is {expectation}."
+  ],
+  "budget_refused": [
+    "The board will not add to the pot. That is refusal {refusals} this season."
+  ],
+  "wages_granted": [
+    "The board have raised the wage budget by £{amount}m to £{budget}m. They will expect it to show: the target is {expectation}."
+  ],
+  "wages_refused": [
+    "The board will not raise the wage budget. That is refusal {refusals} this season."
+  ],
+  "backing_granted": [
+    "The board have backed you in public. Credit up; the target is {expectation}."
+  ],
+  "backing_refused": [
+    "The board said nothing. That is refusal {refusals} this season."
+  ],
+  "third_refusal": [
+    "Three refusals in a season: the board are starting to find you difficult."
+  ],
+  "profile_set": [
+    "The director has the profile: {profile}. Next week's names will follow it."
+  ],
+  "named_card": [
+    "The director has looked at {name}: he will bring him as a card next week if the numbers work."
+  ],
+  "named_unavailable": [
+    "The director cannot go for {name}: {why}."
+  ],
+  "sell_found": [
+    "The director has a buyer for {name}: {club} at £{fee}m. Approve the sale or keep him."
+  ],
+  "sell_none": [
+    "No club wants {name} at the moment."
+  ],
+  "loan_found": [
+    "{name} goes to {club} on loan for the rest of the season."
+  ],
+  "loan_none": [
+    "No club will take {name} on loan."
+  ],
+  "loan_returned": [
+    "{name} is back from his loan at {club}."
+  ],
+  "contract_granted": [
+    "{name} will talk terms. His demand is on the desk."
+  ],
+  "contract_refused": [
+    "{name} is not ready to sign anything just now."
+  ],
+  "captaincy_granted": [
+    "{name} takes the armband."
+  ],
+  "captaincy_refused": [
+    "{name} does not want the armband, and the asking unsettled him a little."
+  ],
+  "playingTime_granted": [
+    "{name} has your word: {starts} starts in the next {weeks} weeks."
+  ],
+  "playingTime_refused": [
+    "{name} has heard promises before."
+  ],
+  "promise_kept": [
+    "You kept your word to {name}."
+  ],
+  "promise_broken": [
+    "You promised {name} starts and he did not get them. The room noticed."
+  ],
+  "closed": [
+    "the window is shut"
+  ],
+  "money": [
+    "the fee is beyond the pot"
+  ],
+  "wagebill": [
+    "his wage would take the bill over budget"
+  ],
+  "own": [
+    "he is already yours"
+  ],
+  "gone": [
+    "he is not available"
+  ]
+}

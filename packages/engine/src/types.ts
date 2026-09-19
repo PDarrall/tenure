@@ -162,6 +162,8 @@ export interface Player {
   soldBy?: SoldBy | null
   /** A candidate from abroad, generated for a card; forgotten if nobody signs him by the deadline. */
   abroad?: boolean
+  /** Out on loan for the season, if so. */
+  loan?: Loan | null
   /** Has played a first-team match. */
   debuted: boolean
   retired: boolean
@@ -307,6 +309,32 @@ export interface TargetProfile {
   position?: Position
   maxAge?: number
   minRating?: number
+}
+
+/** A request (DESIGN.md "Requests"): to the board, the director or a player; each a bet with a stated likelihood. */
+export type RequestAsk = 'budget' | 'wages' | 'backing' | 'profile' | 'named' | 'sell' | 'loan' | 'contract' | 'captaincy' | 'playingTime'
+
+export interface Request {
+  to: 'board' | 'director' | 'player'
+  ask: RequestAsk
+  playerId?: PlayerId
+  profile?: TargetProfile
+}
+
+/** A promise of playing time: this many starts by this week, or it is a fallout. */
+export interface PlayingPromise {
+  playerId: PlayerId
+  week: number
+  byWeek: number
+  startsAtPromise: number
+  startsNeeded: number
+}
+
+/** A player loaned out for the season (DESIGN.md "Requests": loan out); he returns at the season's end. */
+export interface Loan {
+  fromClubId: ClubId
+  toClubId: ClubId
+  season: number
 }
 
 /** A foreign side generated for one European tie (DESIGN.md "World"): a name, a strength drawn by round, a squad while the tie is on. */
@@ -547,6 +575,8 @@ export interface SpellSeasonTally {
   boardRows: number
   /** £m earned in this season of the spell. */
   earned: number
+  /** Board requests refused this season (DESIGN.md "Requests"); the third is a board row. Absent in older saves. */
+  refusals?: number
 }
 
 export interface Spell {
@@ -728,6 +758,8 @@ export interface HumanState {
   shortlist?: PlayerId[]
   /** Candidates declined this window, so the director does not bring the same name back. */
   declinedPlayers?: PlayerId[]
+  /** Promises of playing time still to be kept. */
+  promises?: PlayingPromise[]
 }
 
 /** Enough of a fixture to find it again in world.fixtures. */
@@ -764,6 +796,10 @@ export interface HumanInputs {
   withdraw?: VacancyId[]
   /** Decision id → chosen option key. */
   answers?: Record<number, string>
+  /** Asks of the board, the director and players (DESIGN.md "Requests"), each resolved with a roll this turn. */
+  requests?: Request[]
+  shortlistAdd?: PlayerId[]
+  shortlistRemove?: PlayerId[]
   activity?: UnemployedActivity
   resign?: boolean
   retire?: boolean

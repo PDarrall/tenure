@@ -14,6 +14,7 @@ import { queueContract } from '../players/contracts.js'
 import { playerById } from '../lookup.js'
 import { humanClubId } from '../sim/turn.js'
 import { noteWithdrawal } from '../market/agent.js'
+import { makeRequest } from './requests.js'
 
 export function applyInputs(world: World, rng: Rng, inputs: HumanInputs): void {
   const state = humanState(world)
@@ -48,6 +49,15 @@ export function applyInputs(world: World, rng: Rng, inputs: HumanInputs): void {
     if (state.pending.some((d) => d.kind === 'playerContract' && d.payload['playerId'] === id)) continue
     queueContract(world, p, player.id)
   }
+
+  // The shortlist, then the asks: each a roll at its stated likelihood (DESIGN.md "Requests").
+  if (inputs.shortlistAdd || inputs.shortlistRemove) {
+    const current = new Set(state.shortlist ?? [])
+    for (const id of inputs.shortlistAdd ?? []) current.add(id)
+    for (const id of inputs.shortlistRemove ?? []) current.delete(id)
+    state.shortlist = [...current].sort((a, b) => a - b)
+  }
+  for (const req of inputs.requests ?? []) makeRequest(world, rng, req)
 
   if (inputs.activity && player.status.kind === 'unemployed') setActivity(world, player, inputs.activity)
 
