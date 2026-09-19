@@ -1079,6 +1079,92 @@ export const T = {
   SELL_CASH_SHARE_OF_BUDGET: 0.4,
 
   // ---------------------------------------------------------------------------
+  // Transfers (DESIGN.md "Transfers"): two windows, the director of football,
+  // every signing a bet. Serves: signingsBeatShare ≈ 40%, signingsShortShare
+  // ≈ 25%, and the population through the flip.
+  // ---------------------------------------------------------------------------
+
+  /** January: the calendar month, season weeks inclusive; the last is deadline day. */
+  JANUARY_WINDOW_WEEKS: [18, 21] as readonly [number, number],
+  /** Summer: from the last match to the first; deadline day is the last summer week. */
+  get SUMMER_WINDOW_WEEKS(): readonly [number, number] {
+    return [this.MATCH_WEEKS, this.SEASON_WEEKS - 1]
+  },
+  /** The director's judgement: base + per wealth + noise, clamped. Scouting level (phase 5) will add to it. */
+  DIRECTOR_JUDGEMENT_BASE: 35,
+  DIRECTOR_JUDGEMENT_PER_WEALTH: 0.4,
+  DIRECTOR_JUDGEMENT_SD: 8,
+  DIRECTOR_JUDGEMENT_RANGE: [15, 95] as readonly [number, number],
+  /** Cards a week in a window. DESIGN: up to three. */
+  DIRECTOR_CARDS_PER_WEEK: 3,
+  /** The estimate's error: sd = DIRECTOR_ESTIMATE_SD × (DIRECTOR_JUDGEMENT_SCALE_AT_ZERO − judgement / 100). At judgement 50 the sd is 3: 43% beat the estimate by SIGNING_BEAT_MARGIN, 25% fall short by SIGNING_SHORT_MARGIN. */
+  DIRECTOR_ESTIMATE_SD: 3,
+  DIRECTOR_JUDGEMENT_SCALE_AT_ZERO: 1.5,
+  /** The range on the card: this many rating points either side at judgement 50, scaled the same way. */
+  DIRECTOR_RANGE_HALF: 6,
+  /** A recommendation must promise at least this much over the weakest starter, and sit within reach of the squad's level. */
+  DIRECTOR_MIN_GAIN: 1.5,
+  DIRECTOR_REACH_ABOVE: 12,
+  DIRECTOR_REACH_BELOW: 4,
+  /** Candidates: real players at other clubs, free agents, and players from abroad generated at the level asked (this share of the cards). */
+  DIRECTOR_ABROAD_SHARE: 0.4,
+  /** Ages a generated candidate from abroad can have. */
+  ABROAD_AGE_RANGE: [21, 30] as readonly [number, number],
+  /** How many real players the director looks at before ranking. Serves: sim speed. */
+  DIRECTOR_SEARCH_LIMIT: 60,
+  /** The fee: value × premium for a contracted player; a share of it for one in his last year; nothing for a free agent. */
+  DIRECTOR_FEE_PREMIUM: 1.1,
+  EXPIRING_FEE_SHARE: 0.5,
+  /** A bargain is a fee under this share of value. */
+  BARGAIN_FEE_SHARE: 0.8,
+  /** The director's confidence: sure thing when the estimated gain clears this many half-widths of his range, likely above the smaller one. */
+  DIRECTOR_CONFIDENCE_SURE: 1.5,
+  DIRECTOR_CONFIDENCE_LIKELY: 0.5,
+  /** The wage the director offers: the player's demand, up by this share to move. */
+  SIGNING_WAGE_PREMIUM: 0.1,
+  SIGNING_CONTRACT_YEARS: 3,
+  /** The selling club's roll: base at fee = value, moved by the premium; halved in January for a starter. */
+  BID_CLUB_ACCEPT_BASE: 0.65,
+  BID_CLUB_ACCEPT_PER_PREMIUM: 1.0,
+  BID_CLUB_JANUARY_STARTER_MULT: 0.5,
+  BID_CLUB_ACCEPT_ABROAD: 0.8,
+  BID_ACCEPT_RANGE: [0.05, 0.95] as readonly [number, number],
+  /** The player's roll: base, a step per tier up or down, a bonus per +10% wage. */
+  BID_PLAYER_ACCEPT_BASE: 0.75,
+  BID_PLAYER_TIER_STEP: 0.15,
+  BID_PLAYER_WAGE_BONUS_PER_10PCT: 0.05,
+  /** The truth is out after this many matches; a hit beats the estimate by the first margin, a flop falls short by the second. */
+  SIGNING_REVEAL_MATCHES: 5,
+  SIGNING_BEAT_MARGIN: 0.5,
+  SIGNING_SHORT_MARGIN: 2,
+  /** A hit lifts credit and reputation; a flop costs credit (the board question your signings). */
+  SIGNING_HIT_CREDIT: 3,
+  SIGNING_HIT_REP: 0.5,
+  SIGNING_FLOP_CREDIT: -3,
+  /** A player sold who shines elsewhere (this season average over this many apps, within this many seasons) costs the seller reputation. */
+  SOLD_SHINES_RATING: 7.2,
+  SOLD_SHINES_MIN_APPS: 10,
+  SOLD_SHINES_SEASONS: 2,
+  SOLD_SHINES_REP: -1,
+  /** Sales the director proposes: on a bid, when the wage bill is over budget by this factor, or for a player this unsettled. */
+  WAGE_OVERRUN_FACTOR: 1.05,
+  UNSETTLED_MORALE: 35,
+  /** A big bid is this many times the player's value; refusing one for an unsettled player costs his morale and counts as a fallout. */
+  BIG_BID_SHARE: 1.4,
+  REFUSED_BIG_BID_MORALE: -10,
+  /** An AI director sells to a bid at this chance when the fee clears value; the human is asked. */
+  AI_SELL_ON_BID_P: 0.6,
+  /** A club whose squad is at the tier's size plus this releases its lowest-value reserve to make room for a signing. */
+  SIGNING_MAKES_ROOM: true,
+  SIGNING_ROOM_OVER: 2,
+  /** The director's ranking: the estimate less this many points per whole pot the fee costs. */
+  DIRECTOR_FEE_WEIGHT: 4,
+  /** A candidate from abroad is generated this far above the floor the slot needs. */
+  DIRECTOR_ABROAD_GAIN: 2,
+  /** The club id a candidate from abroad carries until he signs or is forgotten. */
+  ABROAD_CLUB_ID: -1,
+
+  // ---------------------------------------------------------------------------
   // The score (DESIGN.md "The score"). Serves: Legacy calibration — a 30-year
   // mid-table career and a 12-year trophy-laden career within ~20%.
   // ---------------------------------------------------------------------------

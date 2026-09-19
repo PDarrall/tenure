@@ -11,7 +11,7 @@ import { createWorld } from '../src/world/gen.js'
 import { createCareer } from '../src/play/career.js'
 import { clubById, managerById, spellOf } from '../src/lookup.js'
 import { betFor, confidenceFor, markDefault, resolveBet, rollBet, rollKind, selectionWords } from '../src/play/bets.js'
-import { answerBoard, answerPress, human, pendingDecisions, queueActivity, queueBoard, queueFallout, queueOffer, queuePress, queueWindow, resolveDecisions } from '../src/play/decisions.js'
+import { answerBoard, answerPress, human, pendingDecisions, queueActivity, queueBoard, queueFallout, queueOffer, queuePress, resolveDecisions } from '../src/play/decisions.js'
 import { queueContract, queueNewDeal, queueWantsAway } from '../src/players/contracts.js'
 import { startSpell } from '../src/tenure/spell.js'
 import { openNewVacancies } from '../src/market/vacancies.js'
@@ -131,8 +131,6 @@ describe('every decision card is a bet', () => {
       queueFallout(world, spell, 'Someone'),
       queuePress(world, spell, 'win:home_win'),
       queueBoard(world, spell),
-      queueWindow(world, true, 5),
-      queueWindow(world, false, 1),
       queueNewDeal(world, squadOf(world, club)[0]!, 9),
       queueWantsAway(world, squadOf(world, club)[1]!),
       queueContract(world, squadOf(world, club)[2]!, human(world).id),
@@ -148,7 +146,6 @@ describe('every decision card is a bet', () => {
     expect(cards[1]!.defaultKey).toBe('back-down')
     expect(cards[2]!.defaultKey).toBe('measured')
     expect(cards[3]!.defaultKey).toBe('accept')
-    expect(cards[4]!.defaultKey).toBe('hold')
   })
 
   it("keeps the standing activity as the month's default, with waiting the gamble", () => {
@@ -239,7 +236,7 @@ describe('the fairness lines', () => {
     expect(board.cautiousN).toBe(100)
     expect(board.ratio).toBeGreaterThan(1.5)
     expect(board.gap).toBeLessThan(0.5)
-    expect(fair.worstGapKind).toBe('board')
+    expect(fair.worstRatioKind).toBe('board')
     // The human's rolls do not count.
     const career = createCareer(2, { name: 'H', background: 'coach' })
     for (let i = 0; i < 100; i++) rollKind(career, rng, 'activity', 'wait', { managerId: human(career).id })

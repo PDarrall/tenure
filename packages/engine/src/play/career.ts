@@ -42,6 +42,9 @@ export function createCareer(seed: number, options: CareerOptions): World {
     contractChoices: {},
     watched: null,
     agentWithdrawn: [],
+    targetProfile: null,
+    shortlist: [],
+    declinedPlayers: [],
   }
   world.logPolicy = 'career'
   emit(world, 'career.started', { managerId: player.id, name: player.name, background: player.background, age: player.age, reputation: player.reputation, seed })

@@ -156,6 +156,12 @@ export interface Player {
   lastClubId?: ClubId
   /** Came through the academy of the club that promoted him. */
   academy: boolean
+  /** The director's estimate against the truth while it reveals (DESIGN.md "Every signing is a bet"); absent for anyone not bought through a card. */
+  scouted?: Scouted | null
+  /** Who sold him last, until the shine check settles. */
+  soldBy?: SoldBy | null
+  /** A candidate from abroad, generated for a card; forgotten if nobody signs him by the deadline. */
+  abroad?: boolean
   /** Has played a first-team match. */
   debuted: boolean
   retired: boolean
@@ -235,6 +241,72 @@ export interface Club {
   lastRelegatedSeason: number | null
   /** Strength banked from academy promotions, released next summer. */
   pendingYouthGain: number
+  /** The director of football (DESIGN.md "Transfers"): runs the market inside the budgets; the manager decides. */
+  director: Director
+  /** £m left to spend this season: the board's budget for the summer, topped up for January, plus sales. */
+  transferPot: number
+}
+
+/** One per club. His judgement scales how far his estimates sit from the truth. */
+export interface Director {
+  name: string
+  /** 0–100, from the club's scouting level and wealth. */
+  judgement: number
+}
+
+/**
+ * What the director said about a signing when he was bought, against the
+ * truth that reveals over his first matches (DESIGN.md "Every signing is a bet").
+ */
+export interface Scouted {
+  /** The director's point estimate of rating and potential at signing. */
+  estimate: number
+  potentialEstimate: number
+  /** Half the width of the range on the card, from the director's judgement. */
+  halfWidth: number
+  /** Matches seen since signing; the truth is fully out at SIGNING_REVEAL_MATCHES. */
+  matchesSeen: number
+  revealed: boolean
+  fee: number
+  fromClubId: ClubId
+  /** Who signed him (the manager the hit or flop lands on). */
+  managerId: ManagerId | null
+  week: number
+}
+
+/** A player sold: who let him go, so a player who shines elsewhere costs the seller. */
+export interface SoldBy {
+  managerId: ManagerId
+  clubId: ClubId
+  season: number
+  fee: number
+  /** Whether the reputation cost has already been paid. */
+  settled: boolean
+}
+
+/** A bid the director has made: it negotiates itself at the next close (one roll on the club, one on the player). */
+export interface Bid {
+  id: number
+  clubId: ClubId
+  playerId: PlayerId
+  fee: number
+  /** £k a week offered. */
+  wage: number
+  years: number
+  week: number
+  /** The manager who approved it (the signing is theirs). */
+  managerId: ManagerId | null
+  /** Why the director proposed him; kept for the news. */
+  reason: SigningReason
+}
+
+export type SigningReason = 'need' | 'request' | 'bargain'
+
+/** What the manager asked the director for: shapes next week's cards. */
+export interface TargetProfile {
+  position?: Position
+  maxAge?: number
+  minRating?: number
 }
 
 /** A foreign side generated for one European tie (DESIGN.md "World"): a name, a strength drawn by round, a squad while the tie is on. */
@@ -279,6 +351,9 @@ export interface World {
   /** Every player, by id − 1; a slot is null once a player has gone and nobody keeps his record. */
   players: (Player | null)[]
   nextPlayerId: PlayerId
+  /** Bids waiting for the next close, the human's and the AI's. */
+  bids: Bid[]
+  nextBidId: number
   /** The human player, if this world is a career rather than a simulation. */
   human: HumanState | null
   /** 'career' keeps only events that concern the human plus season-level news. */
@@ -566,6 +641,8 @@ export type DecisionKind =
   | 'playerContract'
   | 'newDeal'
   | 'wantsAway'
+  | 'signing'
+  | 'sale'
 
 /** How sure the adviser is of an option, in words (DESIGN.md "Decisions are bets"). */
 export type Confidence = 'sure thing' | 'likely' | 'gamble'
@@ -608,7 +685,7 @@ export interface Decision {
   /** Week from which the default applies if unanswered. */
   deadlineWeek: number
   /** Who is asking: board, agent, press, staff. */
-  from: 'board' | 'agent' | 'press' | 'staff'
+  from: 'board' | 'agent' | 'press' | 'staff' | 'director'
   title: string
   body: string
   options: DecisionOption[]
@@ -645,6 +722,12 @@ export interface HumanState {
   watched: WatchedWeek | null
   /** Vacancies the human withdrew from: the agent never puts them forward there again. */
   agentWithdrawn: VacancyId[]
+  /** What the manager asked the director for; null when nothing is asked. */
+  targetProfile?: TargetProfile | null
+  /** The manager's shortlist: players to name to the director. */
+  shortlist?: PlayerId[]
+  /** Candidates declined this window, so the director does not bring the same name back. */
+  declinedPlayers?: PlayerId[]
 }
 
 /** Enough of a fixture to find it again in world.fixtures. */

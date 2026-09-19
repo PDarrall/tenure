@@ -205,6 +205,7 @@ export function applyFacts(world: World, side: SideInput, facts: SideFacts, squa
     played.add(p.id)
     if (hasTrait(p, 'leader')) leaderPlayed = true
     p.season.apps++
+    if (p.scouted && !p.scouted.revealed) p.scouted.matchesSeen++
     if (f.started) p.season.starts++
     p.season.minutes += f.minutes
     if (!p.debuted) {

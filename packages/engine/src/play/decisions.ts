@@ -21,6 +21,7 @@ import { setActivity } from '../market/unemployment.js'
 import { applyContract, applyNewDeal, applyWantsAway } from '../players/contracts.js'
 import { ordinal, renderText } from '../text/render.js'
 import { betFor, betOption, markDefault, plainOption, resolveBet } from './bets.js'
+import { applySale, applySigning } from './transfers.js'
 
 export function human(world: World): Manager {
   if (!world.human) throw new Error('no human in this world')
@@ -168,30 +169,6 @@ export function queueFallout(world: World, spell: Spell, name: string | null = n
   })
 }
 
-/** The window plan. Its dice are the window itself (the signings that arrive), so the options carry words and confidence only. */
-export function queueWindow(world: World, summer: boolean, budget: number): Decision {
-  const kind = summer ? 'summerWindow' : 'winterWindow'
-  const options: DecisionOption[] = summer
-    ? [
-        plainOption(kind, 'spend', 'Spend the budget', 'likely', {}, world.week, `£${budget}m on senior signings`),
-        plainOption(kind, 'rebuild', 'Rebuild', 'gamble', {}, world.week, 'spend the budget and promote the academy'),
-        plainOption(kind, 'youth', 'Youth first', 'likely', {}, world.week, 'half the budget, promote the academy'),
-        plainOption(kind, 'sell', 'Sell a senior player', 'gamble', {}, world.week, 'cash in, strength down, more of the XI yours'),
-        plainOption(kind, 'hold', 'Hold', 'sure thing', {}, world.week, 'keep the squad as it is'),
-      ]
-    : [plainOption(kind, 'spend', 'Spend the winter pot', 'likely', {}, world.week, `£${budget}m`), plainOption(kind, 'hold', 'Hold', 'sure thing', {}, world.week)]
-  return queueDecision(world, {
-    kind,
-    from: 'staff',
-    title: summer ? 'Summer window: the plan' : 'Winter window: the plan',
-    body: summer ? 'A big turnover resets your standing with the board; youth is cheap and slow. Holding is the cautious path.' : 'A small pot to top up the squad.',
-    options,
-    defaultKey: 'hold',
-    blocking: true,
-    payload: { summer, budget },
-  })
-}
-
 export function queuePress(world: World, spell: Spell, templateKey: string): Decision {
   const club = spell.post.kind === 'home' ? clubById(world, spell.post.clubId).name : 'the club'
   const body = renderText('press', templateKey.split(':')[0] ?? 'draw', { club, defeats: spell.consecutiveDefeats }, world.week)
@@ -315,17 +292,15 @@ export function applyAnswer(world: World, rng: Rng, decision: Decision, rawKey: 
       break
     }
     case 'summerWindow':
-    case 'winterWindow': {
-      const plans: Record<string, { spend: number; youth: number; sell: number }> = {
-        spend: { spend: 1, youth: 0, sell: 0 },
-        rebuild: { spend: 1, youth: T.YOUTH_MAX_PER_SUMMER, sell: 0 },
-        youth: { spend: 0.5, youth: T.YOUTH_MAX_PER_SUMMER, sell: 0 },
-        sell: { spend: 0, youth: 0, sell: 1 },
-        hold: { spend: 0, youth: 0, sell: 0 },
-      }
-      state.windowChoice = plans[key] ?? plans['hold'] ?? null
+    case 'winterWindow':
+      // The abstract window plan of phase 3: a card left pending in an old save does nothing now.
       break
-    }
+    case 'signing':
+      applySigning(world, decision, key)
+      break
+    case 'sale':
+      applySale(world, rng, decision, key)
+      break
     case 'press': {
       const spell = spellOf(world, manager)
       if (spell) answerPress(world, rng, spell, key, decision.id)

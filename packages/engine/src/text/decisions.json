@@ -1,94 +1,269 @@
 {
-  "offer_top-half_likely": ["A quiet start: the board take you at your word and wait."],
-  "offer_top-half_downside": ["Little to lose and little to gain from the promise itself."],
-  "offer_promotion_likely": ["A bold pitch: the board back it with budget and a target to match."],
-  "offer_promotion_downside": ["They will hold you to it: a slow start reads as a broken promise."],
-  "offer_stability_likely": ["A modest pitch: less budget, a gentle target, patience bought."],
-  "offer_stability_downside": ["An ambitious owner hears it as a lack of it."],
-  "offer_decline_likely": ["Nothing changes: your agent keeps applying."],
-  "offer_decline_downside": ["The next offer may be a smaller club, or a longer wait."],
-
-  "approach_accept_likely": ["A bigger club and a fresh start: \"in demand\" on your record."],
-  "approach_accept_downside": ["A new board's welcome is a roll: some start cold."],
-  "approach_decline_likely": ["Credit and loyalty here: the board notice who stayed."],
-  "approach_decline_downside": ["The call may not come again."],
-
-  "mutualConsent_accept_likely": ["Half the contract paid up and a small mark on the record."],
-  "mutualConsent_accept_downside": ["The market still sees a manager who left early."],
-  "mutualConsent_decline_likely": ["You fight on: a run of results could turn it."],
-  "mutualConsent_decline_downside": ["A sacking, the bigger mark, if the results do not come."],
-
-  "renewal_accept_likely": ["Two more years; the board have said they want you."],
-  "renewal_accept_downside": ["A better job may call while you are tied here."],
-  "renewal_decline_likely": ["Your contract runs out and you leave with nothing owed and a free hand."],
-  "renewal_decline_downside": ["The market may read it as drifting; the next job is not promised."],
-
-  "fallout_back-down_likely": ["He stays, and the room loses a little heart."],
-  "fallout_back-down_downside": ["Once seen to back down, the next player tries it too."],
-  "fallout_sell_likely": ["He goes; the side is weaker and more yours."],
-  "fallout_sell_downside": ["A room that liked him turns; one that did not breathes out."],
-
-  "summerWindow_spend_likely": ["The budget goes on senior players; the squad steps up."],
-  "summerWindow_spend_downside": ["Signings arrive as a bet each; the board reset the target upward."],
-  "summerWindow_rebuild_likely": ["Money and the academy together: the biggest turnover, the freshest side."],
-  "summerWindow_rebuild_downside": ["A new side takes time to gel; your standing resets with it."],
-  "summerWindow_youth_likely": ["Half the budget and the academy promoted: cheap, slow, yours."],
-  "summerWindow_youth_downside": ["The season starts with kids in the eleven."],
-  "summerWindow_sell_likely": ["Cash in on a senior player: money in, strength down, more of the XI yours."],
-  "summerWindow_sell_downside": ["The table does not care whose side it is."],
-  "summerWindow_hold_likely": ["Nothing moves; the squad you have is the squad you get."],
-  "summerWindow_hold_downside": ["Rivals strengthen and you stand still."],
-  "winterWindow_spend_likely": ["A small pot spent on a top-up."],
-  "winterWindow_spend_downside": ["A winter signing is a rush job."],
-  "winterWindow_hold_likely": ["Nothing moves."],
-  "winterWindow_hold_downside": ["A thin squad stays thin."],
-
-  "press_confident_likely": ["The room lifts on the front page."],
-  "press_confident_downside": ["Or it sounds like bluster and the room hears it."],
-  "press_measured_likely": ["Nobody remembers it by Monday."],
-  "press_measured_downside": ["Nobody remembers it by Monday."],
-  "press_defiant_likely": ["The room rallies behind a manager under fire."],
-  "press_defiant_downside": ["Or it reads as blame, and the room takes it personally."],
-
-  "board_accept_likely": ["Take it on the chin; nothing moves."],
-  "board_accept_downside": ["The next bad month arrives with the same warning."],
-  "board_pushBack_likely": ["Some boards respect a fight."],
-  "board_pushBack_downside": ["Some do not, and the credit goes the other way."],
-  "board_promise_likely": ["Credit now: they believe you."],
-  "board_promise_downside": ["The target is a place harder, and a promise unkept is remembered."],
-
-  "activity_wait_likely": ["Your name stays in play for the next vacancy."],
-  "activity_wait_downside": ["The phone stays quiet, and the slide goes on."],
-  "activity_punditry_likely": ["Half the slide, a little income, your face on television."],
-  "activity_punditry_downside": ["Boards remember the pundit, not the manager."],
-  "activity_assistant_likely": ["The slide stops; the income is steady."],
-  "activity_assistant_downside": ["Stepping down costs reputation once, and it is on the record."],
-
-  "newDeal_accept_likely": ["He signs, happy; the wage bill rises."],
-  "newDeal_accept_downside": ["Others see what asking gets."],
-  "newDeal_refuse_likely": ["He is unhappy, and the room notices."],
-  "newDeal_refuse_downside": ["Or he knuckles down; or he sulks, and the room takes his side."],
-
-  "wantsAway_keep_likely": ["He stays, unhappy; the side keeps its depth."],
-  "wantsAway_keep_downside": ["An unhappy player does not play like a happy one."],
-  "wantsAway_sell_likely": ["A fee into the club's cash; his place opens up."],
-  "wantsAway_sell_downside": ["The room may miss him; or it may breathe easier."],
-
-  "playerContract_renew_likely": ["He stays on the terms he asked; the assistant agrees."],
-  "playerContract_renew_downside": ["Wages for a player who may be past it."],
-  "playerContract_release_likely": ["He goes in the summer; the wage bill falls."],
-  "playerContract_release_downside": ["A hole in the squad and a friend gone from the room."],
-
-  "selection_upgrade_likely": ["A better player in: the side is stronger for it."],
-  "selection_upgrade_downside": ["Little; the one going off may sulk."],
-  "selection_downgrade_likely": ["Fresh legs at a small cost in quality."],
-  "selection_downgrade_downside": ["The gap in rating shows against a good side."],
-  "selection_tired_likely": ["He plays through it."],
-  "selection_tired_downside": ["Tired legs get hurt, and get caught."],
-  "selection_debut_likely": ["A debut: a point toward a player made."],
-  "selection_debut_downside": ["A kid can freeze; the result carries the risk."],
-
-  "rolled_paid": ["The dice on \"{label}\" fell your way: {effect} {unit}."],
-  "rolled_cost": ["The dice on \"{label}\" went against you: {effect} {unit}."],
-  "rolled_even": ["The dice on \"{label}\" came up even."]
+  "offer_top-half_likely": [
+    "A quiet start: the board take you at your word and wait."
+  ],
+  "offer_top-half_downside": [
+    "Little to lose and little to gain from the promise itself."
+  ],
+  "offer_promotion_likely": [
+    "A bold pitch: the board back it with budget and a target to match."
+  ],
+  "offer_promotion_downside": [
+    "They will hold you to it: a slow start reads as a broken promise."
+  ],
+  "offer_stability_likely": [
+    "A modest pitch: less budget, a gentle target, patience bought."
+  ],
+  "offer_stability_downside": [
+    "An ambitious owner hears it as a lack of it."
+  ],
+  "offer_decline_likely": [
+    "Nothing changes: your agent keeps applying."
+  ],
+  "offer_decline_downside": [
+    "The next offer may be a smaller club, or a longer wait."
+  ],
+  "approach_accept_likely": [
+    "A bigger club and a fresh start: \"in demand\" on your record."
+  ],
+  "approach_accept_downside": [
+    "A new board's welcome is a roll: some start cold."
+  ],
+  "approach_decline_likely": [
+    "Credit and loyalty here: the board notice who stayed."
+  ],
+  "approach_decline_downside": [
+    "The call may not come again."
+  ],
+  "mutualConsent_accept_likely": [
+    "Half the contract paid up and a small mark on the record."
+  ],
+  "mutualConsent_accept_downside": [
+    "The market still sees a manager who left early."
+  ],
+  "mutualConsent_decline_likely": [
+    "You fight on: a run of results could turn it."
+  ],
+  "mutualConsent_decline_downside": [
+    "A sacking, the bigger mark, if the results do not come."
+  ],
+  "renewal_accept_likely": [
+    "Two more years; the board have said they want you."
+  ],
+  "renewal_accept_downside": [
+    "A better job may call while you are tied here."
+  ],
+  "renewal_decline_likely": [
+    "Your contract runs out and you leave with nothing owed and a free hand."
+  ],
+  "renewal_decline_downside": [
+    "The market may read it as drifting; the next job is not promised."
+  ],
+  "fallout_back-down_likely": [
+    "He stays, and the room loses a little heart."
+  ],
+  "fallout_back-down_downside": [
+    "Once seen to back down, the next player tries it too."
+  ],
+  "fallout_sell_likely": [
+    "He goes; the side is weaker and more yours."
+  ],
+  "fallout_sell_downside": [
+    "A room that liked him turns; one that did not breathes out."
+  ],
+  "summerWindow_spend_likely": [
+    "The budget goes on senior players; the squad steps up."
+  ],
+  "summerWindow_spend_downside": [
+    "Signings arrive as a bet each; the board reset the target upward."
+  ],
+  "summerWindow_rebuild_likely": [
+    "Money and the academy together: the biggest turnover, the freshest side."
+  ],
+  "summerWindow_rebuild_downside": [
+    "A new side takes time to gel; your standing resets with it."
+  ],
+  "summerWindow_youth_likely": [
+    "Half the budget and the academy promoted: cheap, slow, yours."
+  ],
+  "summerWindow_youth_downside": [
+    "The season starts with kids in the eleven."
+  ],
+  "summerWindow_sell_likely": [
+    "Cash in on a senior player: money in, strength down, more of the XI yours."
+  ],
+  "summerWindow_sell_downside": [
+    "The table does not care whose side it is."
+  ],
+  "summerWindow_hold_likely": [
+    "Nothing moves; the squad you have is the squad you get."
+  ],
+  "summerWindow_hold_downside": [
+    "Rivals strengthen and you stand still."
+  ],
+  "winterWindow_spend_likely": [
+    "A small pot spent on a top-up."
+  ],
+  "winterWindow_spend_downside": [
+    "A winter signing is a rush job."
+  ],
+  "winterWindow_hold_likely": [
+    "Nothing moves."
+  ],
+  "winterWindow_hold_downside": [
+    "A thin squad stays thin."
+  ],
+  "press_confident_likely": [
+    "The room lifts on the front page."
+  ],
+  "press_confident_downside": [
+    "Or it sounds like bluster and the room hears it."
+  ],
+  "press_measured_likely": [
+    "Nobody remembers it by Monday."
+  ],
+  "press_measured_downside": [
+    "Nobody remembers it by Monday."
+  ],
+  "press_defiant_likely": [
+    "The room rallies behind a manager under fire."
+  ],
+  "press_defiant_downside": [
+    "Or it reads as blame, and the room takes it personally."
+  ],
+  "board_accept_likely": [
+    "Take it on the chin; nothing moves."
+  ],
+  "board_accept_downside": [
+    "The next bad month arrives with the same warning."
+  ],
+  "board_pushBack_likely": [
+    "Some boards respect a fight."
+  ],
+  "board_pushBack_downside": [
+    "Some do not, and the credit goes the other way."
+  ],
+  "board_promise_likely": [
+    "Credit now: they believe you."
+  ],
+  "board_promise_downside": [
+    "The target is a place harder, and a promise unkept is remembered."
+  ],
+  "activity_wait_likely": [
+    "Your name stays in play for the next vacancy."
+  ],
+  "activity_wait_downside": [
+    "The phone stays quiet, and the slide goes on."
+  ],
+  "activity_punditry_likely": [
+    "Half the slide, a little income, your face on television."
+  ],
+  "activity_punditry_downside": [
+    "Boards remember the pundit, not the manager."
+  ],
+  "activity_assistant_likely": [
+    "The slide stops; the income is steady."
+  ],
+  "activity_assistant_downside": [
+    "Stepping down costs reputation once, and it is on the record."
+  ],
+  "newDeal_accept_likely": [
+    "He signs, happy; the wage bill rises."
+  ],
+  "newDeal_accept_downside": [
+    "Others see what asking gets."
+  ],
+  "newDeal_refuse_likely": [
+    "He is unhappy, and the room notices."
+  ],
+  "newDeal_refuse_downside": [
+    "Or he knuckles down; or he sulks, and the room takes his side."
+  ],
+  "wantsAway_keep_likely": [
+    "He stays, unhappy; the side keeps its depth."
+  ],
+  "wantsAway_keep_downside": [
+    "An unhappy player does not play like a happy one."
+  ],
+  "wantsAway_sell_likely": [
+    "A fee into the club's cash; his place opens up."
+  ],
+  "wantsAway_sell_downside": [
+    "The room may miss him; or it may breathe easier."
+  ],
+  "playerContract_renew_likely": [
+    "He stays on the terms he asked; the assistant agrees."
+  ],
+  "playerContract_renew_downside": [
+    "Wages for a player who may be past it."
+  ],
+  "playerContract_release_likely": [
+    "He goes in the summer; the wage bill falls."
+  ],
+  "playerContract_release_downside": [
+    "A hole in the squad and a friend gone from the room."
+  ],
+  "selection_upgrade_likely": [
+    "A better player in: the side is stronger for it."
+  ],
+  "selection_upgrade_downside": [
+    "Little; the one going off may sulk."
+  ],
+  "selection_downgrade_likely": [
+    "Fresh legs at a small cost in quality."
+  ],
+  "selection_downgrade_downside": [
+    "The gap in rating shows against a good side."
+  ],
+  "selection_tired_likely": [
+    "He plays through it."
+  ],
+  "selection_tired_downside": [
+    "Tired legs get hurt, and get caught."
+  ],
+  "selection_debut_likely": [
+    "A debut: a point toward a player made."
+  ],
+  "selection_debut_downside": [
+    "A kid can freeze; the result carries the risk."
+  ],
+  "rolled_paid": [
+    "The dice on \"{label}\" fell your way: {effect} {unit}."
+  ],
+  "rolled_cost": [
+    "The dice on \"{label}\" went against you: {effect} {unit}."
+  ],
+  "rolled_even": [
+    "The dice on \"{label}\" came up even."
+  ],
+  "signing_approve_likely": [
+    "The bid goes in; the answer comes next week. If he comes, he is the director's estimate give or take."
+  ],
+  "signing_approve_downside": [
+    "The club or the player says no; or he comes and the truth is under the estimate, and the board ask."
+  ],
+  "signing_decline_likely": [
+    "Nothing moves; the pot is untouched."
+  ],
+  "signing_decline_downside": [
+    "The weakest slot stays weak."
+  ],
+  "signing_another_likely": [
+    "The director brings a different profile next week."
+  ],
+  "signing_another_downside": [
+    "A week of the window gone."
+  ],
+  "sale_approve_likely": [
+    "The fee lands in the pot; his slot opens."
+  ],
+  "sale_approve_downside": [
+    "If he shines elsewhere it costs you."
+  ],
+  "sale_refuse_likely": [
+    "He stays."
+  ],
+  "sale_refuse_downside": [
+    "An unsettled player kept against a big bid takes the room down with him."
+  ]
 }

@@ -2,6 +2,7 @@ import { rngFromState, seedState, type Rng } from '../rng.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import type { Club, OwnerType, Tier, World } from '../types.js'
+import { makeDirector } from '../market/director.js'
 import { clubName, TownNamer } from './names.js'
 import { createManagers } from '../managers/gen.js'
 import { seatIncumbents } from '../tenure/spell.js'
@@ -66,6 +67,8 @@ function makeClub(rng: Rng, id: number, tier: Tier, town: string): Club {
     thisSeason: { cupFinals: 0, inBottomZone: false, academyPromoted: 0 },
     lastRelegatedSeason: null,
     pendingYouthGain: 0,
+    director: makeDirector(rng, wealth),
+    transferPot: round1(T.TRANSFER_BUDGET_PER_WEALTH_SQ * wealth * wealth),
   }
 }
 
@@ -116,6 +119,8 @@ export function createWorld(seed: number): World {
     players: [],
     nextPlayerId: 1,
     human: null,
+    bids: [],
+    nextBidId: 1,
     logPolicy: 'full',
     log: [],
   }

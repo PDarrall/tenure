@@ -17,8 +17,8 @@ import { weeklySackingCheck } from './sacking.js'
 import { maybeFallout, monthlyShocks } from './shocks.js'
 import { bumpReputation, checkExpiry, monthlyMutualConsent, monthlyResignation } from './exits.js'
 import { activeSpells } from './spell.js'
-import { answerBoard, answerPress, hasPending, queueBoard, queuePress, queueWindow } from '../play/decisions.js'
-import { normalBudget } from '../season/squad.js'
+import { answerBoard, answerPress, hasPending, queueBoard, queuePress } from '../play/decisions.js'
+import { revealSignings } from '../market/director.js'
 import { matchTemplateKey } from '../text/render.js'
 
 function creditForSide(world: World, rng: Rng, played: PlayedFixture, home: boolean): number | null {
@@ -65,6 +65,7 @@ export function afterMatches(world: World, rng: Rng, played: PlayedFixture[]): v
     aiPress(world, rng, p.homeManager)
     aiPress(world, rng, p.awayManager)
   }
+  revealSignings(world, played.flatMap((p) => [p.fixture.homeId, p.fixture.awayId]))
   const state = world.human
   if (!state) return
   const player = managerById(world, state.managerId)
@@ -136,21 +137,6 @@ export function boardMood(spell: Spell): 'secure' | 'settled' | 'uneasy' | 'unde
   if (gap < T.BOARD_WARN_MARGIN) return 'uneasy'
   if (gap < 3 * T.BOARD_WARN_MARGIN) return 'settled'
   return 'secure'
-}
-
-/** Ask the human for a window plan the week before the window runs. */
-export function queueWindowDecision(world: World, summer: boolean): void {
-  const state = world.human
-  if (!state) return
-  const player = managerById(world, state.managerId)
-  const spell = spellOf(world, player)
-  if (!spell || spell.post.kind !== 'home') return
-  const club = homeClub(world, spell.post.clubId)
-  if (!club) return
-  const kind = summer ? 'summerWindow' : 'winterWindow'
-  if (hasPending(world, kind)) return
-  const pot = summer ? round1(normalBudget(club) * spell.budgetMultiplier) : round1(normalBudget(club) * T.WINTER_BUDGET_SHARE)
-  queueWindow(world, summer, pot)
 }
 
 function trophyWeight(h: Honour): number {

@@ -310,6 +310,40 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
       case 'human.decided':
         if (p['byDefault'] === true) push(e, 'agent', renderText('agent', 'default_taken', { key: String(p['key']) }, e.week))
         break
+      case 'window.opened':
+        if (mine(e)) push(e, 'staff', renderText('director', `window_open_${String(p['window'])}`, { deadline: p['deadline'] as number, pot: p['pot'] as number, wages: p['wages'] as number }, e.week))
+        break
+      case 'bid.made':
+        if (mine(e)) push(e, 'staff', renderText('director', 'bid_made', { name: String(p['name']), fee: p['fee'] as number, club: (p['fromClubId'] as number) > 0 ? clubNameOf(world, p['fromClubId'] as number) : (p['fromClubId'] as number) === 0 ? 'the player' : 'his club abroad' }, e.week))
+        break
+      case 'transfer.completed':
+        if (mine(e)) push(e, 'staff', renderText('director', p['free'] === true ? 'bid_free' : 'bid_signed', { name: String(p['name']), fee: p['fee'] as number, club: (p['fromClubId'] as number) > 0 ? clubNameOf(world, p['fromClubId'] as number) : 'abroad', wage: p['wage'] as number, years: p['years'] as number, lo: p['lo'] as number, hi: p['hi'] as number }, e.week))
+        else if ((p['fee'] as number) >= T.TRANSFER_MILESTONE_FEE) push(e, 'news', renderText('director', p['free'] === true ? 'news_free' : 'news_signing', { club: clubNameOf(world, p['clubId'] as number), name: String(p['name']), from: (p['fromClubId'] as number) > 0 ? clubNameOf(world, p['fromClubId'] as number) : 'abroad', fee: p['fee'] as number }, e.week))
+        break
+      case 'bid.failed':
+        if (mine(e) && (p['reason'] === 'club' || p['reason'] === 'player')) push(e, 'staff', renderText('director', p['reason'] === 'club' ? 'bid_club_refused' : 'bid_player_refused', { name: String(p['name']), club: typeof p['fromClubId'] === 'number' && (p['fromClubId'] as number) > 0 ? clubNameOf(world, p['fromClubId'] as number) : 'His club' }, e.week))
+        break
+      case 'player.sold':
+        if (mine(e)) push(e, 'staff', renderText('director', 'sold', { name: String(p['name']), fee: p['fee'] as number, club: typeof p['toClubId'] === 'number' ? clubNameOf(world, p['toClubId'] as number) : 'a club abroad', pot: p['pot'] as number }, e.week))
+        break
+      case 'sale.refused':
+        if (mine(e)) push(e, 'staff', renderText('director', p['big'] === true && p['unsettled'] === true ? 'sale_refused_unsettled' : 'sale_refused', { name: String(p['name']) }, e.week))
+        break
+      case 'window.deadline':
+        if (mine(e)) push(e, 'staff', renderText('director', (p['signings'] as number) + (p['sales'] as number) > 0 ? 'deadline_busy' : 'deadline_quiet', { signings: p['signings'] as number, sales: p['sales'] as number, spend: p['spend'] as number, pot: p['pot'] as number }, e.week))
+        break
+      case 'signing.revealed':
+        if (mine(e)) push(e, p['verdict'] === 'flop' ? 'board' : 'staff', renderText('director', `reveal_${String(p['verdict'])}`, { name: String(p['name']), truth: Math.round(p['truth'] as number), estimate: Math.round(p['estimate'] as number) }, e.week))
+        break
+      case 'sold.shines':
+        if (mine(e)) push(e, 'press', renderText('director', 'sold_shines', { name: String(p['name']), club: clubNameOf(world, p['clubId'] as number) }, e.week))
+        break
+      case 'director.another':
+        if (mine(e)) push(e, 'staff', renderText('director', 'another', {}, e.week))
+        break
+      case 'director.note':
+        if (mine(e)) push(e, 'staff', renderText('director', String(p['note']), {}, e.week))
+        break
       case 'decision.rolled': {
         // Only the bold rolls are news; the cautious ones come up even by design.
         if (!mine(e) || p['bold'] !== true) break
