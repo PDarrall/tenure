@@ -3,6 +3,7 @@
  * the coming turn. Pure functions, no DOM, so it can be tested directly.
  */
 import {
+  tunables,
   advanceTurn,
   createCareer,
   discardWatched,
@@ -273,5 +274,7 @@ export function parseSave(text: string): World {
     throw new Error('not a Tenure save')
   }
   if (!w.human || typeof w.human !== 'object') throw new Error('this save has no human manager')
+  // The calendar changed under phase 4 (DESIGN.md v0.10: 52 weeks); a week number from the old year means something else now.
+  if (w.calendar !== tunables.SEASON_WEEKS) throw new Error(`this save is from an earlier calendar (${w.calendar ?? 46}-week seasons); start a new career`)
   return parsed as World
 }

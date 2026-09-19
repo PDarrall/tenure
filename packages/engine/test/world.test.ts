@@ -67,20 +67,24 @@ describe('world generation', () => {
     expect(withRivals).toBeGreaterThan(world.clubs.length * 0.8)
   })
 
-  it('has no foreign leagues: every post is a home club, and the European field is generated with the season', () => {
+  it('has no foreign leagues: every post is a home club, and the European fields are generated with the season', () => {
     const world = createWorld(1)
     expect(world.europeanOpponents).toEqual([])
     runWeeks(world, 1)
-    expect(world.europeanOpponents).toHaveLength(T.EUROPEAN_OPPONENTS)
+    const home = world.europeanPlaces.championsCup.length + world.europeanPlaces.europaCup.length + world.europeanPlaces.conferenceCup.length
+    expect(world.europeanOpponents).toHaveLength(3 * T.EUROPE_CLUBS - home)
     const names = new Set(world.europeanOpponents.map((o) => o.name))
-    expect(names.size).toBe(T.EUROPEAN_OPPONENTS)
+    expect(names.size).toBe(world.europeanOpponents.length)
     for (const o of world.europeanOpponents) {
       expect(o.id).toBeGreaterThanOrEqual(T.EUROPEAN_OPPONENT_ID_BASE)
       expect(o.strength).toBeGreaterThan(20)
       expect(o.playerIds).toEqual([])
     }
-    const european = world.cups.find((c) => c.competition === 'european')!
-    expect(european.remaining).toHaveLength(T.EUROPEAN_LEAGUE_PLACES + 1 + T.EUROPEAN_OPPONENTS)
+    for (const competition of ['championsCup', 'europaCup', 'conferenceCup'] as const) {
+      const cup = world.cups.find((c) => c.competition === competition)!
+      expect(cup.remaining).toHaveLength(T.EUROPE_CLUBS)
+      expect(cup.groups).toHaveLength(T.EUROPE_GROUPS)
+    }
   })
 
   it('logs a world.created event at week 0', () => {

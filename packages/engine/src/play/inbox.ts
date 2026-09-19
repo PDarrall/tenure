@@ -29,26 +29,35 @@ export function competitionLabel(c: unknown): string {
     case 'league':
       return 'League'
     case 'nationalCup':
-      return 'National Cup'
+      return 'The Cup'
     case 'leagueCup':
-      return 'League Cup'
-    case 'european':
-      return 'European Cup'
+      return 'The League Cup'
+    case 'championsCup':
+      return 'Champions Cup'
+    case 'europaCup':
+      return 'Europa Cup'
+    case 'conferenceCup':
+      return 'Conference Cup'
     default:
       return String(c)
   }
 }
 
+/** The competition as a sentence names it after "the": "won the Cup", "won the league title". */
 export function competitionName(c: unknown): string {
   switch (c) {
     case 'league':
       return 'league title'
     case 'nationalCup':
-      return 'national cup'
+      return 'Cup'
     case 'leagueCup':
-      return 'league cup'
-    case 'european':
-      return 'European title'
+      return 'League Cup'
+    case 'championsCup':
+      return 'Champions Cup'
+    case 'europaCup':
+      return 'Europa Cup'
+    case 'conferenceCup':
+      return 'Conference Cup'
     default:
       return String(c)
   }
@@ -104,7 +113,7 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
       case 'match.played': {
         if (p['homeManagerId'] !== me && p['awayManagerId'] !== me) break
         const position = typeof p['positionAfter'] === 'number' && p['competition'] === 'league' ? ` You are ${ordinal(p['positionAfter'])}.` : ''
-        const comp = p['competition'] === 'league' ? '' : ` (${competitionName(p['competition'])}, round ${p['round']})`
+        const comp = p['competition'] === 'league' ? '' : ` (${competitionLabel(p['competition'])}, ${String(p['label'] ?? `round ${String(p['round'])}`).toLowerCase()}${p['leg'] === 1 ? ', first leg' : p['leg'] === 2 ? `, second leg, ${String(p['aggregateHome'])}–${String(p['aggregateAway'])} on aggregate` : ''})`
         const scorers = (p['homeManagerId'] === me ? p['homeScorers'] : p['awayScorers']) as { name: string; assist: string | null }[] | undefined
         const goals = scorers && scorers.length ? ` Goals: ${scorers.map((g) => (g.assist ? `${g.name} (${g.assist})` : g.name)).join(', ')}.` : ''
         push(e, 'match', `${renderMatch(world, e)}${comp}${position}${goals}`)
@@ -164,12 +173,22 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
         if (myClubId === null) break
         const home = p['homeId'] === myClubId
         const opponent = clubNameOf(world, (home ? p['awayId'] : p['homeId']) as number)
-        const key = p['final'] === true ? 'cup_draw_final' : home ? 'cup_draw_home' : 'cup_draw_away'
-        push(e, 'news', renderText('news', key, { competition: competitionLabel(p['competition']), round: p['round'] as number, opponent, week: (p['week'] as number) + 1 }, e.week))
+        const round = String(p['label'] ?? `round ${String(p['round'])}`).toLowerCase()
+        const key = p['legs'] === 2 ? (home ? 'cup_draw_legs_home' : 'cup_draw_legs_away') : p['neutral'] === true ? 'cup_draw_neutral' : home ? 'cup_draw_home' : 'cup_draw_away'
+        push(e, 'news', renderText('news', key, { competition: competitionLabel(p['competition']), round, opponent, week: (p['week'] as number) + 1 }, e.week))
         break
       }
       case 'cup.bye':
-        if (myClub(e)) push(e, 'news', renderText('news', 'cup_draw_bye', { competition: competitionLabel(p['competition']), round: p['round'] as number }, e.week))
+        if (myClub(e)) push(e, 'news', renderText('news', 'cup_draw_bye', { competition: competitionLabel(p['competition']), round: String(p['label'] ?? `round ${String(p['round'])}`).toLowerCase() }, e.week))
+        break
+      case 'europe.group': {
+        const ids = p['clubIds'] as number[]
+        if (myClubId === null || !ids.includes(myClubId)) break
+        push(e, 'news', renderText('news', 'europe_group', { competition: competitionLabel(p['competition']), group: String.fromCharCode(65 + (p['group'] as number)), others: ids.filter((id) => id !== myClubId).map((id) => clubNameOf(world, id)).join(', '), week: (p['week'] as number) + 1 }, e.week))
+        break
+      }
+      case 'europe.prize':
+        if (myClub(e)) push(e, 'board', renderText('news', 'europe_prize', { competition: competitionLabel(p['competition']), stage: String(p['stage']) === 'winner' ? 'the trophy' : String(p['stage']) === 'group' ? 'the group stage' : `the ${String(p['stage'])}-finals` }, e.week))
         break
       case 'manager.hired':
         if (mine(e)) push(e, 'board', renderText('board', 'welcome', { club: postName(world, p['post'] as Post), expectation: ordinal(p['expectation'] as number), years: p['years'] as number, salary: p['salary'] as number }, e.week))

@@ -40,17 +40,23 @@ export interface WindowState {
   weeksToDeadline: number | null
 }
 
-/** Which window a season week falls in, if any. */
+/** Which window a season week falls in, if any. The summer runs across the season boundary: from the last match week to the deadline in the new season. */
 export function windowAt(sw: number): WindowName | null {
   const [js, je] = T.JANUARY_WINDOW_WEEKS
   if (sw >= js && sw <= je) return 'january'
-  const [ss, se] = T.SUMMER_WINDOW_WEEKS
-  if (sw >= ss && sw <= se) return 'summer'
+  if (sw >= T.SUMMER_WINDOW_OPENS || sw <= T.SUMMER_WINDOW_CLOSES) return 'summer'
   return null
 }
 
 export function deadlineOf(window: WindowName): number {
-  return window === 'january' ? T.JANUARY_WINDOW_WEEKS[1] : T.SUMMER_WINDOW_WEEKS[1]
+  return window === 'january' ? T.JANUARY_WINDOW_WEEKS[1] : T.SUMMER_WINDOW_CLOSES
+}
+
+/** Weeks from a season week to a window's deadline, the summer's counted across the boundary. */
+export function weeksToDeadline(window: WindowName, sw: number): number {
+  const deadline = deadlineOf(window)
+  if (window === 'summer' && sw >= T.SUMMER_WINDOW_OPENS) return T.SEASON_WEEKS - sw + deadline
+  return deadline - sw
 }
 
 export function isDeadlineWeek(sw: number): boolean {
@@ -63,8 +69,7 @@ export function windowState(world: World): WindowState {
   const sw = seasonWeek(world.week)
   const window = windowAt(sw)
   if (!window) return { open: false, window: null, deadlineWeek: null, weeksToDeadline: null }
-  const deadline = deadlineOf(window)
-  return { open: true, window, deadlineWeek: deadline, weeksToDeadline: deadline - sw }
+  return { open: true, window, deadlineWeek: deadlineOf(window), weeksToDeadline: weeksToDeadline(window, sw) }
 }
 
 /**
@@ -73,10 +78,11 @@ export function windowState(world: World): WindowState {
  * (the season closes at that week's close, and the squads change with it).
  */
 export function isCardClose(sw: number): WindowName | null {
-  const next = windowAt(sw + 1)
+  const nextSw = (sw + 1) % T.SEASON_WEEKS
+  const next = windowAt(nextSw)
   if (!next) return null
-  if (deadlineOf(next) === sw + 1) return null
-  if (next === 'summer' && sw + 1 === T.SUMMER_WINDOW_WEEKS[0]) return null
+  if (deadlineOf(next) === nextSw) return null
+  if (next === 'summer' && nextSw === T.MATCH_WEEKS) return null
   return next
 }
 
@@ -684,10 +690,12 @@ export function windowSummaries(world: World): WindowSummary[] {
   return world.clubs.map((club) => ({ clubId: club.id, managerId: club.managerId, turnover: windowTurnover(world, club) }))
 }
 
-/** The global week the current window opened. */
+/** The global week the current window opened; the summer's may lie in the season before. */
 function openedWeek(world: World, window: WindowName): number {
-  const start = window === 'january' ? T.JANUARY_WINDOW_WEEKS[0] : T.SUMMER_WINDOW_WEEKS[0]
-  return world.week - (seasonWeek(world.week) - start)
+  const sw = seasonWeek(world.week)
+  if (window === 'january') return world.week - (sw - T.JANUARY_WINDOW_WEEKS[0])
+  if (sw >= T.SUMMER_WINDOW_OPENS) return world.week - (sw - T.SUMMER_WINDOW_OPENS)
+  return world.week - sw - (T.SEASON_WEEKS - T.SUMMER_WINDOW_OPENS)
 }
 
 /** The human's manager and club in a window, if employed at a home club. */

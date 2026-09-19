@@ -32,12 +32,13 @@ function creditForSide(world: World, rng: Rng, played: PlayedFixture, home: bool
   const opponent = homeClub(world, opponentId)
   const points = home ? played.homePoints : played.awayPoints
   const opponentPosition = home ? played.awayPosition : played.homePosition
-  const knockout = played.fixture.competition !== 'league'
+  // A deciding cup match pays the tie in full (3 or 0); a group match or a first leg pays the night.
+  const knockout = played.decides
   const delta = matchCreditDelta(spell, {
-    points: knockout ? (points === 3 ? 3 : 0) : points,
+    points,
     expected: home ? played.expHome : played.expAway,
     derby: club !== undefined && club.rivals.includes(opponentId),
-    cupExitToLowerTier: knockout && points < 3 && opponent !== undefined && club !== undefined && opponent.tier > club.tier,
+    cupExitToLowerTier: knockout && points < T.POINTS_WIN && opponent !== undefined && club !== undefined && opponent.tier > club.tier,
     beatTopSide: opponentPosition !== null && opponentPosition <= T.CREDIT_TOP_SIDE_RANK,
   })
   const applied = addCredit(spell, delta)
@@ -195,7 +196,12 @@ export function seasonEnd(world: World, outcome: SeasonEnd): void {
   }
 }
 
-/** Ownership from the summer churn, ceiling resets, then the expectation reset. */
+/** The new season's targets (DESIGN.md "Tenure model"): the expectation reset against last season, from the squads as they stand at the summer's end. */
+export function newSeason(world: World): void {
+  for (const spell of activeSpells(world)) resetExpectation(world, spell)
+}
+
+/** Ownership from the summer churn and ceiling resets, at the deadline (the window closes in the new season's third week). */
 export function afterSummerWindow(world: World, summaries: WindowSummary[]): void {
   const byClub = new Map(summaries.map((s) => [s.clubId, s]))
   for (const spell of activeSpells(world)) {
@@ -211,7 +217,6 @@ export function afterSummerWindow(world: World, summaries: WindowSummary[]): voi
       }
     }
     clampToCeiling(spell)
-    resetExpectation(world, spell)
   }
 }
 

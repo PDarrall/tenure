@@ -1,10 +1,10 @@
 /**
- * The European competition's foreign field (DESIGN.md "World"): opponents
- * generated for the season, each a name and a strength drawn afresh by round
- * from EUROPEAN_OPPONENT_STRENGTH_BY_ROUND, so the later rounds are harder
- * whoever survives. A squad appears when a tie against a home club is
- * prepared and goes when the tie is settled. Two generated sides meeting
- * each other are settled on strength alone.
+ * The European competitions' foreign fields (DESIGN.md "World"): opponents
+ * generated for each competition and season, each a name and a strength
+ * drawn afresh by stage from EUROPE_OPPONENT_STRENGTH, so the later rounds
+ * are harder whoever survives. A squad appears when a tie against a home
+ * club is prepared and goes when the tie is settled. Two generated sides
+ * meeting each other are settled on strength alone.
  */
 import type { Rng } from '../rng.js'
 import { T } from '../tunables.js'
@@ -12,34 +12,41 @@ import { clamp, round1 } from '../world/gen.js'
 import { OpponentNamer } from '../world/names.js'
 import { generateSquad, forgetPlayer } from '../players/gen.js'
 import { playerById, europeanOpponentById } from '../lookup.js'
-import type { ClubId, EuropeanOpponent, Nationality, World } from '../types.js'
+import type { ClubId, EuropeanCompetition, EuropeanOpponent, Nationality, World } from '../types.js'
 
 const POOLS: Exclude<Nationality, 'home'>[] = ['big', 'mid', 'small']
 
-function drawStrength(rng: Rng, round: number): number {
-  const spec = T.EUROPEAN_OPPONENT_STRENGTH_BY_ROUND[Math.min(round, T.EUROPEAN_OPPONENT_STRENGTH_BY_ROUND.length - 1)] as { mean: number; sd: number }
+export type EuropeStage = 'group' | 'quarter' | 'semi' | 'final'
+
+export const EUROPEAN_COMPETITIONS: readonly EuropeanCompetition[] = ['championsCup', 'europaCup', 'conferenceCup']
+
+function drawStrength(rng: Rng, competition: EuropeanCompetition, stage: EuropeStage): number {
+  const spec = T.EUROPE_OPPONENT_STRENGTH[competition][stage]
   return round1(clamp(rng.normal(spec.mean, spec.sd), 1, 100))
 }
 
-/** A fresh field for the season: names and round-one strengths. Last season's opponents and their squads are gone. */
-export function generateEuropeanField(world: World, rng: Rng): EuropeanOpponent[] {
+/** Fresh fields for the season, one per competition: names and group-stage strengths. Last season's opponents and their squads are gone. */
+export function generateEuropeanFields(world: World, rng: Rng, counts: Record<EuropeanCompetition, number>): Record<EuropeanCompetition, EuropeanOpponent[]> {
   for (const o of world.europeanOpponents) dropOpponentSquad(world, o)
   const namer = new OpponentNamer(rng)
-  const field: EuropeanOpponent[] = []
-  for (let i = 0; i < T.EUROPEAN_OPPONENTS; i++) {
-    const pool = POOLS[i % POOLS.length] as Exclude<Nationality, 'home'>
-    field.push({ id: T.EUROPEAN_OPPONENT_ID_BASE + i, name: namer.next(pool, T.EUROPEAN_OPPONENT_PREFIX_SHARE), strength: drawStrength(rng, 0), playerIds: [] })
+  const fields: Record<EuropeanCompetition, EuropeanOpponent[]> = { championsCup: [], europaCup: [], conferenceCup: [] }
+  let i = 0
+  for (const competition of EUROPEAN_COMPETITIONS) {
+    for (let n = 0; n < counts[competition]; n++, i++) {
+      const pool = POOLS[i % POOLS.length] as Exclude<Nationality, 'home'>
+      fields[competition].push({ id: T.EUROPEAN_OPPONENT_ID_BASE + i, name: namer.next(pool, T.EUROPEAN_OPPONENT_PREFIX_SHARE), competition, strength: drawStrength(rng, competition, 'group'), playerIds: [] })
+    }
   }
-  world.europeanOpponents = field
-  return field
+  world.europeanOpponents = [...fields.championsCup, ...fields.europaCup, ...fields.conferenceCup]
+  return fields
 }
 
-/** Before a round is drawn: every surviving opponent is drawn again at the round's strength, squads dropped. */
-export function redrawOpponents(world: World, rng: Rng, remaining: readonly ClubId[], round: number): void {
+/** Before a knockout stage is drawn: every surviving opponent is drawn again at the stage's strength, squads dropped. */
+export function redrawOpponents(world: World, rng: Rng, remaining: readonly ClubId[], competition: EuropeanCompetition, stage: EuropeStage): void {
   for (const id of remaining) {
     const o = europeanOpponentById(world, id)
     if (!o) continue
-    o.strength = drawStrength(rng, round)
+    o.strength = drawStrength(rng, competition, stage)
     dropOpponentSquad(world, o)
   }
 }
@@ -62,4 +69,8 @@ export function dropOpponentSquad(world: World, o: EuropeanOpponent): void {
     if (p) forgetPlayer(world, p)
   }
   o.playerIds = []
+}
+
+export function isEuropean(competition: string): competition is EuropeanCompetition {
+  return competition === 'championsCup' || competition === 'europaCup' || competition === 'conferenceCup'
 }

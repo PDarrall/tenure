@@ -94,6 +94,10 @@ export interface MatchState {
   shootoutWinnerId: number | null
   /** Minutes with the home side on top, for possession. */
   homeMinutes: number
+  /** A neutral ground: no home lean. */
+  neutral?: boolean
+  /** The first leg's score carried into a second leg, from the home side's view. */
+  aggregate?: { home: number; away: number }
 }
 
 function copyPlayer(world: World, id: PlayerId, slot: FormationSlot | null): MatchPlayer | null {
@@ -139,7 +143,12 @@ export interface SideSetup {
 }
 
 /** Build a match from two picked sides. One draw from the world's sequence seeds the match's own. */
-export function createMatch(world: World, rng: Rng, home: SideSetup, away: SideSetup, knockout: boolean, bigGame = false): MatchState {
+export interface MatchOptions {
+  neutral?: boolean
+  aggregate?: { home: number; away: number } | null
+}
+
+export function createMatch(world: World, rng: Rng, home: SideSetup, away: SideSetup, knockout: boolean, bigGame = false, options: MatchOptions = {}): MatchState {
   const build = (s: SideSetup): MatchSide => {
     const slots = slotsOf(s.formation)
     const players: MatchPlayer[] = []
@@ -187,6 +196,8 @@ export function createMatch(world: World, rng: Rng, home: SideSetup, away: SideS
     shootoutWinnerId: null,
     homeMinutes: 0,
   }
+  if (options.neutral) state.neutral = true
+  if (options.aggregate) state.aggregate = { ...options.aggregate }
   const r = rngFromState(state.rng)
   state.stoppage = r.int(T.STOPPAGE_FIRST[0], T.STOPPAGE_FIRST[1])
   push(state, 0, 'kickoff', null, undefined, false, {})
@@ -284,7 +295,7 @@ function withStrength(v: SideView): SideView {
 
 /** Where pressure is heading this minute. */
 export function pressureTarget(state: MatchState, home: SideView, away: SideView): number {
-  return pressureLean(home, away, state.home.goals, state.away.goals, state.momentum)
+  return pressureLean(home, away, state.home.goals, state.away.goals, state.momentum, state.neutral === true)
 }
 
 function keeperOf(side: MatchSide): MatchPlayer | null {
@@ -561,7 +572,8 @@ export function tick(state: MatchState): MatchEvent[] {
 
 function finish(state: MatchState, rng: Rng): void {
   state.over = true
-  if (state.knockout && state.home.goals === state.away.goals) {
+  const agg = state.aggregate ?? { home: 0, away: 0 }
+  if (state.knockout && state.home.goals + agg.home === state.away.goals + agg.away) {
     const gap = (sideRating(withStrength(sideView(state, state.home))) - sideRating(withStrength(sideView(state, state.away)))) / 50
     const pHome = 0.5 + clamp(gap, -1, 1) * T.SHOOTOUT_STRENGTH_EDGE
     state.shootoutWinnerId = rng.chance(pHome) ? state.home.clubId : state.away.clubId

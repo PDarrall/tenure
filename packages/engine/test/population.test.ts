@@ -120,8 +120,15 @@ describe('500 AI careers (DESIGN.md validation targets, to verify)', () => {
     expect(l.pass, describeLine(l)).toBe(true)
   })
 
-  it('the European trophy is hard: home clubs win a minority of them, rarely from outside the top three', () => {
-    for (const key of ['europeanTitlesHomeShare', 'europeanTitlesOutsideTopThree'] as const) {
+  it('the Champions Cup is hard: home clubs win it about one year in five, rarely from outside the top three', () => {
+    for (const key of ['championsCupHomeShare', 'championsCupOutsideTopThree'] as const) {
+      const l = line(key)
+      expect(l.pass, describeLine(l)).toBe(true)
+    }
+  })
+
+  it('calendar and cups: every match inside the season weeks, no club more than twice in a week, a tier-5 club in the third round about once in twenty seasons', () => {
+    for (const key of ['unscheduledFixtures', 'clubWeekMaxFixtures', 'tier5CupThirdRound'] as const) {
       const l = line(key)
       expect(l.pass, describeLine(l)).toBe(true)
     }

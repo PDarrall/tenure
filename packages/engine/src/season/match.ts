@@ -46,8 +46,8 @@ export function effectiveStrength(p: Participant): number {
   return sideRating(p)
 }
 
-export function matchOdds(home: Participant, away: Participant): MatchOdds {
-  const o = fastOdds(home, away)
+export function matchOdds(home: Participant, away: Participant, neutral = false): MatchOdds {
+  const o = fastOdds(home, away, undefined, neutral)
   return {
     pHome: o.pHome,
     pDraw: o.pDraw,
@@ -67,11 +67,19 @@ export function shootoutHomeChance(home: Participant, away: Participant): number
   return 0.5 + edge
 }
 
-export function playMatch(rng: Rng, home: Participant, away: Participant, knockout: boolean): MatchOutcome {
-  const odds = matchOdds(home, away)
+export interface PlayOptions {
+  /** A neutral ground: no home lean. */
+  neutral?: boolean
+  /** The first leg's score carried into a second leg, from the home side's view; a knockout is level on aggregate. */
+  aggregate?: { home: number; away: number } | null
+}
+
+export function playMatch(rng: Rng, home: Participant, away: Participant, knockout: boolean, options: PlayOptions = {}): MatchOutcome {
+  const odds = matchOdds(home, away, options.neutral === true)
   const { homeGoals, awayGoals } = sampleScoreline(rng.float(), odds.pmf)
   const outcome: MatchOutcome = { homeGoals, awayGoals, odds }
-  if (knockout && homeGoals === awayGoals) {
+  const agg = options.aggregate ?? { home: 0, away: 0 }
+  if (knockout && homeGoals + agg.home === awayGoals + agg.away) {
     outcome.shootoutWinnerId = rng.chance(shootoutHomeChance(home, away)) ? home.id : away.id
   }
   return outcome

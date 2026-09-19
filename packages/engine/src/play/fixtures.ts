@@ -1,27 +1,36 @@
 /**
  * The human club's fixtures as the UI shows them (DESIGN.md "Fixtures"):
- * the next fixture with the opponent's form and position, and the season's
- * fixtures and results by competition. Everything here is read from state
- * and the log; nothing is stored twice.
+ * the next fixture with the opponent's form and position, the season's
+ * fixtures and results by competition with the cups' rounds named and
+ * Europe's group tables, and the calendar's weeks with what happens in
+ * them. Everything here is read from state and the log; nothing is
+ * stored twice.
  */
 import { T } from '../tunables.js'
-import type { ClubId, Competition, Fixture, Result, Tier, World } from '../types.js'
+import type { ClubId, Competition, CupState, Fixture, GroupRow, Result, Tier, World } from '../types.js'
 import { seasonWeek } from '../season/calendar.js'
-import { drawnCupFixtures } from '../season/season.js'
+import { cupRoundLabel, groupStandings } from '../season/cups.js'
 import { positionOf } from '../season/table.js'
 import { homeClub, europeanOpponentById } from '../lookup.js'
 import { clubNameOf } from '../text/render.js'
 import { competitionLabel } from './inbox.js'
 import { humanClubId } from '../sim/turn.js'
+import { deadlineOf, windowAt } from '../market/director.js'
 
 export interface FixtureView {
   /** Global week. */
   week: number
   /** 0-based week of the season. */
   seasonWeek: number
+  /** 0 the weekend, 1 the midweek. */
+  slot: 0 | 1
   competition: Competition
   competitionLabel: string
   round: number
+  /** The round as the cup names it ("Quarter-final", "Group stage, matchday 2"); '' for the league. */
+  roundLabel: string
+  leg: 1 | 2 | null
+  neutral: boolean
   opponentId: ClubId
   opponent: string
   home: boolean
@@ -44,7 +53,7 @@ export type NextFixture =
       opponentEuropean: string | null
     })
   | {
-      /** A cup round the club is in that has not been drawn yet. */
+      /** A cup round the club is in that has not been drawn yet (every round is drawn ahead now; kept for the shells). */
       kind: 'draw'
       week: number
       seasonWeek: number
@@ -53,12 +62,20 @@ export type NextFixture =
       round: number
     }
 
+export interface GroupView {
+  /** 'A', 'B', … */
+  name: string
+  rows: (GroupRow & { name: string; mine: boolean })[]
+}
+
 export interface CompetitionFixtures {
   competition: Competition
   label: string
   fixtures: FixtureView[]
   /** Where the club stands in a cup: '' for the league. */
   status: string
+  /** Europe's group, while the club is in one. */
+  group: GroupView | null
 }
 
 function shootoutWinners(world: World, clubId: ClubId): Map<string, number> {
@@ -90,12 +107,17 @@ function view(world: World, f: Fixture, clubId: ClubId, shootouts: Map<string, n
     }
   }
   const base = world.week - seasonWeek(world.week)
+  const cup = f.competition === 'league' ? undefined : world.cups.find((c) => c.competition === f.competition)
   return {
     week: base + f.week,
     seasonWeek: f.week,
+    slot: f.slot,
     competition: f.competition,
     competitionLabel: competitionLabel(f.competition),
     round: f.round,
+    roundLabel: cup ? cupRoundLabel(cup, f.round) : '',
+    leg: f.leg ?? null,
+    neutral: f.neutral === true,
     opponentId,
     opponent: clubNameOf(world, opponentId),
     home,
@@ -107,29 +129,19 @@ function view(world: World, f: Fixture, clubId: ClubId, shootouts: Map<string, n
   }
 }
 
-/** The human club's next fixture, or the cup round it is waiting on, or null when it has none this season. */
+function byDate(a: Fixture, b: Fixture): number {
+  return a.week - b.week || a.slot - b.slot || a.round - b.round
+}
+
+/** The human club's next fixture, or null when it has none left this season. */
 export function nextFixture(world: World): NextFixture | null {
   const clubId = humanClubId(world)
   if (clubId === null) return null
   const sw = seasonWeek(world.week)
-  const base = world.week - sw
   const shootouts = new Map<string, number>()
-  for (let w = sw; w < T.MATCH_WEEKS; w++) {
-    const league = world.fixtures.filter((f) => f.competition === 'league' && f.week === w && !f.played && (f.homeId === clubId || f.awayId === clubId)).sort((a, b) => a.round - b.round)
-    const first = league[0]
-    if (first) return withOpponent(world, view(world, first, clubId, shootouts))
-    for (const cup of world.cups) {
-      if (cup.roundWeeks[cup.roundsPlayed] !== w || cup.remaining.length <= 1 || !cup.remaining.includes(clubId)) continue
-      const drawn = drawnCupFixtures(world, cup)
-      if (drawn.length === 0) {
-        return { kind: 'draw', week: base + w, seasonWeek: w, competition: cup.competition, competitionLabel: competitionLabel(cup.competition), round: cup.roundsPlayed + 1 }
-      }
-      const mine = drawn.find((f) => f.homeId === clubId || f.awayId === clubId)
-      if (mine) return withOpponent(world, view(world, mine, clubId, shootouts))
-      // A bye: nothing to play this round.
-    }
-  }
-  return null
+  const mine = world.fixtures.filter((f) => !f.played && f.week >= sw && (f.homeId === clubId || f.awayId === clubId)).sort(byDate)
+  const first = mine[0]
+  return first ? withOpponent(world, view(world, first, clubId, shootouts)) : null
 }
 
 function withOpponent(world: World, v: FixtureView): NextFixture {
@@ -141,28 +153,74 @@ function withOpponent(world: World, v: FixtureView): NextFixture {
   return { kind: 'fixture', ...v, opponentForm: [], opponentPosition: null, opponentTier: null, opponentEuropean: opponent ? `European opposition, strength ${Math.round(opponent.strength)}` : 'European opposition' }
 }
 
+function groupView(world: World, cup: CupState, clubId: ClubId): GroupView | null {
+  const group = cup.groups.find((g) => g.clubIds.includes(clubId))
+  if (!group) return null
+  return { name: String.fromCharCode(65 + group.index), rows: groupStandings(group).map((r) => ({ ...r, name: clubNameOf(world, r.clubId), mine: r.clubId === clubId })) }
+}
+
 /** This season's fixtures and results for the human's club, by competition. */
 export function seasonFixtures(world: World): CompetitionFixtures[] {
   const clubId = humanClubId(world)
   if (clubId === null) return []
   const shootouts = shootoutWinners(world, clubId)
   const out: CompetitionFixtures[] = []
-  const league = world.fixtures.filter((f) => f.competition === 'league' && (f.homeId === clubId || f.awayId === clubId)).sort((a, b) => a.week - b.week || a.round - b.round)
-  out.push({ competition: 'league', label: competitionLabel('league'), fixtures: league.map((f) => view(world, f, clubId, shootouts)), status: '' })
+  const league = world.fixtures.filter((f) => f.competition === 'league' && (f.homeId === clubId || f.awayId === clubId)).sort(byDate)
+  out.push({ competition: 'league', label: competitionLabel('league'), fixtures: league.map((f) => view(world, f, clubId, shootouts)), status: '', group: null })
   for (const cup of world.cups) {
-    const ties = world.fixtures.filter((f) => f.competition === cup.competition && (f.homeId === clubId || f.awayId === clubId)).sort((a, b) => a.round - b.round)
-    const entered = ties.length > 0 || cup.remaining.includes(clubId) || cup.winnerId === clubId
+    const ties = world.fixtures.filter((f) => f.competition === cup.competition && (f.homeId === clubId || f.awayId === clubId)).sort(byDate)
+    const entered = ties.length > 0 || cup.remaining.includes(clubId) || cup.winnerId === clubId || cup.entrants.some((e) => e.includes(clubId))
     if (!entered) continue
     let status: string
+    const inGroup = cup.groups.some((g) => g.clubIds.includes(clubId)) && cup.roundsPlayed < cup.groups.length * 0 + cup.rounds.filter((r) => r.group).length
     if (cup.winnerId === clubId) status = 'Winners.'
     else if (cup.remaining.includes(clubId)) {
-      const nextWeek = cup.roundWeeks[cup.roundsPlayed]
-      status = nextWeek === undefined ? 'Still in.' : `Still in: round ${cup.roundsPlayed + 1} in week ${nextWeek + 1}.`
+      const next = cup.rounds[cup.roundsPlayed]
+      status = next ? (inGroup ? `In the group stage.` : `Still in: the ${next.label.toLowerCase()} in week ${next.week + 1}.`) : 'Still in.'
+    } else if (cup.entrants.some((e) => e.includes(clubId))) {
+      const entry = cup.rounds[cup.entrants.findIndex((e) => e.includes(clubId))]
+      status = entry ? `Enter at the ${entry.label.toLowerCase()}, week ${entry.week + 1}.` : 'Yet to enter.'
     } else {
       const exit = ties.filter((f) => f.played).at(-1)
-      status = exit ? `Out in round ${exit.round}.` : 'Out.'
+      status = exit ? `Out at the ${cupRoundLabel(cup, exit.round).toLowerCase()}.` : 'Out.'
     }
-    out.push({ competition: cup.competition, label: competitionLabel(cup.competition), fixtures: ties.map((f) => view(world, f, clubId, shootouts)), status })
+    out.push({ competition: cup.competition, label: competitionLabel(cup.competition), fixtures: ties.map((f) => view(world, f, clubId, shootouts)), status, group: groupView(world, cup, clubId) })
   }
   return out
+}
+
+export interface CalendarWeek {
+  /** 0-based week of the season. */
+  seasonWeek: number
+  /** "Week 12" or "Summer week 3". */
+  label: string
+  summer: boolean
+  /** What the week holds beyond the league: cup rounds, the window, the season's end, the new fixtures. */
+  events: string[]
+  current: boolean
+}
+
+/** The 52 weeks of the year and what happens in each (DESIGN.md "World"): the cups' rounds, the windows, the summer's steps. */
+export function calendarOf(world: World): CalendarWeek[] {
+  const sw = seasonWeek(world.week)
+  const weeks: CalendarWeek[] = []
+  for (let w = 0; w < T.SEASON_WEEKS; w++) {
+    const summer = w >= T.MATCH_WEEKS
+    const events: string[] = []
+    for (const cup of world.cups) {
+      for (const round of cup.rounds) {
+        if (round.week === w) events.push(`${competitionLabel(cup.competition)}: ${round.label.toLowerCase()}${round.secondLeg ? ', first leg' : ''}`)
+        if (round.secondLeg && round.secondLeg.week === w) events.push(`${competitionLabel(cup.competition)}: ${round.label.toLowerCase()}, second leg`)
+      }
+    }
+    const window = windowAt(w)
+    const before = windowAt((w + T.SEASON_WEEKS - 1) % T.SEASON_WEEKS)
+    if (window && !before) events.push(window === 'summer' ? 'The summer window opens' : 'The January window opens')
+    if (window && deadlineOf(window) === w) events.push(window === 'summer' ? 'Summer deadline day' : 'January deadline day')
+    if (w === T.MATCH_WEEKS - 1) events.push('The last match week; expiring contracts decided')
+    if (w === T.MATCH_WEEKS) events.push('The season ends: tables settle, honours, the awards')
+    if (w === T.SEASON_WEEKS - 1) events.push("Next season's fixtures come out")
+    weeks.push({ seasonWeek: w, label: summer ? `Summer week ${w - T.MATCH_WEEKS + 1}` : `Week ${w + 1}`, summer, events, current: w === sw })
+  }
+  return weeks
 }

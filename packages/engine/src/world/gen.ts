@@ -7,6 +7,7 @@ import { clubName, TownNamer } from './names.js'
 import { createManagers } from '../managers/gen.js'
 import { seatIncumbents } from '../tenure/spell.js'
 import { resetTables } from '../season/table.js'
+import { europeanPlaces } from '../season/promotion.js'
 import { generateHomeSquads } from '../players/gen.js'
 
 export function clamp(x: number, lo: number, hi: number): number {
@@ -110,7 +111,8 @@ export function createWorld(seed: number): World {
     fixtures: [],
     tables: [],
     cups: [],
-    europeanEntrants: [],
+    europeanPlaces: { championsCup: [], europaCup: [], conferenceCup: [] },
+    calendar: T.SEASON_WEEKS,
     spells: [],
     nextSpellId: 1,
     vacancies: [],
@@ -142,11 +144,11 @@ export function createWorld(seed: number): World {
     total: world.managers.length,
     employed: world.managers.filter((m) => m.status.kind === 'employed').length,
   })
-  // Season one's European places go to the most prestigious tier-1 clubs.
-  world.europeanEntrants = world.clubs
+  // Season one's European places go to the most prestigious tier-1 clubs, as if that were last season's table.
+  const byPrestige = world.clubs
     .filter((c) => c.tier === 1)
     .sort((a, b) => b.prestige - a.prestige || a.id - b.id)
-    .slice(0, T.EUROPEAN_LEAGUE_PLACES + 1)
     .map((c) => c.id)
+  world.europeanPlaces = europeanPlaces(byPrestige, null, null)
   return world
 }

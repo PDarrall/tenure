@@ -663,3 +663,57 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   there); the Match line's "a match plays in about a minute at full speed"
   was left as the brief did not name it, though the mode it describes no
   longer exists.
+
+## The 52-week calendar and the cups (DESIGN v0.10)
+
+- Weeks are 0-based in the code: 0–40 the season, 41–51 the summer.
+  Each week has two slots, the weekend and the midweek, and every
+  fixture has one; a club plays at most one fixture per slot, which is
+  what keeps it to two a week. The template in the tunables fixes the
+  cups' weeks; a tier's league round moves to the midweek on the Cup
+  weekends it has entered; tiers 2–5 play two league rounds in five
+  weeks kept clear of every cup; tier 1 sits out three weekends.
+- The Cup's field is not a power of two (48, then 48, then 68), so entry
+  rounds pair everyone and the fourth round, the first without entrants,
+  pares 34 to 32 with two ties on a midweek and thirty byes. The League
+  Cup pairs everyone in its entry rounds too (one bye when odd, which
+  depends on how many tier-1 clubs are in Europe) and pares in the
+  fourth round if it must. Byes are drawn at random.
+- Two-legged ties settle on aggregate; a level aggregate goes to a
+  shoot-out at the end of the second leg. No away-goals rule. The first
+  leg pays credit and form like a league match; the second leg pays the
+  tie in full. A group match pays like a league match.
+- Neutral ground means no home lean in the odds or the minute engine; the
+  side listed first still fields as "home" on the card.
+- Europe: 16 clubs a competition, four groups of four drawn at random
+  (home clubs can share a group), six matchdays, the top two through;
+  group winners meet runners-up of other groups in the quarter-finals,
+  the runner-up at home first. Opponents are generated per competition
+  and drawn again at each stage. Prize money and prestige land on wealth
+  and prestige by the stage reached (EUROPE_PRIZE), small numbers on a
+  0–100 scale. Season one's places go by prestige as if it were last
+  season's table.
+- Qualification passes down the table in the order the places are
+  listed: a Cup winner already in the top four hands the Europa place to
+  the next unplaced club, and the Conference Cup's sixth place moves down
+  behind it.
+- The summer window runs from the last match week to the third week of
+  the new season. The tenure model reads it at the season boundary:
+  ownership, the ceiling reset and the credit clamp use the turnover up
+  to the last summer week, and the new season's expectation is set then;
+  the three window weeks in the new season count for trading but not for
+  ownership. The winter window is read at its deadline as before.
+- The next cup round is drawn the moment the previous one is settled,
+  in the simulation and in a career alike, so the tie is on the card
+  from that week; the population simulation's random sequence moved
+  with the calendar (the simpath snapshot was retaken).
+- The "tier-5 club in the Cup's third round about once in twenty
+  seasons" line is read per club: a given tier-5 club reaches the third
+  round about once in twenty seasons. The model reads about once in ten
+  (a tier-5 side beats a tier-4 side about a third of the time), which
+  the band allows; per season, two or three tier-5 clubs get there.
+- Saves from the 46-week calendar are refused with a message: a week
+  number no longer means the same thing. There is no migration.
+- The weekly board roll and the monthly rolls happen in every week of
+  the longer year, so their per-week chances were scaled by 46/52 to
+  keep the per-season hazard where it was; the numbers are in the PR.

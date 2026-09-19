@@ -13,9 +13,11 @@
  */
 import { rngFromState, type Rng } from '../rng.js'
 import { T } from '../tunables.js'
-import type { ClubId, CupState, Fixture, FixtureKey, HumanInputs, Tier, WatchedWeek, World } from '../types.js'
+import type { ClubId, CupState, Fixture, FixtureKey, HumanInputs, WatchedWeek, World } from '../types.js'
 import { seasonOf, seasonWeek } from '../season/calendar.js'
-import { commitFixtureMatch, createFixtureMatch, cupRoundFixtures, drawCupRound, drawnCupFixtures, playCupRound, playFixture, prepareFixture, settleCupRound, startSeason, type PlayedFixture } from '../season/season.js'
+import { commitFixtureMatch, createFixtureMatch, playCupRound, playFixture, prepareFixture, settleCupRound, startSeason, type PlayedFixture } from '../season/season.js'
+import { roundDue, roundFixtures, type RoundDue } from '../season/cups.js'
+import { SLOTS } from '../season/calendar.js'
 import { runToEnd } from '../match/minute.js'
 import { decayMorale } from '../season/squad.js'
 import * as tenure from '../tenure/hooks.js'
@@ -35,7 +37,13 @@ export interface TurnOptions {
   watch?: boolean
 }
 
-export type Slot = { kind: 'league'; fixtures: Fixture[] } | { kind: 'cup'; cup: CupState }
+/** One slot of a week (DESIGN.md "World"): every league round on it and every cup round due, played together. */
+export interface Slot {
+  sw: number
+  slot: 0 | 1
+  league: Fixture[]
+  cups: { cup: CupState; due: RoundDue }[]
+}
 
 /** The club the human manages, if any. */
 export function humanClubId(world: World): ClubId | null {
@@ -53,35 +61,27 @@ export function clubFixturesInWeek(world: World, sw: number, clubId: ClubId): Fi
   return world.fixtures.filter((f) => f.week === sw && involves(f, clubId))
 }
 
-/** A cup whose next round falls in this week and still has a field. */
-function cupDue(cup: CupState, sw: number): boolean {
-  return cup.roundWeeks[cup.roundsPlayed] === sw && cup.remaining.length > 1
-}
-
-/** Does the club have football left this week: an unplayed fixture, or a cup round still to be drawn that it is in? */
+/** Does the club have football left this week: an unplayed fixture (every round is drawn ahead of its week)? */
 export function humanHasFixtureIn(world: World, sw: number, clubId: ClubId): boolean {
-  if (clubFixturesInWeek(world, sw, clubId).some((f) => !f.played)) return true
-  return world.cups.some((cup) => cupDue(cup, sw) && cup.remaining.includes(clubId) && drawnCupFixtures(world, cup).length === 0)
+  return clubFixturesInWeek(world, sw, clubId).some((f) => !f.played)
 }
 
-/** The next slot of the week: the earliest unplayed league round of each tier together, else the first cup round due. */
+/** The fixtures a slot holds: its league rounds and the ties of its cup rounds, unplayed. */
+export function slotFixtures(world: World, slot: Slot): Fixture[] {
+  return [...slot.league, ...slot.cups.flatMap(({ cup, due }) => roundFixtures(world, cup, due.round, due.leg).filter((f) => !f.played))]
+}
+
+/** The next slot of the week with football in it: the weekend, then the midweek. */
 export function nextSlot(world: World, sw: number): Slot | null {
-  const byTier = new Map<Tier, { round: number; fixtures: Fixture[] }>()
-  for (const f of world.fixtures) {
-    if (f.competition !== 'league' || f.week !== sw || f.played || f.tier === undefined) continue
-    const current = byTier.get(f.tier)
-    if (!current || f.round < current.round) byTier.set(f.tier, { round: f.round, fixtures: [f] })
-    else if (f.round === current.round) current.fixtures.push(f)
-  }
-  if (byTier.size > 0) {
-    const fixtures: Fixture[] = []
-    for (let tier = 1; tier <= T.TIER_SIZES.length; tier++) {
-      const t = byTier.get(tier as Tier)
-      if (t) fixtures.push(...t.fixtures)
+  for (const slot of SLOTS) {
+    const league = world.fixtures.filter((f) => f.competition === 'league' && f.week === sw && f.slot === slot && !f.played)
+    const cups: Slot['cups'] = []
+    for (const cup of world.cups) {
+      const due = roundDue(cup, sw, slot)
+      if (due && roundFixtures(world, cup, due.round, due.leg).some((f) => !f.played)) cups.push({ cup, due })
     }
-    return { kind: 'league', fixtures }
+    if (league.length > 0 || cups.length > 0) return { sw, slot, league, cups }
   }
-  for (const cup of world.cups) if (cupDue(cup, sw)) return { kind: 'cup', cup }
   return null
 }
 
@@ -93,10 +93,9 @@ export function findFixture(world: World, key: FixtureKey): Fixture | undefined 
   return world.fixtures.find((f) => f.competition === key.competition && f.round === key.round && f.homeId === key.homeId && f.awayId === key.awayId)
 }
 
-/** Does this slot hold a fixture of the club that is drawn and unplayed? */
+/** Does this slot hold an unplayed fixture of the club? */
 function slotInvolves(world: World, slot: Slot, clubId: ClubId): boolean {
-  if (slot.kind === 'league') return slot.fixtures.some((f) => involves(f, clubId))
-  return drawnCupFixtures(world, slot.cup).some((f) => !f.played && involves(f, clubId))
+  return slotFixtures(world, slot).some((f) => involves(f, clubId))
 }
 
 /**
@@ -105,23 +104,16 @@ function slotInvolves(world: World, slot: Slot, clubId: ClubId): boolean {
  * the slot waits for the fast path at commit.
  */
 export function prepareWatchedSlot(world: World, rng: Rng, slot: Slot, sw: number, clubId: ClubId): WatchedWeek {
-  let fixtures: Fixture[]
-  let watchedKind: WatchedWeek['slot']
-  if (slot.kind === 'league') {
-    fixtures = slot.fixtures
-    watchedKind = { kind: 'league' }
-  } else {
-    fixtures = cupRoundFixtures(world, rng, slot.cup, sw)
-    watchedKind = { kind: 'cup', competition: slot.cup.competition }
-  }
+  const fixtures = slotFixtures(world, slot)
   const mine = fixtures.find((f) => involves(f, clubId))
   if (!mine) throw new Error('prepareWatchedSlot: the human has no fixture in this slot')
+  const watchedKind: WatchedWeek['slot'] = mine.competition === 'league' ? { kind: 'league' } : { kind: 'cup', competition: mine.competition }
   const tier = mine.tier
-  const watched = [mine, ...fixtures.filter((f) => f !== mine && slot.kind === 'league' && f.tier === tier)]
+  const watched = [mine, ...fixtures.filter((f) => f !== mine && mine.competition === 'league' && f.competition === 'league' && f.tier === tier)]
   const others = fixtures.filter((f) => !watched.includes(f))
   const prepared = watched.map((f) => prepareFixture(world, rng, f))
   const matches = prepared.map((p) => createFixtureMatch(world, rng, p))
-  return { seasonWeek: sw, slot: watchedKind, prepared, matches, others: others.map(fixtureKey) }
+  return { seasonWeek: sw, slot: watchedKind, slotIndex: slot.slot, prepared, matches, others: others.map(fixtureKey) }
 }
 
 /** Settle a watched slot: finish any match still running, commit them, play the rest on the fast path, run the hooks. */
@@ -142,10 +134,12 @@ export function commitWatched(world: World, rng: Rng): PlayedFixture[] {
     const f = findFixture(world, key)
     if (f && !f.played) played.push(playFixture(world, rng, f))
   }
-  if (w.slot.kind === 'cup') {
-    const competition = w.slot.competition
-    const cup = world.cups.find((c) => c.competition === competition)
-    if (cup) settleCupRound(world, cup, played)
+  // Every cup round the slot held is settled now that its ties are played.
+  for (const cup of world.cups) {
+    const due = roundDue(cup, w.seasonWeek, w.slotIndex ?? 0)
+    if (!due) continue
+    const ties = played.filter((p) => p.fixture.competition === cup.competition && p.fixture.round === due.round.round)
+    if (ties.length > 0 && roundFixtures(world, cup, due.round, due.leg).every((f) => f.played)) settleCupRound(world, rng, cup, ties, due.leg)
   }
   tenure.afterMatches(world, rng, played)
   world.human.watched = null
@@ -157,8 +151,9 @@ export function discardWatched(world: World): void {
   if (world.human) world.human.watched = null
 }
 
-function playSlot(world: World, rng: Rng, slot: Slot, sw: number): PlayedFixture[] {
-  const played = slot.kind === 'league' ? slot.fixtures.map((f) => playFixture(world, rng, f)) : playCupRound(world, rng, slot.cup, sw)
+function playSlot(world: World, rng: Rng, slot: Slot): PlayedFixture[] {
+  const played = slot.league.map((f) => playFixture(world, rng, f))
+  for (const { cup, due } of slot.cups) played.push(...playCupRound(world, rng, cup, due))
   tenure.afterMatches(world, rng, played)
   return played
 }
@@ -168,19 +163,10 @@ function ensureSeasonStarted(world: World, rng: Rng, sw: number): void {
   if (sw === 0 && !world.fixtures.some((f) => !f.played)) startSeason(world, rng)
 }
 
-/** Draw any cup round due in a season week that has not been drawn, so the tie is known before it is played. */
-function drawCupsDue(world: World, rng: Rng, sw: number): void {
-  if (sw >= T.MATCH_WEEKS) return
-  for (const cup of world.cups) {
-    if (cupDue(cup, sw) && drawnCupFixtures(world, cup).length === 0) drawCupRound(world, rng, cup, sw)
-  }
-}
-
-/** Close a career week: morale settles, the shared hooks run, next week's cups are drawn, the clock moves. */
+/** Close a career week: morale settles, the shared hooks run, the clock moves. */
 function closeWeek(world: World, rng: Rng, sw: number): void {
   if (sw < T.MATCH_WEEKS) for (const club of world.clubs) decayMorale(club)
   closeWeekHooks(world, rng, sw)
-  drawCupsDue(world, rng, sw + 1) // stamped in this week, so the draw reads before the tie
   world.week++
   world.season = seasonOf(world.week)
   if (seasonWeek(world.week) === 0) startSeason(world, rng)
@@ -229,7 +215,7 @@ export function advanceTurn(world: World, inputs: HumanInputs = {}, options: Tur
         world.human.watched = prepareWatchedSlot(world, rng, slot, sw, club)
         return fixturesPlayed
       }
-      const played = playSlot(world, rng, slot, sw)
+      const played = playSlot(world, rng, slot)
       if (club !== null && played.some((p) => involves(p.fixture, club))) {
         fixturesPlayed++
         if (!options.wholeWeek) return fixturesPlayed

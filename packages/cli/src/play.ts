@@ -211,6 +211,7 @@ async function main(): Promise<void> {
   let world: World
   if (args.load) {
     world = JSON.parse(readFileSync(args.load, 'utf8')) as World
+    if (world.calendar !== tunables.SEASON_WEEKS) throw new Error(`this save is from an earlier calendar (${world.calendar ?? 46}-week seasons); start a new career`)
     console.log(`Loaded ${args.load}.`)
   } else {
     world = createCareer(args.seed, { name: args.name, background: args.background })

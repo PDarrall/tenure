@@ -1,7 +1,7 @@
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import { clamp, round1 } from '../world/gen.js'
-import type { Club, ClubId, Tier, World } from '../types.js'
+import type { Club, ClubId, EuropeanCompetition, Tier, World } from '../types.js'
 import { positionOf, tableFor } from './table.js'
 import { managerAt } from '../lookup.js'
 import { awardPromotionPoints, awardTrophyPoints } from '../scoring/score.js'
@@ -16,7 +16,7 @@ export interface LeagueOutcome {
   champions: Map<Tier, ClubId>
 }
 
-export function awardHonour(world: World, club: Club, competition: 'league' | 'nationalCup' | 'leagueCup' | 'european', tier?: Tier): void {
+export function awardHonour(world: World, club: Club, competition: 'league' | 'nationalCup' | 'leagueCup' | EuropeanCompetition, tier?: Tier): void {
   const honour = tier === undefined ? { season: world.season, competition, clubId: club.id } : { season: world.season, competition, clubId: club.id, tier }
   club.honours.push(honour)
   const manager = managerAt(world, club)
@@ -112,13 +112,48 @@ export function settleLeagues(world: World): LeagueOutcome {
     })
   }
 
-  // European places for next season: top N of tier 1 plus the cup winner.
-  const topTier = tableFor(world, 1).map((r) => r.clubId)
-  const cupWinner = world.cups.find((c) => c.competition === 'nationalCup')?.winnerId ?? null
-  const entrants = topTier.slice(0, T.EUROPEAN_LEAGUE_PLACES)
-  if (cupWinner !== null && !entrants.includes(cupWinner) && byId.get(cupWinner)?.tier === 1) entrants.push(cupWinner)
-  else entrants.push(...topTier.slice(T.EUROPEAN_LEAGUE_PLACES, T.EUROPEAN_LEAGUE_PLACES + 1))
-  world.europeanEntrants = entrants
+  // European places for next season (DESIGN.md "World"), from the table as it finished and the cup winners.
+  world.europeanPlaces = europeanPlaces(
+    tableFor(world, 1).map((r) => r.clubId),
+    world.cups.find((c) => c.competition === 'nationalCup')?.winnerId ?? null,
+    world.cups.find((c) => c.competition === 'leagueCup')?.winnerId ?? null,
+  )
 
   return outcome
+}
+
+/**
+ * The Champions Cup for the top four of tier 1, the Europa Cup for fifth
+ * and the Cup winner, the Conference Cup for sixth and the League Cup
+ * winner; a place passes down the table when a club has already qualified.
+ */
+export function europeanPlaces(topTier: readonly ClubId[], cupWinner: ClubId | null, leagueCupWinner: ClubId | null): Record<EuropeanCompetition, ClubId[]> {
+  const taken = new Set<ClubId>()
+  const next = (): ClubId | null => {
+    const id = topTier.find((c) => !taken.has(c))
+    if (id === undefined) return null
+    taken.add(id)
+    return id
+  }
+  const take = (n: number): ClubId[] => {
+    const out: ClubId[] = []
+    for (let i = 0; i < n; i++) {
+      const id = next()
+      if (id !== null) out.push(id)
+    }
+    return out
+  }
+  const winner = (id: ClubId | null): ClubId | null => {
+    if (id === null || taken.has(id)) return next()
+    taken.add(id)
+    return id
+  }
+  const championsCup = take(T.EUROPE_LEAGUE_PLACES.championsCup)
+  const europaCup = take(T.EUROPE_LEAGUE_PLACES.europaCup)
+  const viaCup = winner(cupWinner)
+  if (viaCup !== null) europaCup.push(viaCup)
+  const conferenceCup = take(T.EUROPE_LEAGUE_PLACES.conferenceCup)
+  const viaLeagueCup = winner(leagueCupWinner)
+  if (viaLeagueCup !== null) conferenceCup.push(viaLeagueCup)
+  return { championsCup, europaCup, conferenceCup }
 }

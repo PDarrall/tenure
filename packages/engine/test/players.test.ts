@@ -8,7 +8,7 @@ import { FORMATIONS, FORMATION_NAMES, slotsOf, structureOf } from '../src/player
 import { TRAITS, TRAIT_RULES } from '../src/players/traits.js'
 import { autoPick, bestXiMean, effectiveRating, enforceSelection, positionPenalty, squadOf, xiBands } from '../src/players/select.js'
 import { anchorSquad, generateSquad, positionMix } from '../src/players/gen.js'
-import { ensureOpponentSquad, generateEuropeanField } from '../src/season/europe.js'
+import { ensureOpponentSquad, generateEuropeanFields } from '../src/season/europe.js'
 import { playerById } from '../src/lookup.js'
 import { digestWorld } from '../src/digest.js'
 import { T } from '../src/tunables.js'
@@ -80,9 +80,10 @@ describe('squads', () => {
     anchorSquad(world, club, 40, '4-4-2')
     expect(Math.abs(bestXiMean(world, club, '4-4-2') - 40)).toBeLessThanOrEqual(T.ANCHOR_TOLERANCE)
     const rng = createRng(3)
-    const field = generateEuropeanField(world, rng)
-    expect(field).toHaveLength(T.EUROPEAN_OPPONENTS)
-    const opponent = field[0]!
+    const fields = generateEuropeanFields(world, rng, { championsCup: 12, europaCup: 14, conferenceCup: 14 })
+    expect(fields.championsCup).toHaveLength(12)
+    expect(world.europeanOpponents).toHaveLength(40)
+    const opponent = fields.championsCup[0]!
     ensureOpponentSquad(world, rng, opponent)
     expect(opponent.playerIds).toHaveLength(T.EUROPEAN_OPPONENT_SQUAD_SIZE)
     expect(Math.abs(bestXiMean(world, opponent, T.DEFAULT_FORMATION) - opponent.strength)).toBeLessThanOrEqual(T.ANCHOR_TOLERANCE)

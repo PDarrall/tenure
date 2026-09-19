@@ -106,7 +106,7 @@ export function seasonMilestones(world: World, outcome: { promoted: Set<number>;
     for (const id of club.playerIds) {
       const p = playerById(world, id)
       if (!p || p.retired || p.madeBy.length === 0 || p.season.apps === 0) continue
-      if (title) milestone(world, p, 'title', { competition: club.id === europeanWinner ? 'european' : 'league', tier: club.tier })
+      if (title) milestone(world, p, 'title', { competition: club.id === europeanWinner ? 'championsCup' : 'league', tier: club.tier })
       if (promoted) milestone(world, p, 'promotion', { fromTier: club.tier })
     }
   }
