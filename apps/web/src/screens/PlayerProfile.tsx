@@ -1,6 +1,6 @@
-import { clubNameOf, pendingDecisions, playerById, TRAIT_RULES, tunables, type World } from '@tenure/engine'
+import { clubNameOf, pendingDecisions, playerById, requestLikelihood, scoutedView, TRAIT_RULES, tunables, windowState, type Request, type World } from '@tenure/engine'
 import type { Session } from '../controller.js'
-import { withContractOffer, withSelection } from '../controller.js'
+import { requested, withRequest, withoutRequest } from '../controller.js'
 import { humanClub, isMine, rating, ratingChange, ratingChangeUp } from './common.js'
 import { Chevron, Star } from './ui.js'
 
@@ -11,6 +11,23 @@ function potentialRange(p: { rating: number; potential: number; age: number }): 
   const low = Math.max(Math.round(p.rating), Math.floor(p.potential - spread))
   const high = Math.ceil(p.potential + spread)
   return `${low}–${high}`
+}
+
+function askLabel(ask: Request['ask']): string {
+  switch (ask) {
+    case 'captaincy':
+      return 'Offer the armband'
+    case 'contract':
+      return 'Talk terms'
+    case 'playingTime':
+      return 'Promise starts'
+    case 'sell':
+      return 'Put him up for sale'
+    case 'loan':
+      return 'Loan him out'
+    default:
+      return ask
+  }
 }
 
 const POSITION: Record<string, string> = { GK: 'Goalkeeper', D: 'Defender', M: 'Midfielder', F: 'Forward' }
@@ -51,6 +68,18 @@ export function PlayerProfile({ session, playerId, onChange, onBack }: { session
   const history = [...p.history, p.season].filter((h) => h.apps > 0 || h.season === world.season).reverse()
   const selection = { ...world.human!.selection, ...(session.inputs.selection ?? {}) }
   const captain = selection.captain === p.id
+  const scouted = scoutedView(p)
+  const open = windowState(world).open
+  const ask = (ask: Request['ask'], to: Request['to']) => {
+    const req: Request = { to, ask, playerId: p.id }
+    const like = requestLikelihood(world, req)
+    const on = requested(session, req)
+    return (
+      <button type="button" className="btn small" disabled={!on && !like.available} title={like.available ? like.words : (like.why ?? '')} onClick={() => onChange(on ? withoutRequest(session, req) : withRequest(session, req))} data-testid={`ask-${ask}`}>
+        {on ? 'Asked · cancel' : like.available ? `${askLabel(ask)} (${like.words})` : `${askLabel(ask)}: ${like.why === 'closed' ? 'window shut' : 'not now'}`}
+      </button>
+    )
+  }
   const condition = p.injuryWeeks > 0 ? `inj ${p.injuryWeeks}w` : p.suspension > 0 ? `ban ${p.suspension}` : `${Math.round(p.condition)}`
   return (
     <>
@@ -69,20 +98,22 @@ export function PlayerProfile({ session, playerId, onChange, onBack }: { session
           <div style={{ display: 'flex', gap: 20 }}>
             <div className="stack g2 grow">
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <span className="figure" style={{ fontSize: 34, lineHeight: '38px' }}>
-                  {rating(p)}
+                <span className="figure" style={{ fontSize: 34, lineHeight: '38px' }} data-testid="player-rating">
+                  {scouted ? `${scouted.lo}–${scouted.hi}` : rating(p)}
                 </span>
-                <span className={`strong ${ratingChangeUp(p) ? 'ink' : 'ink3'}`} style={{ fontSize: 14 }}>
-                  {ratingChange(p)} this season
-                </span>
+                {!scouted && (
+                  <span className={`strong ${ratingChangeUp(p) ? 'ink' : 'ink3'}`} style={{ fontSize: 14 }}>
+                    {ratingChange(p)} this season
+                  </span>
+                )}
               </div>
-              <div className="label">Rating</div>
+              <div className="label" data-testid="rating-label">{scouted ? `Rating, the director's estimate · ${scouted.seen} of ${scouted.of} matches seen` : 'Rating'}</div>
             </div>
             <div className="stack g2 grow">
               <div className="figure" style={{ fontSize: 34, lineHeight: '38px' }}>
-                {range ?? (p.age < tunables.YOUTH_AGE ? '—' : 'Made')}
+                {scouted ? `${scouted.plo}–${scouted.phi}` : (range ?? (p.age < tunables.YOUTH_AGE ? '—' : 'Made'))}
               </div>
-              <div className="label">{range ? 'Potential, as scouted' : p.age < tunables.YOUTH_AGE ? 'Potential, not scouted' : 'A finished player'}</div>
+              <div className="label">{scouted ? 'Potential, his estimate' : range ? 'Potential, as scouted' : p.age < tunables.YOUTH_AGE ? 'Potential, not scouted' : 'A finished player'}</div>
             </div>
           </div>
           <div className="triple">
@@ -128,11 +159,7 @@ export function PlayerProfile({ session, playerId, onChange, onBack }: { session
                 <div className="label">Captain</div>
                 <span className="row-name">{captain ? 'Wears the armband' : selection.captain === null ? 'Nobody wears the armband' : 'Not the captain'}</span>
               </div>
-              {!captain && (
-                <button type="button" className="btn small" onClick={() => onChange(withSelection(session, { captain: p.id }))} data-testid="make-captain">
-                  Make captain
-                </button>
-              )}
+              {!captain && ask('captaincy', 'player')}
             </div>
           )}
           <div className="contract-row">
@@ -148,11 +175,20 @@ export function PlayerProfile({ session, playerId, onChange, onBack }: { session
               ) : offered ? (
                 <span className="caption right">You will talk terms when you continue.</span>
               ) : (
-                <button type="button" className="btn small" onClick={() => onChange(withContractOffer(session, p.id))}>
-                  Talk terms
-                </button>
+                ask('contract', 'player')
               ))}
           </div>
+          {ours && (
+            <div className="stack g6">
+              <div className="label">Asks · each a bet</div>
+              <div className="between" style={{ gap: 8, flexWrap: 'wrap' }}>
+                {ask('playingTime', 'player')}
+                {ask('sell', 'director')}
+                {ask('loan', 'director')}
+              </div>
+              {!open && <div className="caption">Sales and loans wait for a window.</div>}
+            </div>
+          )}
           <div className="stack">
             <div className="table-head" style={{ padding: '4px 0 6px' }}>
               <span className="w20" style={{ textAlign: 'left' }}>

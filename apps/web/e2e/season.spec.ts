@@ -61,8 +61,9 @@ test('a season on an iPad: the match view, subs, mentality, a cup tie, a contrac
     const text = await rows.nth(i).innerText()
     if (/· 1 yr$/.test(text.trim())) {
       await rows.nth(i).click()
+      // Talking terms is an ask with a stated likelihood now (DESIGN.md "Requests"): queued for the turn.
       await page.getByRole('button', { name: /Talk terms/ }).click()
-      await expect(page.getByText('You will talk terms')).toBeVisible()
+      await expect(page.getByTestId('ask-contract')).toHaveText(/Asked/)
       talked = true
     }
   }

@@ -21,6 +21,7 @@ import {
   type MatchState,
   type Mentality,
   type PlayerId,
+  type Request,
   type Selection,
   type Style,
   type UnemployedActivity,
@@ -91,6 +92,37 @@ export function withSelection(s: Session, selection: Partial<Selection>): Sessio
 }
 
 /** Talk terms with one of your players: a contract decision arrives next turn. */
+/** Queue an ask of the board, the director or a player for the coming turn (DESIGN.md "Requests"); one of each kind per player. */
+export function withRequest(s: Session, req: Request): Session {
+  const same = (r: Request) => r.to === req.to && r.ask === req.ask && (r.playerId ?? null) === (req.playerId ?? null)
+  const requests = [...(s.inputs.requests ?? []).filter((r) => !same(r)), req]
+  return bump(s, { ...s.inputs, requests })
+}
+
+export function withoutRequest(s: Session, req: Request): Session {
+  const requests = (s.inputs.requests ?? []).filter((r) => !(r.to === req.to && r.ask === req.ask && (r.playerId ?? null) === (req.playerId ?? null)))
+  return bump(s, { ...s.inputs, requests })
+}
+
+export function requested(s: Session, req: Pick<Request, 'to' | 'ask'> & { playerId?: PlayerId }): boolean {
+  return (s.inputs.requests ?? []).some((r) => r.to === req.to && r.ask === req.ask && (r.playerId ?? null) === (req.playerId ?? null))
+}
+
+/** Add to or take off the shortlist for the coming turn. */
+export function withShortlist(s: Session, add: PlayerId[], remove: PlayerId[]): Session {
+  const shortlistAdd = [...new Set([...(s.inputs.shortlistAdd ?? []).filter((id) => !remove.includes(id)), ...add])]
+  const shortlistRemove = [...new Set([...(s.inputs.shortlistRemove ?? []).filter((id) => !add.includes(id)), ...remove])]
+  return bump(s, { ...s.inputs, shortlistAdd, shortlistRemove })
+}
+
+/** The shortlist as it will stand after the turn: the saved one plus the queued changes. */
+export function shortlistOf(s: Session): PlayerId[] {
+  const ids = new Set(s.world.human?.shortlist ?? [])
+  for (const id of s.inputs.shortlistAdd ?? []) ids.add(id)
+  for (const id of s.inputs.shortlistRemove ?? []) ids.delete(id)
+  return [...ids]
+}
+
 export function withContractOffer(s: Session, playerId: PlayerId): Session {
   const contractOffers = [...(s.inputs.contractOffers ?? []).filter((id) => id !== playerId), playerId]
   return bump(s, { ...s.inputs, contractOffers })

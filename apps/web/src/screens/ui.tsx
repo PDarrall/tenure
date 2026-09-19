@@ -198,3 +198,36 @@ export function Form({ form }: { form: readonly string[] }) {
     </span>
   )
 }
+
+/**
+ * A decision's options as bets (DESIGN.md "Decisions are bets"): each with
+ * its likely effect, its downside and the adviser's confidence in words;
+ * the default marked. Stacked, one button per option.
+ */
+export function BetOptions({ options, value, defaultKey, onChoose, testId }: { options: { key: string; label: string; detail?: string; likely?: string; downside?: string; confidence?: string }[]; value: string | null; defaultKey: string; onChoose: (key: string) => void; testId?: (key: string) => string | undefined }) {
+  return (
+    <div className="choices stacked bets">
+      {options.map((o) => {
+        const on = value === o.key
+        return (
+          <button key={o.key} type="button" className="choice bet" aria-pressed={on} data-key={o.key} data-default={o.key === defaultKey ? 'true' : undefined} data-testid={testId ? testId(o.key) : undefined} style={on ? { background: 'var(--ink)', color: 'var(--on-ink)' } : undefined} onClick={() => onChoose(o.key)}>
+            <span className="bet-head">
+              <span className="main">{o.label}</span>
+              <span className="bet-tags">
+                {o.key === defaultKey && <span className="chip small">default</span>}
+                {o.confidence && <span className={`chip small ${o.confidence === 'gamble' ? 'chip-gamble' : ''}`}>{o.confidence}</span>}
+              </span>
+            </span>
+            {o.detail && <span className="detail" style={on ? { color: 'var(--on-ink-dim)' } : undefined}>{o.detail}</span>}
+            {o.likely && (
+              <span className="bet-words" style={on ? { color: 'var(--on-ink-dim)' } : undefined}>
+                <span className="bet-line"><b>Likely</b> {o.likely}</span>
+                <span className="bet-line"><b>Downside</b> {o.downside}</span>
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}

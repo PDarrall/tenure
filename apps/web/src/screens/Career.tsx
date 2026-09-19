@@ -55,6 +55,23 @@ export function CareerBody({ world }: { world: World }) {
           </div>
         </div>
       ))}
+      <SectionLabel>Gambles</SectionLabel>
+      <div className="body ink2" data-testid="gambles">
+        {s.gambles.taken === 0
+          ? 'No bold option taken yet: the dice have only rolled on the cautious path.'
+          : `${s.gambles.taken} bold option${s.gambles.taken === 1 ? '' : 's'} taken: ${s.gambles.paid} paid, ${s.gambles.cost} cost. Net of every roll: credit ${s.gambles.net.credit > 0 ? '+' : ''}${s.gambles.net.credit}, reputation ${s.gambles.net.reputation > 0 ? '+' : ''}${s.gambles.net.reputation}, morale ${s.gambles.net.morale > 0 ? '+' : ''}${s.gambles.net.morale}.`}
+      </div>
+      {s.gambles.recent.length > 0 && (
+        <div className="stack g2">
+          {s.gambles.recent.map((r, i) => (
+            <div className="caption" key={`${r.week}-${i}`}>
+              Week {r.week} · {r.label} · {r.effect > 0 ? '+' : ''}
+              {r.effect} {r.unit}
+              {r.bold ? ' · bold' : ''}
+            </div>
+          ))}
+        </div>
+      )}
       <SectionLabel>Honours</SectionLabel>
       {s.honours.length === 0 && <div className="sub ink3" style={{ padding: '4px 0 6px' }}>None yet.</div>}
       {s.honours.map((h, i) => (

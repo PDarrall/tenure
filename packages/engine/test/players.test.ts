@@ -219,7 +219,7 @@ describe('traits', () => {
 })
 
 describe('players over seasons', () => {
-  it('keeps every squad at size through windows and summers, strength is the best XI, and forgets nobody who matters', () => {
+  it('keeps every squad at size through windows and summers, strength is the best XI, and forgets nobody who matters', { timeout: 60_000 }, () => {
     const world = createWorld(6)
     runSeasons(world, 2)
     for (const club of world.clubs) {

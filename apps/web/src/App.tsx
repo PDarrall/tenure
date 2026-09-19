@@ -119,6 +119,8 @@ export function App() {
   }
 
   const careerKey = screen.careerKey
+  // For the browser tests: the live world, read-only.
+  ;(window as unknown as { __tenure?: unknown }).__tenure = screen.session.world
   return (
     <Game
       key={careerKey}

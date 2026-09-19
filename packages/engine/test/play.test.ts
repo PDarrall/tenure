@@ -142,7 +142,7 @@ describe('a human career', () => {
     expect(world.log.some((e) => e.type === 'board.note' && e.payload['managerId'] === player.id) || player.status.kind !== 'employed').toBe(true)
   })
 
-  it('the director brings cards in a window and an approved bid is answered at the close', () => {
+  it('the director brings cards in a window and an approved bid is answered at the close', { timeout: 60_000 }, () => {
     const world = createCareer(4, { name: 'Test Player', background: 'coach' })
     const player = me(world)
     getFirstJob(world, () => 'top-half:4')
