@@ -400,9 +400,18 @@ function injuries(state: MatchState, rng: Rng): void {
     victim.injured = true
     victim.injuryWeeks = injuryWeeks(rng)
     victim.on = false
-    push(state, state.minute, 'injury', key, victim.id, true, { player: victim.name, club: side.name })
-    if (!side.isHuman) aiReplace(state, rng, key, victim)
+    // The AI replaces its own at once; only the human's injury is a pause, and a change to make.
+    push(state, state.minute, 'injury', key, victim.id, side.isHuman, { player: victim.name, club: side.name })
+    if (!side.isHuman) aiReplace(state, key, victim)
   }
+}
+
+/** Injured players off the pitch with nobody in their slot, while the side still has a change to make. */
+export function injuredNeedingChange(state: MatchState, key: 'home' | 'away'): MatchPlayer[] {
+  const side = state[key]
+  if (state.over || side.subsUsed >= T.SUBS_MAX) return []
+  if (!side.players.some((p) => !p.on && !p.sentOff && !p.injured && !p.started && p.minutes === 0)) return []
+  return side.players.filter((p) => p.injured && !p.on && p.slot !== null && !side.players.some((q) => q.on && q.slot === p.slot))
 }
 
 /** The best bench player for a slot, or null. */
@@ -440,7 +449,7 @@ export function substitute(state: MatchState, key: 'home' | 'away', offId: Playe
   return true
 }
 
-function aiReplace(state: MatchState, _rng: Rng, key: 'home' | 'away', off: MatchPlayer): void {
+function aiReplace(state: MatchState, key: 'home' | 'away', off: MatchPlayer): void {
   const side = state[key]
   if (side.subsUsed >= T.SUBS_MAX) return
   const slot = off.slot ?? slotOf(off)
@@ -487,7 +496,7 @@ function aiDecisions(state: MatchState, rng: Rng, key: 'home' | 'away', views: {
   }
   if (canSub && state.minute >= T.SUB_TIRED_FROM) {
     const tired = onPitch(side).filter((p) => p.condition < T.SUB_TIRED_BELOW && p.slot?.position !== 'GK').sort((a, b) => a.condition - b.condition)[0]
-    if (tired) aiReplace(state, rng, key, tired)
+    if (tired) aiReplace(state, key, tired)
   }
 }
 
@@ -569,6 +578,40 @@ function finish(state: MatchState, rng: Rng): void {
 export function runToEnd(state: MatchState): void {
   let guard = 0
   while (!state.over && guard++ < 200) tick(state)
+}
+
+/**
+ * To key events (DESIGN.md "Match"): play until an event the match screen
+ * stops at — a goal, a red card, the human's injury needing a change, half
+ * time, full time — or the whistle. Returns the events produced.
+ */
+export function runToNextPause(state: MatchState): MatchEvent[] {
+  const before = state.events.length
+  let guard = 0
+  while (!state.over && guard++ < 200) {
+    if (tick(state).some((e) => e.pause)) break
+  }
+  return state.events.slice(before)
+}
+
+/**
+ * To full time (DESIGN.md "Match"): play to the whistle with the assistant
+ * taking the human side's forced decisions on their defaults — an injured
+ * player needing a change is replaced by the best on the bench.
+ */
+export function runToEndWithDefaults(state: MatchState): void {
+  const assist = () => {
+    for (const key of ['home', 'away'] as const) {
+      if (!state[key].isHuman) continue
+      for (const off of injuredNeedingChange(state, key)) aiReplace(state, key, off)
+    }
+  }
+  assist()
+  let guard = 0
+  while (!state.over && guard++ < 200) {
+    tick(state)
+    assist()
+  }
 }
 
 function resultFor(state: MatchState, key: 'home' | 'away'): Result {

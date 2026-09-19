@@ -1,12 +1,19 @@
 import { useEffect, useReducer, useState } from 'react'
-import { bestReplacement, competitionLabel, tableFor, type MatchEvent, type MatchPlayer, type MatchSide, type MatchState, type Mentality, type PlayerId, type Tier, type World } from '@tenure/engine'
-import { humanMatch, humanSide, mentalityWatched, skipWatched, substituteWatched, tickWatched, watched, type Session } from '../controller.js'
+import { bestReplacement, competitionLabel, tableFor, type MatchEvent, type MatchPlay, type MatchPlayer, type MatchSide, type MatchState, type Mentality, type PlayerId, type Tier, type World } from '@tenure/engine'
+import { forcedChange, humanMatch, humanSide, matchPlay, mentalityWatched, playToFullTime, playToNextPause, substituteWatched, watched, withMatchPlay, type Session } from '../controller.js'
 import { humanClub, ordinalOf, positionLabel, weekLabel } from './common.js'
-import { Continue, Foot, FootSpace, SectionLabel, Seg, Star } from './ui.js'
+import { Choices, Continue, Foot, FootSpace, SectionLabel, Seg, Star } from './ui.js'
 import { Table } from './Fixtures.js'
 
-/** Wall time per match minute at full speed: a match in about a minute (DESIGN.md "Match"). */
-export const MINUTE_MS = 640
+/** The ticker: the finished match replayed as minutes and goals, inside three seconds (DESIGN.md "Interface", Result first). */
+export const TICKER_MS = 2200
+/** The beat after the whistle before the result lands. */
+export const TICKER_LAND_MS = 300
+
+const PLAY_OPTIONS: { key: MatchPlay; label: string }[] = [
+  { key: 'fullTime', label: 'To full time' },
+  { key: 'keyEvents', label: 'To key events' },
+]
 
 function clock(m: MatchState): string {
   if (m.over) return 'FT'
@@ -19,10 +26,40 @@ function clock(m: MatchState): string {
 
 const PAUSE_LABEL: Record<string, string> = { goal: 'goal', red: 'red card', injury: 'injury', halftime: 'half time', fulltime: 'full time', shootout: 'penalties', sub: 'a change', kickoff: 'kick-off' }
 
+function lastPause(m: MatchState): MatchEvent | undefined {
+  return [...m.events].reverse().find((e) => e.pause)
+}
+
 function pauseReason(m: MatchState): string {
-  const last = [...m.events].reverse().find((e) => e.pause)
+  const last = lastPause(m)
   if (!last) return 'paused'
-  return `paused · ${PAUSE_LABEL[last.kind] ?? last.kind}`
+  return `Paused · ${PAUSE_LABEL[last.kind] ?? last.kind}`
+}
+
+// --- The ticker replays a finished match by its ticks: the first half runs 1 to 45 plus stoppage, the second 46 to the whistle.
+
+/** Ticks in the first half of a finished match: the second half's are the minutes past 45. */
+function firstHalfTicks(m: MatchState): number {
+  return m.over ? m.played - (m.minute - 45) : m.played
+}
+
+/** Every event with the tick it happened on. */
+function tickedEvents(m: MatchState): { e: MatchEvent; tick: number }[] {
+  const fh = firstHalfTicks(m)
+  let second = false
+  return m.events.map((e) => {
+    if (e.kind === 'halftime' || e.kind === 'secondhalf') {
+      second = true
+      return { e, tick: fh }
+    }
+    return { e, tick: second ? fh + (e.minute - 45) : e.minute }
+  })
+}
+
+function tickerClock(tick: number, fh: number): string {
+  if (tick <= fh) return tick > 45 ? `45+${tick - 45}'` : `${tick}'`
+  const minute = 45 + (tick - fh)
+  return minute > 90 ? `90+${minute - 90}'` : `${minute}'`
 }
 
 /** The live table for the human's division: the standings with today's results applied. */
@@ -100,120 +137,82 @@ function Commentary({ events, testId, limit }: { events: MatchEvent[]; testId?: 
   )
 }
 
-export function MatchView({ session, onContinue }: { session: Session; onContinue: () => void }) {
+function ScoreHead({ home, away, homeGoals, awayGoals, live }: { home: MatchSide; away: MatchSide; homeGoals: number; awayGoals: number; live: boolean }) {
+  return (
+    <div className="score-head">
+      <div className="side home">
+        <div className="nm">{home.name}</div>
+        <div className="sc">{scorers(home) || ' '}</div>
+      </div>
+      <div className={`scoreline${live ? ' live' : ''}`} data-testid="score" aria-label={`${home.name} ${homeGoals}, ${away.name} ${awayGoals}`}>
+        {homeGoals}
+        <span className="dash">–</span>
+        {awayGoals}
+      </div>
+      <div className="side away">
+        <div className="nm">{away.name}</div>
+        <div className="sc">{scorers(away) || ' '}</div>
+      </div>
+    </div>
+  )
+}
+
+interface Ticker {
+  start: number
+  /** The tick the press was made at: a match switched to full time mid-way replays from there. */
+  from: number
+  tick: number
+}
+
+/**
+ * The match screen (DESIGN.md "Match", "Interface" Result first): one toggle
+ * and one button. To full time plays the match in one press behind the ticker;
+ * To key events plays to the next pause, mentality and substitutions while
+ * paused, an injury needing a change a forced decision in the foot.
+ */
+export function MatchView({ session, onChange, onContinue }: { session: Session; onChange: (s: Session) => void; onContinue: () => void }) {
   const world = session.world
   const [, bump] = useReducer((x: number) => x + 1, 0)
-  const [running, setRunning] = useState(false)
-  const [holding, setHolding] = useState(false)
-  const [picking, setPicking] = useState(false)
-  const [subOff, setSubOff] = useState<PlayerId | null>(null)
   const m = humanMatch(session)
   const w = watched(session)
   const us = humanSide(session)
-  const live = running || holding
+  const mode = matchPlay(session)
+  const [ticker, setTicker] = useState<Ticker | null>(null)
+  // A match already over when the screen opens (a reload after the whistle) goes straight to the result.
+  const [showResult, setShowResult] = useState<boolean>(() => m?.over ?? false)
+  const [picking, setPicking] = useState(false)
+  const [subOff, setSubOff] = useState<PlayerId | null>(null)
 
+  // The ticker runs on the wall clock, so it lands inside TICKER_MS whatever the frame rate.
   useEffect(() => {
-    if (!live || !m || m.over) return
-    const timer = window.setInterval(() => {
-      const events = tickWatched(session)
-      const mine = humanMatch(session)
-      if (mine && mine.over) {
-        setRunning(false)
-        setHolding(false)
-      } else if (events.some((e) => e.pause)) {
-        setRunning(false)
-        setHolding(false)
+    if (!ticker || !m) return
+    const span = Math.max(1, m.played - ticker.from)
+    const id = window.setInterval(() => {
+      const elapsed = performance.now() - ticker.start
+      if (elapsed >= TICKER_MS + TICKER_LAND_MS) {
+        window.clearInterval(id)
+        setTicker(null)
+        setShowResult(true)
+        return
       }
-      bump()
-    }, MINUTE_MS)
-    return () => window.clearInterval(timer)
-  }, [live, session, m])
-
-  // Space bar held runs the match, as in CM.
-  useEffect(() => {
-    if (!m || m.over) return
-    const down = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat && !(e.target instanceof HTMLInputElement)) {
-        e.preventDefault()
-        setHolding(true)
-      }
-    }
-    const up = (e: KeyboardEvent) => {
-      if (e.code === 'Space') setHolding(false)
-    }
-    window.addEventListener('keydown', down)
-    window.addEventListener('keyup', up)
-    return () => {
-      window.removeEventListener('keydown', down)
-      window.removeEventListener('keyup', up)
-    }
-  }, [m])
+      const tick = ticker.from + Math.min(span, Math.floor((elapsed / TICKER_MS) * span))
+      if (tick !== ticker.tick) setTicker({ ...ticker, tick })
+    }, 16)
+    return () => window.clearInterval(id)
+  }, [ticker, m])
 
   if (!m || !w) return null
   const them: 'home' | 'away' = us === 'home' ? 'away' : 'home'
   const ours = m[us]
   const theirs = m[them]
-  const paused = !live && !m.over
   const club = humanClub(world)
   const tier: Tier | null = club ? club.tier : null
   const label = w.slot.kind === 'cup' ? competitionLabel(w.slot.competition) : 'League'
   const eyebrow = `${label} · ${weekLabel(w.seasonWeek)} · ${us === 'home' ? 'Home' : 'Away'}`
-  const onPitch = ours.players.filter((p) => p.on)
-  const bench = ours.players.filter((p) => !p.on && !p.started && !p.sentOff && !p.injured && p.minutes === 0)
-  const injuredNeedingChange = ours.players.filter((p) => p.injured && p.started && !ours.players.some((q) => q.on && q.slot === p.slot && q.id !== p.id))
   const others = w.matches.slice(1)
-  const subsLeft = 3 - ours.subsUsed
-  const canSub = paused && subsLeft > 0 && bench.length > 0
-  const pressureHome = m.pressure > 0
-  const pressurePct = Math.min(50, Math.round(Math.abs(m.pressure) / 2))
-  const offPlayer = subOff === null ? null : ours.players.find((p) => p.id === subOff)
 
-  const sub = (onId: PlayerId) => {
-    if (subOff === null) return
-    substituteWatched(session, subOff, onId)
-    setSubOff(null)
-    setPicking(false)
-    bump()
-  }
-  const changeMentality = (mentality: Mentality) => {
-    mentalityWatched(session, mentality)
-    bump()
-  }
-  const playOn = () => {
-    setPicking(false)
-    setSubOff(null)
-    setRunning(true)
-  }
-  const pause = () => {
-    setRunning(false)
-    setHolding(false)
-  }
-  const skip = () => {
-    skipWatched(session)
-    setRunning(false)
-    setHolding(false)
-    bump()
-  }
-
-  const scoreHead = (
-    <div className="score-head">
-      <div className="side home">
-        <div className="nm">{m.home.name}</div>
-        <div className="sc">{scorers(m.home) || ' '}</div>
-      </div>
-      <div className={`scoreline${m.over ? '' : ' live'}`} data-testid="score" aria-label={`${m.home.name} ${m.home.goals}, ${m.away.name} ${m.away.goals}`}>
-        {m.home.goals}
-        <span className="dash">–</span>
-        {m.away.goals}
-      </div>
-      <div className="side away">
-        <div className="nm">{m.away.name}</div>
-        <div className="sc">{scorers(m.away) || ' '}</div>
-      </div>
-    </div>
-  )
-
-  if (m.over) {
+  // --- The result card.
+  if (m.over && showResult) {
     const gf = ours.goals
     const ga = theirs.goals
     const home = us === 'home'
@@ -242,7 +241,7 @@ export function MatchView({ session, onContinue }: { session: Session; onContinu
             <div className="label">{eyebrow}</div>
             <span className="label">Full time</span>
           </div>
-          {scoreHead}
+          <ScoreHead home={m.home} away={m.away} homeGoals={m.home.goals} awayGoals={m.away.goals} live={false} />
           <div className="body">
             {ours.name} {verb} {theirs.name}.{move}
           </div>
@@ -299,19 +298,95 @@ export function MatchView({ session, onContinue }: { session: Session; onContinu
     )
   }
 
+  // --- The ticker: the match already played, replayed as minutes and goals.
+  if (ticker) {
+    const fh = firstHalfTicks(m)
+    const seen = tickedEvents(m).filter((t) => t.tick <= ticker.tick)
+    const goals = seen.filter((t) => t.e.kind === 'goal')
+    const homeGoals = goals.filter((t) => t.e.side === 'home').length
+    const awayGoals = goals.filter((t) => t.e.side === 'away').length
+    const minute = tickerClock(ticker.tick, fh)
+    return (
+      <main className="screen" aria-label="Match" data-testid="ticker">
+        <div className="head tight">
+          <div className="between">
+            <div className="label">{eyebrow}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+              <span className="label accent">Playing</span>
+              <span className="minute live" data-testid="minute">
+                {minute}
+              </span>
+            </div>
+          </div>
+          <ScoreHead home={m.home} away={m.away} homeGoals={homeGoals} awayGoals={awayGoals} live />
+          <div className="ticker-line" aria-hidden="true">
+            <div style={{ width: `${Math.min(100, Math.round((ticker.tick / Math.max(1, m.played)) * 100))}%` }} />
+          </div>
+          {goals.length > 0 && <Commentary events={goals.slice(-3).map((t) => t.e)} />}
+        </div>
+        <div className="rule" />
+        <div className="scroll" />
+        <Foot>
+          <Continue next={`Playing · ${minute}`} disabled testId="playing" onClick={() => undefined} />
+        </Foot>
+        <FootSpace />
+      </main>
+    )
+  }
+
+  // --- Paused: before kick-off, at a key event, or at the whistle before the result.
+  const onPitch = ours.players.filter((p) => p.on)
+  const bench = ours.players.filter((p) => !p.on && !p.started && !p.sentOff && !p.injured && p.minutes === 0)
+  const subsLeft = 3 - ours.subsUsed
+  const canSub = !m.over && subsLeft > 0 && bench.length > 0
+  const forced = mode === 'keyEvents' ? forcedChange(session) : null
+  const forcedBest = forced ? bestReplacement(m, us, forced.id) : null
+  const forcedBestPlayer = forcedBest === null ? null : ours.players.find((p) => p.id === forcedBest)
+  const pressureHome = m.pressure > 0
+  const pressurePct = Math.min(50, Math.round(Math.abs(m.pressure) / 2))
+  const offPlayer = subOff === null ? null : ours.players.find((p) => p.id === subOff)
+  const pause = lastPause(m)
+  const state = m.played === 0 ? 'Kick-off' : m.over ? 'Full time' : pauseReason(m)
+
+  const sub = (offId: PlayerId, onId: PlayerId) => {
+    substituteWatched(session, offId, onId)
+    setSubOff(null)
+    setPicking(false)
+    bump()
+  }
+  const changeMentality = (mentality: Mentality) => {
+    mentalityWatched(session, mentality)
+    bump()
+  }
+  const press = () => {
+    setPicking(false)
+    setSubOff(null)
+    if (mode === 'fullTime') {
+      const from = m.played
+      playToFullTime(session)
+      setTicker({ start: performance.now(), from, tick: from })
+    } else {
+      playToNextPause(session)
+      bump()
+    }
+  }
+  // The second line says what Continue will do: "Kick off · to full time", then "To next event" at each pause, "Result" at the whistle.
+  const next = m.over ? 'Result' : `${m.played === 0 ? 'Kick off · to' : 'To'} ${mode === 'fullTime' ? 'full time' : 'next event'}`
+  const dataNext = m.over ? 'result' : mode === 'fullTime' ? 'full-time' : 'next-event'
+
   return (
     <main className="screen" aria-label="Match">
       <div className="head tight">
         <div className="between">
           <div className="label">{eyebrow}</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span className="label">{m.played === 0 ? 'Kick-off' : live ? 'Playing' : pauseReason(m)}</span>
+            <span className="label" data-testid="match-state">{state}</span>
             <span className="minute" data-testid="minute">
               {clock(m)}
             </span>
           </div>
         </div>
-        {scoreHead}
+        <ScoreHead home={m.home} away={m.away} homeGoals={m.home.goals} awayGoals={m.away.goals} live={!m.over} />
         <div className="pressure" aria-label="Pressure" title={`Pressure ${Math.round(m.pressure)}`}>
           <div className="track">
             {pressurePct > 0 && <div className={`fill ${pressureHome ? 'home' : 'away'}`} style={{ width: `${pressurePct}%` }} />}
@@ -322,84 +397,85 @@ export function MatchView({ session, onContinue }: { session: Session; onContinu
             <span>{m.away.name}</span>
           </div>
         </div>
-        {m.events.length > 0 && <Commentary events={m.events} limit={4} />}
+        {m.played > 0 && pause && <Commentary events={[pause]} testId="pause-line" />}
       </div>
       <div className="rule" />
       <div className="scroll">
-        {paused && (
-          <div className="stack g10" style={{ padding: '14px 0 4px' }}>
-            <div className="label">While paused · mentality</div>
-            <Seg small options={[{ key: 'defend', label: 'Defend' }, { key: 'balanced', label: 'Balanced' }, { key: 'attack', label: 'Attack' }]} value={ours.mentality} onChange={changeMentality} testId={(k) => `mentality-${k}`} />
-            <div className="between center" style={{ paddingTop: 4 }}>
-              <span className="sub">
-                Substitutions · {subsLeft} left
-                {injuredNeedingChange.length ? ` · ${injuredNeedingChange.map((p) => p.name).join(', ')} cannot go on` : ''}
-              </span>
-              <span style={{ display: 'flex', gap: 8 }}>
+        <div className="stack g10" style={{ padding: '14px 0 4px' }}>
+          <div className="label">Continue plays</div>
+          <Seg small options={PLAY_OPTIONS} value={mode} onChange={(k) => onChange(withMatchPlay(session, k))} testId={(k) => `play-${k}`} />
+          {!m.over && (
+            <>
+              <div className="label" style={{ paddingTop: 4 }}>
+                While paused · mentality
+              </div>
+              <Seg small options={[{ key: 'defend', label: 'Defend' }, { key: 'balanced', label: 'Balanced' }, { key: 'attack', label: 'Attack' }]} value={ours.mentality} onChange={changeMentality} testId={(k) => `mentality-${k}`} />
+              <div className="between center" style={{ paddingTop: 4 }}>
+                <span className="sub">
+                  Substitutions · {subsLeft} left
+                  {forced ? ` · ${forced.name} cannot go on` : ''}
+                </span>
                 {canSub && !picking && (
                   <button type="button" className="btn small" onClick={() => setPicking(true)} data-testid="make-a-change">
                     Make a change
                   </button>
                 )}
-                <button type="button" className="btn small" onClick={skip} data-testid="to-full-time">
-                  To full time
-                </button>
-              </span>
-            </div>
-            {picking && canSub && (
-              <div className="sub-box" data-testid="sub-box">
-                <div className="between">
-                  <span className="strong" style={{ fontSize: 14 }}>
-                    {offPlayer ? `${offPlayer.name} off. Who comes on?` : 'Who comes off?'}
-                  </span>
-                  <button
-                    type="button"
-                    className="text-btn quiet"
-                    onClick={() => {
-                      setPicking(false)
-                      setSubOff(null)
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-                {subOff === null &&
-                  onPitch.map((p) => (
-                    <button type="button" className="pitch-row" key={p.id} onClick={() => setSubOff(p.id)} data-testid="sub-off" data-player={p.id}>
-                      <span className="slot">{p.slot ? `${p.slot.position}${p.slot.position === 'GK' ? '' : p.slot.side}` : positionLabel(p)}</span>
-                      <span className="who">
-                        <span className="nm">{p.name}</span>
-                      </span>
-                      {p.injured && <span className="note">injured</span>}
-                      <span className="rt">{p.live.toFixed(1)}</span>
-                    </button>
-                  ))}
-                {subOff !== null &&
-                  bench.map((p) => (
-                    <button type="button" className="pitch-row" key={p.id} onClick={() => sub(p.id)} data-testid="sub-on" data-player={p.id}>
-                      <span className="slot">{positionLabel(p)}</span>
-                      <span className="who">
-                        <span className="nm">{p.name}</span>
-                      </span>
-                      <span className="rt">{Math.round(p.rating)}</span>
-                    </button>
-                  ))}
-                {subOff !== null &&
-                  (() => {
-                    const best = bestReplacement(m, us, subOff)
-                    const bestPlayer = best === null ? null : ours.players.find((p) => p.id === best)
-                    return bestPlayer ? (
-                      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 0 6px' }}>
-                        <button type="button" className="btn small" onClick={() => sub(bestPlayer.id)} data-testid="sub-best">
-                          Best available · {bestPlayer.name}
-                        </button>
-                      </div>
-                    ) : null
-                  })()}
               </div>
-            )}
-          </div>
-        )}
+              {picking && canSub && (
+                <div className="sub-box" data-testid="sub-box">
+                  <div className="between">
+                    <span className="strong" style={{ fontSize: 14 }}>
+                      {offPlayer ? `${offPlayer.name} off. Who comes on?` : 'Who comes off?'}
+                    </span>
+                    <button
+                      type="button"
+                      className="text-btn quiet"
+                      onClick={() => {
+                        setPicking(false)
+                        setSubOff(null)
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {subOff === null &&
+                    onPitch.map((p) => (
+                      <button type="button" className="pitch-row" key={p.id} onClick={() => setSubOff(p.id)} data-testid="sub-off" data-player={p.id}>
+                        <span className="slot">{p.slot ? `${p.slot.position}${p.slot.position === 'GK' ? '' : p.slot.side}` : positionLabel(p)}</span>
+                        <span className="who">
+                          <span className="nm">{p.name}</span>
+                        </span>
+                        {p.injured && <span className="note">injured</span>}
+                        <span className="rt">{p.live.toFixed(1)}</span>
+                      </button>
+                    ))}
+                  {subOff !== null &&
+                    bench.map((p) => (
+                      <button type="button" className="pitch-row" key={p.id} onClick={() => sub(subOff, p.id)} data-testid="sub-on" data-player={p.id}>
+                        <span className="slot">{positionLabel(p)}</span>
+                        <span className="who">
+                          <span className="nm">{p.name}</span>
+                        </span>
+                        <span className="rt">{Math.round(p.rating)}</span>
+                      </button>
+                    ))}
+                  {subOff !== null &&
+                    (() => {
+                      const best = bestReplacement(m, us, subOff)
+                      const bestPlayer = best === null ? null : ours.players.find((p) => p.id === best)
+                      return bestPlayer ? (
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '8px 0 6px' }}>
+                          <button type="button" className="btn small" onClick={() => sub(subOff, bestPlayer.id)} data-testid="sub-best">
+                            Best available · {bestPlayer.name}
+                          </button>
+                        </div>
+                      ) : null
+                    })()}
+                </div>
+              )}
+            </>
+          )}
+        </div>
         <SectionLabel>Both elevens</SectionLabel>
         <div className="two-col">
           <div>
@@ -438,7 +514,7 @@ export function MatchView({ session, onContinue }: { session: Session; onContinu
             </div>
           </>
         )}
-        {m.events.length > 4 && (
+        {m.events.length > 1 && (
           <>
             <SectionLabel>Commentary</SectionLabel>
             <Commentary events={m.events} testId="commentary" />
@@ -447,10 +523,23 @@ export function MatchView({ session, onContinue }: { session: Session; onContinu
         <div className="tail" />
       </div>
       <Foot>
-        {live ? (
-          <Continue main="Pause" next={`Playing · ${clock(m)}`} testId="pause" onClick={pause} />
+        {forced && forcedBestPlayer ? (
+          <Choices
+            title={`${forced.name} is injured · who comes on?`}
+            options={[
+              { key: 'best', label: 'Best available', detail: forcedBestPlayer.name, testId: 'choice-default' },
+              { key: 'pick', label: 'Choose', detail: 'from the bench', testId: 'choice-pick' },
+            ]}
+            onChoose={(key) => {
+              if (key === 'best') sub(forced.id, forcedBestPlayer.id)
+              else {
+                setSubOff(forced.id)
+                setPicking(true)
+              }
+            }}
+          />
         ) : (
-          <Continue next={m.played === 0 ? 'Kick off' : 'Play on · to the next pause'} testId="play-on" onClick={playOn} />
+          <Continue next={next} dataNext={dataNext} onClick={m.over ? () => setShowResult(true) : press} />
         )}
       </Foot>
       <FootSpace />

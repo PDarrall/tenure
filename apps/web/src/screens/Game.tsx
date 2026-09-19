@@ -50,7 +50,7 @@ export function Game({ session, onChange, onContinue, onExport, onImport, onRese
   // A match week stopped before kick-off: Home offers the kick-off; then the match view, then Continue.
   const match = humanMatch(session)
   if (watched(session) && match && (kickedOff || match.played > 0 || match.over)) {
-    return <MatchView session={session} onContinue={() => onContinue()} />
+    return <MatchView session={session} onChange={onChange} onContinue={() => onContinue()} />
   }
   const kickOff = () => {
     // The side was picked when the week was prepared: changes made since need it picked again.

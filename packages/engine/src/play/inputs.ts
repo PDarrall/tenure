@@ -5,7 +5,8 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import { spellOf } from '../lookup.js'
-import type { HumanInputs, World } from '../types.js'
+import type { HumanInputs, MatchPlay, World } from '../types.js'
+import { T } from '../tunables.js'
 import { resign } from '../tenure/exits.js'
 import { endCareer } from '../market/retirement.js'
 import { setActivity } from '../market/unemployment.js'
@@ -66,4 +67,14 @@ export function applyInputs(world: World, rng: Rng, inputs: HumanInputs): void {
     if (spell) resign(world, spell)
   }
   if (inputs.retire) endCareer(world, player, 'voluntary')
+}
+
+/** How Continue plays a match from the match screen; MATCH_PLAY_DEFAULT until the player sets it. */
+export function matchPlayOf(world: World): MatchPlay {
+  return world.human?.matchPlay ?? T.MATCH_PLAY_DEFAULT
+}
+
+/** The toggle on the match screen: saved with the career, so it persists across matches. */
+export function setMatchPlay(world: World, matchPlay: MatchPlay): void {
+  humanState(world).matchPlay = matchPlay
 }

@@ -29,7 +29,7 @@ Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · �
 
 ## Match
 - Minute-by-minute engine, commentary naming players — ✓
-- Space-bar speed, automatic pauses at goals, reds, injuries, half time — ✓
+- Continue to full time (one press, a ticker inside three seconds, the assistant on any forced change) or to key events (goals, reds, injuries needing a change, half time, full time), the toggle saved with the career — ✓
 - Substitutions and mentality changes while paused — ✓
 - Latest scores from the division; live table at full time — ✓
 - Match stats (shots, on target, possession, corners, fouls, cards); pre-match odds — ✓

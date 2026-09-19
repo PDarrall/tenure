@@ -492,8 +492,11 @@ export const T = {
   // ---------------------------------------------------------------------------
   // The minute engine (DESIGN.md "Match"). Serves: goals per game ≈ 2.7,
   // home / draw / away ≈ 45 / 26 / 29, yellows ≈ 3–4, reds ≈ 0.2 (to verify);
-  // a match in about a minute at full speed.
+  // Interface: a match is one press in To full time, four to six in To key events.
   // ---------------------------------------------------------------------------
+
+  /** How Continue plays a match until the player changes it: one press to the result (Interface: a match is one press in To full time). */
+  MATCH_PLAY_DEFAULT: 'fullTime' as const,
 
   /** Pressure target per point of effective XI difference, and per midfielder of presence (a quality-weighted count). */
   PRESSURE_PER_POINT: 1.0,

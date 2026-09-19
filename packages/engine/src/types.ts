@@ -757,6 +757,8 @@ export interface HumanState {
   contractChoices: Record<number, 'release' | { years: number; wage: number }>
   /** A match week stopped before kick-off so the human can watch it (phase 3d); null between matches. */
   watched: WatchedWeek | null
+  /** How Continue plays a match from the match screen (DESIGN.md "Interface", Result first); MATCH_PLAY_DEFAULT when unset. */
+  matchPlay?: MatchPlay
   /** Vacancies the human withdrew from: the agent never puts them forward there again. */
   agentWithdrawn: VacancyId[]
   /** What the manager asked the director for; null when nothing is asked. */
@@ -783,6 +785,9 @@ export interface FixtureKey {
  * everything else in the slot waits for the fast path at commit. Plain data,
  * so a save taken mid-match resumes at the same minute.
  */
+/** To full time: one press to the result. To key events: each press plays to the next pause. */
+export type MatchPlay = 'fullTime' | 'keyEvents'
+
 export interface WatchedWeek {
   seasonWeek: number
   slot: { kind: 'league' } | { kind: 'cup'; competition: 'nationalCup' | 'leagueCup' | 'european' }

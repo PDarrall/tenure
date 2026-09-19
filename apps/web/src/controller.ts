@@ -7,8 +7,13 @@ import {
   createCareer,
   discardWatched,
   inboxMark,
+  injuredNeedingChange,
+  matchPlayOf,
   pendingDecisions,
   runToEnd,
+  runToEndWithDefaults,
+  runToNextPause,
+  setMatchPlay,
   setMentality,
   substitute,
   tick,
@@ -18,6 +23,8 @@ import {
   type InboxMark,
   type Formation,
   type MatchEvent,
+  type MatchPlay,
+  type MatchPlayer,
   type MatchState,
   type Mentality,
   type PlayerId,
@@ -196,23 +203,39 @@ function humanClubOf(world: World): number | null {
   return me.status.post.clubId
 }
 
-/** One minute for every match in the watched week, in step. Returns the human match's new events. */
-export function tickWatched(s: Session): MatchEvent[] {
+/** To key events: the human's match to its next pause, the rest of the division kept in step. Returns the events produced. */
+export function playToNextPause(s: Session): MatchEvent[] {
   const w = watched(s)
-  if (!w) return []
-  let mine: MatchEvent[] = []
-  w.matches.forEach((m, i) => {
-    const events = tick(m)
-    if (i === 0) mine = events
-  })
-  return mine
+  const m = humanMatch(s)
+  if (!w || !m) return []
+  const events = runToNextPause(m)
+  for (const other of w.matches.slice(1)) while (!other.over && other.played < m.played) tick(other)
+  return events
 }
 
-/** Straight to full time for every match in the week. */
-export function skipWatched(s: Session): void {
+/** To full time: the human's match to the whistle with the assistant's defaults, and the rest of the division with it. */
+export function playToFullTime(s: Session): void {
   const w = watched(s)
   if (!w) return
-  for (const m of w.matches) runToEnd(m)
+  w.matches.forEach((m, i) => (i === 0 ? runToEndWithDefaults(m) : runToEnd(m)))
+}
+
+/** How Continue plays a match from the match screen (DESIGN.md "Interface", Result first). */
+export function matchPlay(s: Session): MatchPlay {
+  return matchPlayOf(s.world)
+}
+
+/** The toggle: a preference saved with the career. A new session object, so the shell re-renders and autosaves. */
+export function withMatchPlay(s: Session, mode: MatchPlay): Session {
+  setMatchPlay(s.world, mode)
+  return { ...s }
+}
+
+/** In To key events an injury needing a change is a forced decision: the first such player, or null. */
+export function forcedChange(s: Session): MatchPlayer | null {
+  const m = humanMatch(s)
+  if (!m) return null
+  return injuredNeedingChange(m, humanSide(s))[0] ?? null
 }
 
 export function substituteWatched(s: Session, offId: PlayerId, onId: PlayerId): boolean {

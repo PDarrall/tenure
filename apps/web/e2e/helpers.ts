@@ -46,10 +46,13 @@ export async function inMatch(page: Page): Promise<boolean> {
   return (await page.getByTestId('score').count()) > 0
 }
 
-/** In the match view: straight to full time, then to the inbox. */
+/** On the match screen: Continue to the result whichever way it is set (an injury answered with the best available), then to the inbox. */
 export async function playMatchQuickly(page: Page): Promise<void> {
-  await expect(page.getByTestId('to-full-time')).toBeVisible()
-  await page.getByTestId('to-full-time').click()
+  for (let i = 0; i < 60 && (await page.getByTestId('continue-after-match').count()) === 0; i++) {
+    if ((await page.getByTestId('choice-default').count()) > 0) await page.getByTestId('choice-default').click()
+    else if ((await page.getByTestId('continue').count()) > 0) await page.getByTestId('continue').click()
+    else await page.waitForTimeout(200) // the ticker
+  }
   await expect(page.getByTestId('continue-after-match')).toBeVisible()
   await page.getByTestId('continue-after-match').click()
 }
