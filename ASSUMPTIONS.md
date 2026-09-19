@@ -636,3 +636,30 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   highest-paid at each close. The star-sale shock and a fallout's sale
   now sell the player for real. The numbers before and after are in the
   PR.
+
+## The match screen's Continue (DESIGN v0.9)
+
+- The toggle is a preference on the human state (`matchPlay`), saved with
+  the career like the sticky tactic and never logged: nothing renders from
+  it but the match screen. Old saves without it read MATCH_PLAY_DEFAULT.
+- "Continue's label" is the button's second line under the standing
+  "Continue": "Kick off · to full time" or "Kick off · to next event"
+  before kick-off, "To full time" or "To next event" at a pause, "Result"
+  at the whistle. The result card keeps "To the inbox".
+- The ticker replays the finished match from its events over TICKER_MS
+  (2.2 s) plus a 0.3 s beat, on the wall clock, so it lands inside three
+  seconds whatever the frame rate. A match switched to full time mid-way
+  replays from the minute it was at. Nothing on the screen is live during
+  the ticker but the minute, the score and the goal lines.
+- Only the human side's injury pauses: the AI replaces its own in the same
+  minute, so an opponent's injury is not a key event. A red card on either
+  side is. The forced decision is "Best available" (the default) or
+  "Choose", which opens the bench; with no bench player or no change left
+  there is no decision and the side plays short.
+- "To full time with defaults" replaces an injured player needing a change
+  in the minute he goes down; nothing else the AI does by rule (chasing,
+  holding, tired legs) is done for the human.
+- The Interface validation line was added to DESIGN.md's list (none was
+  there); the Match line's "a match plays in about a minute at full speed"
+  was left as the brief did not name it, though the mode it describes no
+  longer exists.
