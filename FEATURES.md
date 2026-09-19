@@ -36,13 +36,17 @@ Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · �
 - Fixtures and results by competition; league table; cups; European competition — ✓
 
 ## Transfers
-- Searchable market, shortlist, scout reports — 4
-- Bids with two rounds of haggling; loans; free agents — 4
-- Contract of wage and years; players accept or refuse — 4
-- Listing players; unprompted bids for your best players — 4
-- Two windows, summer and January — 4
+- Two windows, summer and January; free agents any time — 4
+- A director of football who recommends signings and sales; the manager decides — 4
+- Every signing a bet: the director's estimate against the truth, revealed over five matches — 4
+- Requests to the board, the director and players, each with a stated likelihood — 4
+- A shortlist and search, used to name targets for the director — 4
 - Transfer and wage budgets from the board — ◐ (abstract budget ✓; real budgets 4)
-- Agents, clauses, instalments, sell-on fees, work permits — ✗
+- Agents, clauses, instalments, haggling rounds, sell-on fees — ✗
+
+## Decisions
+- Every decision card shows likely, downside and confidence; the dice decide; the default is the cautious option — 4
+- Gambles recorded in the event log and on the career page — 4
 
 ## Club
 - Four levels — coaching, scouting, medical, academy — the manager can ask the board to raise — 5

@@ -71,7 +71,10 @@ single branch, so they live here instead.
   diminishing returns and churns the first XI. The winter pot is 30% of
   the normal budget. Net spend is ranked within the division as played.
   (DESIGN.md v0.5 § Players keeps the window abstract until phase 4 and
-  makes club strength the master number that squads are anchored to.)
+  makes club strength the master number that squads are anchored to.
+  Settled by DESIGN.md v0.7 § Transfers: the director of football trades
+  real players against real budgets, AI clubs included, and strength is
+  derived from the squad.)
 - Match summaries are stored as a template key on the event and rendered
   on demand from text/match.json; rendering never draws from the RNG.
 
@@ -260,12 +263,15 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   with nothing owed and no mark on the record.
 - Window plans are presets: spend, rebuild, youth first, sell a senior
   player, hold. Selling raises cash worth 40% of the normal budget per
-  player and costs 3 strength.
+  player and costs 3 strength. (Settled by DESIGN.md v0.7 § Transfers:
+  the presets give way to the director's recommendation and sale cards.)
 - Press responses: confident +2 morale, measured nothing, defiant −2
   morale and +1 credit. Board responses when uneasy: accept nothing,
   push back a coin flip of ±3 credit, promise +3 credit and a target one
   place harder. DESIGN names these controls without effects; these are
-  the smallest ones that matter.
+  the smallest ones that matter. (Settled by DESIGN.md v0.7 § Decisions
+  are bets: every option carries a likely effect, a downside and a
+  confidence, and the seeded dice decide.)
 - The board's mood is shown in words derived from credit against the
   threshold; the number itself is never shown.
 - In a career the log keeps only events that concern the human plus the
@@ -325,7 +331,8 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   whole squad shifts together whenever strength changes (generation,
   windows, summer, strength shocks, an appointment). Below strength 10
   the rating floor of 1 gets in the way, so the anchoring test skips
-  those clubs.
+  those clubs. (Settled by DESIGN.md v0.7 § Transfers: from phase 4
+  strength is derived from the squad and nothing is anchored.)
 - Position is one of GK, D, M, F with a side (L, C, R or any). Playing
   an adjacent role costs 15, a distant one 30, the wrong side 5;
   versatile halves the penalty. Condition below 80 costs a quarter of a
@@ -457,7 +464,9 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   shifts in windows.
 - Potential shows as a range only for your own club's players under 24
   (the assistant knows them; scouting levels are phase 5): from the
-  rating to the hidden potential ± 4, whole numbers.
+  rating to the hidden potential ± 4, whole numbers. (Widened by
+  DESIGN.md v0.7 § Transfers: the director's cards carry rating and
+  potential ranges for any player he recommends.)
 - "Talk terms" on a player's profile queues the same contract decision
   an expiring deal raises; the assistant's demand is his wage demand.
 - Tap-to-swap on the tactics screen exchanges two players' places (a
