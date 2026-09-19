@@ -71,7 +71,10 @@ single branch, so they live here instead.
   diminishing returns and churns the first XI. The winter pot is 30% of
   the normal budget. Net spend is ranked within the division as played.
   (DESIGN.md v0.5 § Players keeps the window abstract until phase 4 and
-  makes club strength the master number that squads are anchored to.)
+  makes club strength the master number that squads are anchored to.
+  Settled by DESIGN.md v0.7 § Transfers: the director of football trades
+  real players against real budgets, AI clubs included, and strength is
+  derived from the squad.)
 - Match summaries are stored as a template key on the event and rendered
   on demand from text/match.json; rendering never draws from the RNG.
 
@@ -260,12 +263,15 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   with nothing owed and no mark on the record.
 - Window plans are presets: spend, rebuild, youth first, sell a senior
   player, hold. Selling raises cash worth 40% of the normal budget per
-  player and costs 3 strength.
+  player and costs 3 strength. (Settled by DESIGN.md v0.7 § Transfers:
+  the presets give way to the director's recommendation and sale cards.)
 - Press responses: confident +2 morale, measured nothing, defiant −2
   morale and +1 credit. Board responses when uneasy: accept nothing,
   push back a coin flip of ±3 credit, promise +3 credit and a target one
   place harder. DESIGN names these controls without effects; these are
-  the smallest ones that matter.
+  the smallest ones that matter. (Settled by DESIGN.md v0.7 § Decisions
+  are bets: every option carries a likely effect, a downside and a
+  confidence, and the seeded dice decide.)
 - The board's mood is shown in words derived from credit against the
   threshold; the number itself is never shown.
 - In a career the log keeps only events that concern the human plus the
@@ -325,7 +331,8 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   whole squad shifts together whenever strength changes (generation,
   windows, summer, strength shocks, an appointment). Below strength 10
   the rating floor of 1 gets in the way, so the anchoring test skips
-  those clubs.
+  those clubs. (Settled by DESIGN.md v0.7 § Transfers: from phase 4
+  strength is derived from the squad and nothing is anchored.)
 - Position is one of GK, D, M, F with a side (L, C, R or any). Playing
   an adjacent role costs 15, a distant one 30, the wrong side 5;
   versatile halves the penalty. Condition below 80 costs a quarter of a
@@ -457,7 +464,9 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   shifts in windows.
 - Potential shows as a range only for your own club's players under 24
   (the assistant knows them; scouting levels are phase 5): from the
-  rating to the hidden potential ± 4, whole numbers.
+  rating to the hidden potential ± 4, whole numbers. (Widened by
+  DESIGN.md v0.7 § Transfers: the director's cards carry rating and
+  potential ranges for any player he recommends.)
 - "Talk terms" on a player's profile queues the same contract decision
   an expiring deal raises; the assistant's demand is his wage demand.
 - Tap-to-swap on the tactics screen exchanges two players' places (a
@@ -493,3 +502,137 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   job instead of nine (AI_REST_MONTHS_AFTER_EXIT). Every other market
   rule is untouched.
 - The foreign-title trophy points went with the leagues.
+
+## Decisions are bets (DESIGN v0.7)
+
+- One unit per decision kind. A kind's dice all move the same thing so
+  bold and cautious can be compared: the press and the fallout move the
+  squad's morale (the club's number and every player in it, so the match
+  feels it), a new deal or an expiring contract the player's, the board's
+  warning and the interview promise the spell's credit, an approach the
+  credit where you end up (declining, at this club; accepting, the new
+  board's welcome on the new spell), the month out of work, a renewal
+  and mutual consent the manager's reputation. Means are equal inside a
+  kind by construction (BETS in tunables.ts), so the population test
+  checks the implementation rolls as designed, not whether the designer
+  balanced the numbers.
+- Fixed trades stay outside the dice. A promise to the board still buys
+  credit now for a target a place harder (BOARD_PROMISE); selling the
+  player in a fallout still moves ownership and strength; a refused
+  player still loses the fixed morale and counts as a fallout; declining
+  an approach still earns loyalty. The card's detail names the trade;
+  the roll is on top of it, and only the roll is in the fairness lines.
+- "Within 10%" is read in units of the bold option's own spread, since
+  most cautious means are zero. The line tests the gap net of sampling
+  noise (two standard errors of the difference, BET_GAP_SE_ALLOWANCE):
+  a kind the AI rolls 150 times a run cannot resolve a 10% gap
+  otherwise. The observed gap is reported beside it. Kinds under
+  BET_MIN_ROLLS on either side are reported and not measured; every
+  kind must still show BET_PRESENT_ROLLS on both sides.
+- The AI rolls every kind so the lines can be measured: it answers the
+  press (bold half the time, on morale, mean zero) and the board's
+  warning (AI_BOARD_ANSWER_WEIGHTS; a promise 5% of the time, since at
+  20% the credit it buys cut sackings by a third), it rolls the promise
+  at hire, the approach both ways, the fallout, mutual consent, the
+  month out of work, a renewal (declining 15% of the time when its
+  reputation band is above the club's; at 30% careers shortened), and
+  its clubs answer their players' requests (a new deal when the wage
+  bill allows, a wants-away sold 30% of the time) and settle expiring
+  contracts against their own rule one time in ten (AI_CONTRACT_GAMBLE_P).
+- The default is the lowest-variance option on every card but two. The
+  month out of work keeps the standing activity as its default: the
+  lowest-variance option is the assistant role, and stepping down by
+  default would be a trap. The window plan's default is Hold (its dice
+  are the window itself, so the options carry words and confidence but
+  no roll). The interview's default is still to turn the job down,
+  which has no variance at all.
+- The substitution and the kid in the eleven are bets whose dice are the
+  match engine. They carry the three words (selectionWords) from the
+  rating gap, the condition and whether it is a debut, and no roll of
+  their own.
+- Population on the day: over seeds 1–3 the bets leave every existing
+  line where main had it (means within the seed-to-seed noise). On seed
+  1 alone, three lines that passed by a hair on main now fail by a hair
+  (never a second job 51.6% against 50%, median career 5.97 against 6,
+  1,000-game careers 17 against 15) and clubs per career stays red as it
+  has been since phase 1; the flip retunes the population through the
+  directors' trading, and the numbers are in the PR.
+
+## Transfers (DESIGN v0.7)
+
+- The director's judgement comes from wealth alone until phase 5 brings a
+  scouting level (DIRECTOR_JUDGEMENT_BASE + DIRECTOR_JUDGEMENT_PER_WEALTH ×
+  wealth, with noise). Old saves get one per club from wealth, no noise.
+- Candidates are real players at other home clubs and in the free-agent
+  pool, plus players "from abroad" generated at the level asked (a share
+  of the cards, DIRECTOR_ABROAD_SHARE); an unsigned candidate from abroad
+  is forgotten on deadline day. The world has no foreign leagues, so
+  abroad is where new quality comes from and where a player sold without
+  a named buyer goes (into the pool, for a club at his level).
+- The estimate's error is normal with sd 3 at judgement 50 (scaled by
+  1.5 − judgement/100); a hit beats the estimate by SIGNING_BEAT_MARGIN
+  (0.5), a flop falls short by SIGNING_SHORT_MARGIN (2), so about 43% hit
+  and 25% flop at judgement 50. "About 40% / about 25%" is met by the
+  margins, not by a skewed error.
+- The fee is value × DIRECTOR_FEE_PREMIUM for a contracted player, half
+  of value for one in his last year, nothing for a free agent; the wage
+  offered is his demand plus SIGNING_WAGE_PREMIUM. There is no haggling
+  (FEATURES: agents, clauses, instalments, haggling rounds ✗).
+- The two rolls: the selling club accepts at BID_CLUB_ACCEPT_BASE moved by
+  the premium over value, halved in January for one of its starters; the
+  player at BID_PLAYER_ACCEPT_BASE, a step per tier up or down, a bonus
+  per 10% on the wage. The answer arrives at the next close.
+- Cards come at the close of the week before each window week except
+  deadline day and the summer's first week (the season closes at that
+  week's close, and the squads change with it), so the summer's first
+  cards are seen in its second week. A bid approved on deadline day is
+  answered at that day's close, inside the window.
+- Deadline day is its own step in the career loop: the turn stops after
+  the deadline week's close whatever the next week holds. On it, every
+  squad is brought back to its tier's size (reserves from the pool and
+  generated backups, the surplus released).
+- Sales: the director proposes one when a bid is in, the wage bill is
+  over WAGE_OVERRUN_FACTOR × budget, or a player's morale is under
+  UNSETTLED_MORALE. A big bid is BIG_BID_SHARE × value; refusing one for
+  an unsettled player costs him REFUSED_BIG_BID_MORALE and counts as a
+  fallout. A player sold who then averages SOLD_SHINES_RATING over
+  SOLD_SHINES_MIN_APPS at his new club within SOLD_SHINES_SEASONS costs the
+  seller SOLD_SHINES_REP once.
+- The pot is the board's normal budget × the promise's multiplier each
+  summer, plus WINTER_BUDGET_SHARE of it for January, plus sales; the
+  abstract "cash" stays as a record. Academy promotions follow the
+  manager's development ability for every club, the human's included: the
+  old window plan (spend / rebuild / youth / sell / hold) is gone, since
+  the director's cards are the plan.
+- Requests: the likelihood is stated in words (sure thing / likely /
+  gamble at REQUEST_WORDS) and the chance is in the state for the
+  interface. Board asks depend on credit over the threshold, the owner's
+  ambition and refusals already this season. A named player is served as
+  a bid at the close (the roll is the deal's own). "Loan out" is a season
+  at a club at his level with a return at the season's end; nothing else
+  about loans exists. The captaincy has no effect in the match yet; it is
+  the armband on the team sheet. Ratings in the search are shown as the
+  director's range around the truth (no noise: the search is a list, the
+  card is his opinion). AI managers make no requests, so requests are not
+  in the fairness lines.
+- Following you: the bond threshold is FOLLOW_BOND_THRESHOLD (10, the
+  loyal threshold); the asking price is value × FOLLOW_ASKING_PREMIUM;
+  the move waits for the next window and negotiates like any other bid,
+  so nothing moves between windows. AI managers take a follower who asks
+  with AI_FOLLOW_P. A follower is known, so nothing is revealed.
+- The flip: club strength is the best XI's mean in the club's formation,
+  refreshed weekly and after every move; a new manager's formation can
+  change it. Anchoring, gravity, the abstract summer ageing, the spend
+  gain and the turnover churn are gone; anchoring remains only at genesis
+  (and for European opponents generated for a tie). Generated players —
+  reserves, academy graduates, candidates from abroad — are pegged to the
+  wealth level (0.85 × wealth), not to the squad's current strength:
+  pegged to strength, growth with minutes ratcheted every squad upward
+  (tier 5 reached 57 in 49 seasons) and the tiers collapsed into one
+  another. AI directors aim at the level plus AI_TRADE_AMBITION ×
+  (wealth/100)²: without the ambition term the top tier sat at 68 ± 9 and
+  home clubs won the European Cup in 2% of seasons. A club above its aim
+  by AI_TRADE_HOLD_ABOVE buys nothing; one over its wage budget sells its
+  highest-paid at each close. The star-sale shock and a fallout's sale
+  now sell the player for real. The numbers before and after are in the
+  PR.

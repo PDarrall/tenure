@@ -14,6 +14,7 @@ import type { Background, Honour, ManagerTag, Nationality, Spell, World } from '
 import { human } from './decisions.js'
 import { madePlayers, type MadePlayerSummary } from '../players/made.js'
 import { firstOffer } from '../market/agent.js'
+import { rollOutcome } from './bets.js'
 
 export interface CareerOptions {
   name: string
@@ -41,6 +42,9 @@ export function createCareer(seed: number, options: CareerOptions): World {
     contractChoices: {},
     watched: null,
     agentWithdrawn: [],
+    targetProfile: null,
+    shortlist: [],
+    declinedPlayers: [],
   }
   world.logPolicy = 'career'
   emit(world, 'career.started', { managerId: player.id, name: player.name, background: player.background, age: player.age, reputation: player.reputation, seed })
@@ -73,6 +77,38 @@ export interface CareerSummary {
   seasonsManaged: number
   /** Players made, ordered by points under the manager, with what became of each. */
   playersMade: MadePlayerSummary[]
+  /** The gambles (DESIGN.md "Decisions are bets"): bold options taken, how many paid, and the net of every roll by unit. */
+  gambles: Gambles
+}
+
+export interface Gambles {
+  taken: number
+  paid: number
+  cost: number
+  net: { credit: number; reputation: number; morale: number }
+  /** The last few rolls, newest first, for the career page. */
+  recent: { week: number; kind: string; label: string; unit: string; effect: number; bold: boolean }[]
+}
+
+/** Every roll of the human's dice, from the log. */
+export function gamblesFromLog(world: World, managerId: number): Gambles {
+  const out: Gambles = { taken: 0, paid: 0, cost: 0, net: { credit: 0, reputation: 0, morale: 0 }, recent: [] }
+  for (const e of world.log) {
+    if (e.type !== 'decision.rolled' || e.payload['managerId'] !== managerId) continue
+    const unit = e.payload['unit'] as keyof Gambles['net']
+    const effect = e.payload['effect'] as number
+    const bold = e.payload['bold'] === true
+    out.net[unit] = Math.round((out.net[unit] + effect) * 10) / 10
+    if (bold) {
+      out.taken++
+      const outcome = rollOutcome(effect, unit)
+      if (outcome === 'paid') out.paid++
+      else if (outcome === 'cost') out.cost++
+    }
+    out.recent.unshift({ week: e.week, kind: String(e.payload['kind']), label: String(e.payload['label'] ?? e.payload['key']), unit, effect, bold })
+    if (out.recent.length > T.CAREER_RECENT_ROLLS) out.recent.pop()
+  }
+  return out
 }
 
 function postLabel(world: World, spell: Spell): { club: string; where: string } {
@@ -116,5 +152,6 @@ export function careerSummary(world: World): CareerSummary {
     tags: player.tags,
     seasonsManaged: Math.round(spells.reduce((s, sp) => s + sp.seasons, 0) * 10) / 10,
     playersMade: madePlayers(world, player.id),
+    gambles: gamblesFromLog(world, player.id),
   }
 }

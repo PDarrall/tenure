@@ -156,6 +156,14 @@ export interface Player {
   lastClubId?: ClubId
   /** Came through the academy of the club that promoted him. */
   academy: boolean
+  /** The director's estimate against the truth while it reveals (DESIGN.md "Every signing is a bet"); absent for anyone not bought through a card. */
+  scouted?: Scouted | null
+  /** Who sold him last, until the shine check settles. */
+  soldBy?: SoldBy | null
+  /** A candidate from abroad, generated for a card; forgotten if nobody signs him by the deadline. */
+  abroad?: boolean
+  /** Out on loan for the season, if so. */
+  loan?: Loan | null
   /** Has played a first-team match. */
   debuted: boolean
   retired: boolean
@@ -235,6 +243,104 @@ export interface Club {
   lastRelegatedSeason: number | null
   /** Strength banked from academy promotions, released next summer. */
   pendingYouthGain: number
+  /** The director of football (DESIGN.md "Transfers"): runs the market inside the budgets; the manager decides. */
+  director: Director
+  /** £m left to spend this season: the board's budget for the summer, topped up for January, plus sales. */
+  transferPot: number
+  /** The first XI when the window opened, for the turnover at its close. */
+  xiAtWindowOpen?: PlayerId[]
+  /** Bids the director has placed this window (AI clubs trade to a quota). */
+  windowBids?: number
+}
+
+/** One per club. His judgement scales how far his estimates sit from the truth. */
+export interface Director {
+  name: string
+  /** 0–100, from the club's scouting level and wealth. */
+  judgement: number
+}
+
+/**
+ * What the director said about a signing when he was bought, against the
+ * truth that reveals over his first matches (DESIGN.md "Every signing is a bet").
+ */
+export interface Scouted {
+  /** The director's point estimate of rating and potential at signing. */
+  estimate: number
+  potentialEstimate: number
+  /** Half the width of the range on the card, from the director's judgement. */
+  halfWidth: number
+  /** Matches seen since signing; the truth is fully out at SIGNING_REVEAL_MATCHES. */
+  matchesSeen: number
+  revealed: boolean
+  fee: number
+  fromClubId: ClubId
+  /** Who signed him (the manager the hit or flop lands on). */
+  managerId: ManagerId | null
+  week: number
+}
+
+/** A player sold: who let him go, so a player who shines elsewhere costs the seller. */
+export interface SoldBy {
+  managerId: ManagerId
+  clubId: ClubId
+  season: number
+  fee: number
+  /** Whether the reputation cost has already been paid. */
+  settled: boolean
+}
+
+/** A bid the director has made: it negotiates itself at the next close (one roll on the club, one on the player). */
+export interface Bid {
+  id: number
+  clubId: ClubId
+  playerId: PlayerId
+  fee: number
+  /** £k a week offered. */
+  wage: number
+  years: number
+  week: number
+  /** The manager who approved it (the signing is theirs). */
+  managerId: ManagerId | null
+  /** Why the director proposed him; kept for the news. */
+  reason: SigningReason
+  /** A player following his manager to a new club (DESIGN.md "Following you"): no estimate to reveal, the old club's asking price. */
+  follow?: boolean
+}
+
+export type SigningReason = 'need' | 'request' | 'bargain'
+
+/** What the manager asked the director for: shapes next week's cards. */
+export interface TargetProfile {
+  position?: Position
+  maxAge?: number
+  minRating?: number
+}
+
+/** A request (DESIGN.md "Requests"): to the board, the director or a player; each a bet with a stated likelihood. */
+export type RequestAsk = 'budget' | 'wages' | 'backing' | 'profile' | 'named' | 'sell' | 'loan' | 'contract' | 'captaincy' | 'playingTime'
+
+export interface Request {
+  to: 'board' | 'director' | 'player'
+  ask: RequestAsk
+  playerId?: PlayerId
+  profile?: TargetProfile
+}
+
+/** A promise of playing time: this many starts by this week, or it is a fallout. */
+export interface PlayingPromise {
+  playerId: PlayerId
+  week: number
+  byWeek: number
+  startsAtPromise: number
+  startsNeeded: number
+}
+
+/** A player loaned out for the season (DESIGN.md "Requests": loan out); he returns at the season's end. */
+export interface Loan {
+  fromClubId: ClubId
+  toClubId: ClubId
+  season: number
 }
 
 /** A foreign side generated for one European tie (DESIGN.md "World"): a name, a strength drawn by round, a squad while the tie is on. */
@@ -279,6 +385,9 @@ export interface World {
   /** Every player, by id − 1; a slot is null once a player has gone and nobody keeps his record. */
   players: (Player | null)[]
   nextPlayerId: PlayerId
+  /** Bids waiting for the next close, the human's and the AI's. */
+  bids: Bid[]
+  nextBidId: number
   /** The human player, if this world is a career rather than a simulation. */
   human: HumanState | null
   /** 'career' keeps only events that concern the human plus season-level news. */
@@ -472,6 +581,8 @@ export interface SpellSeasonTally {
   boardRows: number
   /** £m earned in this season of the spell. */
   earned: number
+  /** Board requests refused this season (DESIGN.md "Requests"); the third is a board row. Absent in older saves. */
+  refusals?: number
 }
 
 export interface Spell {
@@ -566,11 +677,41 @@ export type DecisionKind =
   | 'playerContract'
   | 'newDeal'
   | 'wantsAway'
+  | 'signing'
+  | 'sale'
+  | 'follow'
+
+/** How sure the adviser is of an option, in words (DESIGN.md "Decisions are bets"). */
+export type Confidence = 'sure thing' | 'likely' | 'gamble'
+
+/** What an option's roll moves: the spell's credit, the manager's reputation, or morale (a player's or the squad's). */
+export type BetUnit = 'credit' | 'reputation' | 'morale'
+
+/**
+ * The hidden dice behind an option: the roll is mean + sd × z, in `unit`.
+ * The words on the card (likely, downside, confidence) are drawn from these.
+ */
+export interface Bet {
+  mean: number
+  sd: number
+  unit: BetUnit
+}
 
 export interface DecisionOption {
   key: string
   label: string
   detail?: string
+  /** What it will likely do, in words. */
+  likely?: string
+  /** What could go wrong, in words. */
+  downside?: string
+  confidence?: Confidence
+  /** The dice; absent when the option has no roll of its own (it is settled by another system, or is a plain refusal). */
+  bet?: Bet
+  /** The cautious option: lowest variance, what Continue applies. */
+  isDefault?: boolean
+  /** A bold option: higher variance than the default. Counted for the fairness target. */
+  bold?: boolean
 }
 
 export interface Decision {
@@ -581,7 +722,7 @@ export interface Decision {
   /** Week from which the default applies if unanswered. */
   deadlineWeek: number
   /** Who is asking: board, agent, press, staff. */
-  from: 'board' | 'agent' | 'press' | 'staff'
+  from: 'board' | 'agent' | 'press' | 'staff' | 'director'
   title: string
   body: string
   options: DecisionOption[]
@@ -618,6 +759,14 @@ export interface HumanState {
   watched: WatchedWeek | null
   /** Vacancies the human withdrew from: the agent never puts them forward there again. */
   agentWithdrawn: VacancyId[]
+  /** What the manager asked the director for; null when nothing is asked. */
+  targetProfile?: TargetProfile | null
+  /** The manager's shortlist: players to name to the director. */
+  shortlist?: PlayerId[]
+  /** Candidates declined this window, so the director does not bring the same name back. */
+  declinedPlayers?: PlayerId[]
+  /** Promises of playing time still to be kept. */
+  promises?: PlayingPromise[]
 }
 
 /** Enough of a fixture to find it again in world.fixtures. */
@@ -654,6 +803,10 @@ export interface HumanInputs {
   withdraw?: VacancyId[]
   /** Decision id → chosen option key. */
   answers?: Record<number, string>
+  /** Asks of the board, the director and players (DESIGN.md "Requests"), each resolved with a roll this turn. */
+  requests?: Request[]
+  shortlistAdd?: PlayerId[]
+  shortlistRemove?: PlayerId[]
   activity?: UnemployedActivity
   resign?: boolean
   retire?: boolean

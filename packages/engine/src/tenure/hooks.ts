@@ -17,8 +17,8 @@ import { weeklySackingCheck } from './sacking.js'
 import { maybeFallout, monthlyShocks } from './shocks.js'
 import { bumpReputation, checkExpiry, monthlyMutualConsent, monthlyResignation } from './exits.js'
 import { activeSpells } from './spell.js'
-import { hasPending, queueBoard, queuePress, queueWindow } from '../play/decisions.js'
-import { normalBudget } from '../season/squad.js'
+import { answerBoard, answerPress, hasPending, queueBoard, queuePress } from '../play/decisions.js'
+import { revealSignings } from '../market/director.js'
 import { matchTemplateKey } from '../text/render.js'
 
 function creditForSide(world: World, rng: Rng, played: PlayedFixture, home: boolean): number | null {
@@ -45,14 +45,27 @@ function creditForSide(world: World, rng: Rng, played: PlayedFixture, home: bool
   return applied
 }
 
-/** Credit for every match of the week, written onto the match events; the press may want a word with the human. */
+/** The AI's answer to the press: bold (confident or defiant) with AI_PRESS_BOLD_P, else measured. */
+function aiPress(world: World, rng: Rng, manager: Manager | undefined): void {
+  if (!manager || manager.isHuman) return
+  const spell = spellOf(world, manager)
+  if (!spell || spell.post.kind !== 'home') return
+  if (!rng.chance(T.PRESS_QUESTION_P)) return
+  const key = rng.chance(T.AI_PRESS_BOLD_P) ? (rng.chance(0.5) ? 'confident' : 'defiant') : 'measured'
+  answerPress(world, rng, spell, key)
+}
+
+/** Credit for every match of the week, written onto the match events; the press want a word with every manager, the human by a card. */
 export function afterMatches(world: World, rng: Rng, played: PlayedFixture[]): void {
   for (const p of played) {
     const homeDelta = creditForSide(world, rng, p, true)
     const awayDelta = creditForSide(world, rng, p, false)
     p.event.payload['homeCredit'] = homeDelta
     p.event.payload['awayCredit'] = awayDelta
+    aiPress(world, rng, p.homeManager)
+    aiPress(world, rng, p.awayManager)
   }
+  revealSignings(world, played.flatMap((p) => [p.fixture.homeId, p.fixture.awayId]))
   const state = world.human
   if (!state) return
   const player = managerById(world, state.managerId)
@@ -78,7 +91,7 @@ export function weekly(world: World, rng: Rng): void {
     const pay = spell.contract.salary / T.SEASON_WEEKS
     spell.season.earned += pay
     manager.history.earnings += pay
-    if (checkExpiry(world, spell)) continue
+    if (checkExpiry(world, rng, spell)) continue
     weeklySackingCheck(world, rng, spell)
   }
 }
@@ -108,6 +121,10 @@ export function monthly(world: World, rng: Rng): void {
       const mood = boardMood(spell)
       emit(world, 'board.note', { spellId: spell.id, managerId: spell.managerId, mood, position, expectation: spell.expectation, season: world.season })
       if (spell.credit < spell.threshold + T.BOARD_WARN_MARGIN && !hasPending(world, 'board')) queueBoard(world, spell)
+    } else if (spell.credit < spell.threshold + T.BOARD_WARN_MARGIN) {
+      // The AI answers the same warning with the same dice.
+      const keys = Object.keys(T.AI_BOARD_ANSWER_WEIGHTS) as (keyof typeof T.AI_BOARD_ANSWER_WEIGHTS)[]
+      answerBoard(world, rng, spell, rng.weighted(keys, keys.map((k) => T.AI_BOARD_ANSWER_WEIGHTS[k])))
     }
   }
 }
@@ -120,21 +137,6 @@ export function boardMood(spell: Spell): 'secure' | 'settled' | 'uneasy' | 'unde
   if (gap < T.BOARD_WARN_MARGIN) return 'uneasy'
   if (gap < 3 * T.BOARD_WARN_MARGIN) return 'settled'
   return 'secure'
-}
-
-/** Ask the human for a window plan the week before the window runs. */
-export function queueWindowDecision(world: World, summer: boolean): void {
-  const state = world.human
-  if (!state) return
-  const player = managerById(world, state.managerId)
-  const spell = spellOf(world, player)
-  if (!spell || spell.post.kind !== 'home') return
-  const club = homeClub(world, spell.post.clubId)
-  if (!club) return
-  const kind = summer ? 'summerWindow' : 'winterWindow'
-  if (hasPending(world, kind)) return
-  const pot = summer ? round1(normalBudget(club) * spell.budgetMultiplier) : round1(normalBudget(club) * T.WINTER_BUDGET_SHARE)
-  queueWindow(world, summer, pot)
 }
 
 function trophyWeight(h: Honour): number {
@@ -225,7 +227,7 @@ export function afterWinterWindow(world: World, summaries: WindowSummary[]): voi
   }
 }
 
-/** The budget multiplier the summer window should use for a club. */
+/** The budget multiplier the summer pot takes for a club: the promise its manager made. */
 export function budgetMultiplierFor(world: World, clubId: number): number {
   const club = homeClub(world, clubId)
   if (!club || club.managerId === null) return 1

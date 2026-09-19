@@ -18,7 +18,7 @@ Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · �
 - Growth with minutes for under-24s, visible in the squad screen — ✓
 - Milestone news for your players after you leave — ✓
 - Players made, the fourth score line, with its career-page list — ✓
-- Players who follow you to a new club — 4
+- Players who follow you to a new club — ✓
 - The obituary's three names; the makers' list in the Hall of Fame — 6
 
 ## Tactics
@@ -36,13 +36,17 @@ Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · �
 - Fixtures and results by competition; league table; cups; European competition — ✓
 
 ## Transfers
-- Searchable market, shortlist, scout reports — 4
-- Bids with two rounds of haggling; loans; free agents — 4
-- Contract of wage and years; players accept or refuse — 4
-- Listing players; unprompted bids for your best players — 4
-- Two windows, summer and January — 4
-- Transfer and wage budgets from the board — ◐ (abstract budget ✓; real budgets 4)
-- Agents, clauses, instalments, sell-on fees, work permits — ✗
+- Two windows, summer and January; free agents any time — ✓
+- A director of football who recommends signings and sales; the manager decides — ✓
+- Every signing a bet: the director's estimate against the truth, revealed over five matches — ✓
+- Requests to the board, the director and players, each with a stated likelihood — ✓
+- A shortlist and search, used to name targets for the director — ✓
+- Transfer and wage budgets from the board — ◐ (the pot by tier and wealth, the wage budget, requests for more ✓; a level upgrade 5)
+- Agents, clauses, instalments, haggling rounds, sell-on fees — ✗
+
+## Decisions
+- Every decision card shows likely, downside and confidence; the dice decide; the default is the cautious option — ✓
+- Gambles recorded in the event log and on the career page — ✓
 
 ## Club
 - Four levels — coaching, scouting, medical, academy — the manager can ask the board to raise — 5

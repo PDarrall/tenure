@@ -218,13 +218,7 @@ export const T = {
   /** League rounds per tier, index 0 = tier 1. DESIGN: 38 or 46. */
   LEAGUE_ROUNDS_BY_TIER: [38, 46, 46, 46, 46] as readonly number[],
 
-  /** Season week of the winter window (played after that week's matches). */
-  WINTER_WINDOW_WEEK: 20,
 
-  /** Season week of the summer window: the second summer week. */
-  get SUMMER_WINDOW_WEEK(): number {
-    return this.MATCH_WEEKS + 1
-  },
 
   /** Season weeks each cup round is played in. Last entry is the final. */
   NATIONAL_CUP_ROUND_WEEKS: [3, 8, 13, 18, 23, 28, 35] as readonly number[],
@@ -591,7 +585,8 @@ export const T = {
 
   /** Anchoring tolerance the tests allow after rounding to one decimal; below the minimum strength the rating floor gets in the way. */
   ANCHOR_TOLERANCE: 0.15,
-  ANCHOR_MIN_STRENGTH: 10,
+  /** Genesis squads under this strength sit on the rating floor and cannot be anchored exactly; the anchoring test skips them. */
+  ANCHOR_MIN_STRENGTH: 12,
   /** Anchoring passes, and the residue below which it stops. */
   ANCHOR_PASSES: 4,
   ANCHOR_RESIDUE: 0.02,
@@ -618,59 +613,31 @@ export const T = {
   // and blame, and the long-tenure targets through strength maintenance.
   // ---------------------------------------------------------------------------
 
-  /** Peak age band. Squads older than the top lose strength each summer. */
-  PEAK_AGE: [25, 29] as readonly [number, number],
 
-  /** Strength lost per summer by a squad past its peak, uniform. DESIGN: 3–5. */
-  AGEING_LOSS: [3, 5] as readonly [number, number],
 
-  /** Strength gained per summer by a squad younger than the peak band. */
-  YOUNG_SQUAD_GROWTH: 1,
 
-  /** Mean age rises by this each summer before turnover. */
-  AGE_DRIFT: 1,
 
-  /** Mean age of incoming signings; turnover pulls the squad toward it. */
-  SIGNING_AGE: 26,
 
   /** Mean age of promoted academy players. */
   ACADEMY_AGE: 19,
 
-  /** Share of the gap to the gravity target closed each summer. Serves: 2–4 long top-tier tenures (a flat top produced none). */
-  GRAVITY_RATE: 0.5,
 
   /** Transfer budget in £m per season = coefficient × wealth². Serves: earnings, big-spender ranks. */
   TRANSFER_BUDGET_PER_WEALTH_SQ: 0.012,
 
-  /** Spend returns: gain = SPEND_GAIN_MAX × r / (r + 1), r = spend / normal budget. Diminishing. */
-  SPEND_GAIN_MAX: 6,
 
-  /** Dealing ability multiplies spend gain: 1 + this × (dealing − 50) / 50. */
-  DEALING_EFFECT: 0.3,
 
-  /** AI spends this share of its summer budget. */
-  AI_SPEND_FRACTION: 1,
   /** The winter pot is this share of the normal budget. DESIGN: two windows. */
   WINTER_BUDGET_SHARE: 0.3,
 
-  /** First-XI turnover each summer = base + slope × (spend / normal budget), capped. */
-  TURNOVER_BASE: 0.15,
-  TURNOVER_PER_BUDGET: 0.25,
-  TURNOVER_MAX: 0.7,
 
   /** Academy players promoted into the XI = floor((development − offset) / step), clamped 0–max. */
   YOUTH_DEVELOPMENT_OFFSET: 25,
   YOUTH_DEVELOPMENT_STEP: 12,
   YOUTH_MAX_PER_SUMMER: 5,
 
-  /** Strength gained next season per academy player in the XI (slow, cheap). */
-  YOUTH_GAIN_PER_PLAYER: 0.6,
 
-  /** Strength lost now per academy player replacing a senior (they are raw). */
-  YOUTH_COST_PER_PLAYER: 0.4,
 
-  /** Age needed for a youth-promoted player to count as a signing for ownership. */
-  ACADEMY_COUNTS_AS_SIGNING: true,
 
   // ---------------------------------------------------------------------------
   // Prestige and wealth drift (DESIGN.md: prestige "slow-moving").
@@ -785,14 +752,10 @@ export const T = {
   CRISIS_EXPECTATION_EASE: 3,
   /** Forced star sale: only at low-wealth clubs. */
   STAR_SALE_P: 0.01,
-  STAR_SALE_STRENGTH: -5,
   STAR_SALE_EXPECTATION_EASE: 1,
   /** Dressing-room fallout rolls once per losing run of this length. */
   FALLOUT_TRIGGER_DEFEATS: 4,
   FALLOUT_P: 0.25,
-  /** Back down: squad morale falls. Sell: ownership up, strength down, "difficult" progress. */
-  FALLOUT_MORALE_LOSS: 10,
-  FALLOUT_STRENGTH_LOSS: 3,
   FALLOUT_OWNERSHIP_GAIN: 1 / 11,
   /** AI sells the player when its motivation ability is below this. */
   AI_FALLOUT_SELL_BELOW_MOTIVATION: 50,
@@ -911,8 +874,7 @@ export const T = {
   /** A manager must have been in post this many weeks before a bigger club calls. Serves: a handful past 1,000 games. */
   POACH_MIN_WEEKS: 46,
   AI_ACCEPT_APPROACH_P: 0.5,
-  /** Declining an approach. DESIGN: credit +3, loyalty progress. */
-  DECLINE_APPROACH_CREDIT: 3,
+  /** Declining an approach. DESIGN: credit +3 (the mean of BETS.approach.decline), loyalty progress. */
   LOYALTY_PER_DECLINE: 1,
   REP_POACHED: 2,
   /** The new club pays the buy-out if it is under this share of its wage budget; otherwise the manager must walk out. */
@@ -996,23 +958,265 @@ export const T = {
   HUMAN_CONTRACT_YEARS_OPTIONS: [1, 2, 3, 4] as readonly number[],
   /** Chance a match week brings a press question. Serves: most weeks zero or one decision. */
   PRESS_QUESTION_P: 0.3,
-  /** Press responses: confident lifts morale, defiant buys a little credit at morale's expense. */
-  PRESS_RESPONSE_EFFECTS: {
-    confident: { morale: 2, credit: 0 },
-    measured: { morale: 0, credit: 0 },
-    defiant: { morale: -2, credit: 1 },
-  } as const,
   /** The board writes when credit is within this of the threshold. */
   BOARD_WARN_MARGIN: 10,
-  /** Board responses: push back is a coin flip on credit; a promise buys credit and tightens the target. */
-  BOARD_RESPONSE_EFFECTS: {
-    pushBackSwing: 3,
-    promiseCredit: 3,
-    promisePlaces: 1,
+  /** A promise to the board: credit now, a harder target. The trade is fixed; the dice on top are in BETS.board.promise. */
+  BOARD_PROMISE: { credit: 3, places: 1 } as const,
+
+  // ---------------------------------------------------------------------------
+  // Decisions are bets (DESIGN.md "Decisions are bets"). Every option rolls
+  // mean + sd × z on the seeded RNG. Within a kind every option has the same
+  // mean, so a gamble is fair and not free. Serves: decisionFairnessGap and
+  // decisionVarianceRatio.
+  // ---------------------------------------------------------------------------
+
+  /** z is clamped to ±this: no roll is a career in itself. */
+  BET_ROLL_CLAMP: 2.5,
+  /** Confidence in words by sd, per unit: up to the first is a sure thing, up to the second likely, beyond a gamble. */
+  BET_CONFIDENCE_BANDS: {
+    credit: [1, 2.5],
+    reputation: [0.4, 1],
+    morale: [1.5, 3.5],
+  } as Record<'credit' | 'reputation' | 'morale', readonly [number, number]>,
+  /**
+   * The dice behind every option, by decision kind and key. Means are equal
+   * inside a kind; the cautious option has the lowest sd and is the default.
+   * Credit moves the spell's credit, reputation the manager's, morale the
+   * player's or the squad's.
+   */
+  BETS: {
+    /** The press: what the room makes of the answer. */
+    press: { unit: 'morale', options: { measured: { mean: 0, sd: 1 }, confident: { mean: 0, sd: 3 }, defiant: { mean: 0, sd: 3 } } },
+    /** The board's warning: how the answer lands with them. A promise also trades credit now for a harder target (BOARD_PROMISE). */
+    board: { unit: 'credit', options: { accept: { mean: 0, sd: 0.5 }, pushBack: { mean: 0, sd: 3 }, promise: { mean: 0, sd: 2 } } },
+    /** A fallout: the dressing room after you back down or sell him. Selling also moves ownership and strength. */
+    fallout: { unit: 'morale', options: { 'back-down': { mean: -5, sd: 2 }, sell: { mean: -5, sd: 6 } } },
+    /** An approach: declining earns credit here; accepting rolls the new board's welcome onto the new spell's credit. */
+    approach: { unit: 'credit', options: { decline: { mean: 3, sd: 0.5 }, accept: { mean: 3, sd: 4 } } },
+    /** The interview promise: how the board read it, rolled onto credit at hire. */
+    offer: { unit: 'credit', options: { 'top-half': { mean: 0, sd: 0.5 }, promotion: { mean: 0, sd: 2.5 }, stability: { mean: 0, sd: 1.5 } } },
+    /** A month out of work: waiting keeps your name in play or out of it; the slide itself is UNEMPLOYED_DECAY. */
+    activity: { unit: 'reputation', options: { wait: { mean: 0, sd: 0.8 }, punditry: { mean: 0, sd: 0.3 }, assistant: { mean: 0, sd: 0.15 } } },
+    /** A renewal: the market's read of signing on or letting it run. */
+    renewal: { unit: 'reputation', options: { accept: { mean: 0, sd: 0.3 }, decline: { mean: 0, sd: 1.5 } } },
+    /** Mutual consent offered: leaving quietly or fighting on. */
+    mutualConsent: { unit: 'reputation', options: { accept: { mean: 0, sd: 0.3 }, decline: { mean: 0, sd: 1.5 } } },
+    /** A player asks for a new deal: his morale after the answer, on top of the fixed gain or loss. */
+    newDeal: { unit: 'morale', options: { accept: { mean: 0, sd: 1 }, refuse: { mean: 0, sd: 4 } } },
+    /** A player wants away: the squad's morale after he stays or goes. */
+    wantsAway: { unit: 'morale', options: { keep: { mean: 0, sd: 1 }, sell: { mean: 0, sd: 4 } } },
+    /** An expiring contract: the assistant's advice is the safe path; the other is the gamble (his morale renewed, the squad's on a release). */
+    playerContract: { unit: 'morale', options: { safe: { mean: 0, sd: 1 }, risky: { mean: 0, sd: 3 } } },
   } as const,
-  /** Selling a senior player: strength lost and £m raised (scaled by the club's normal budget). */
-  SELL_STRENGTH_PER_PLAYER: 3,
-  SELL_CASH_SHARE_OF_BUDGET: 0.4,
+  /**
+   * AI managers answer the board's warning with these weights, so the
+   * population rolls the board kind on both sides. A promise props credit
+   * (+BOARD_PROMISE.credit a time): at 0.2 it cut sackings a third and
+   * pushed neverSecondJobShare and thousandGameCount out of band; at 0.05
+   * the population matches main over seeds 1–3. Serves: sackings per season,
+   * neverSecondJobShare, thousandGameCount.
+   */
+  AI_BOARD_ANSWER_WEIGHTS: { accept: 0.7, pushBack: 0.25, promise: 0.05 } as const,
+  /** AI managers give the press a bold answer (confident or defiant) this often; the roll is on morale, mean zero. */
+  AI_PRESS_BOLD_P: 0.5,
+  /** AI managers decline a renewal with this chance when their reputation band is above the club's tier (they think they can do better). At 0.3 careers shortened (neverSecondJobShare +0.02, careerMedianSeasons −0.3 over seeds 1–3); 0.15 leaves them where main had them. Serves: the renewal kind rolled on both sides. */
+  AI_DECLINE_RENEWAL_P: 0.15,
+  /** AI clubs answer their players' requests too: a new deal is given if the wage bill allows, a wants-away is sold with this chance. Serves: newDeal and wantsAway rolls in the population. */
+  AI_SELL_WANTS_AWAY_P: 0.3,
+  /** AI clubs settle an expiring contract against their own rule with this chance, so the population rolls the risky side too. */
+  AI_CONTRACT_GAMBLE_P: 0.1,
+  /** Weeks a wage is paid in a year, for the wage bill against the wage budget (£k a week × this / 1000 = £m a year). */
+  WAGE_WEEKS_PER_YEAR: 52,
+  /** Rolls a kind needs on both sides before it counts toward the fairness lines: under this the 10% gap is inside the sampling noise. */
+  BET_MIN_ROLLS: 50,
+  /** Rolls a kind must show on each side over 500 careers to prove the AI rolls it at all (rare kinds are reported, not measured). */
+  BET_PRESENT_ROLLS: 20,
+  /** The fairness gap is tested net of sampling noise: this many standard errors of the difference are allowed before a gap counts. A kind rolled 150 times cannot resolve a 10% gap otherwise. */
+  BET_GAP_SE_ALLOWANCE: 2,
+  /** Rolls the career page keeps in view. */
+  CAREER_RECENT_ROLLS: 8,
+  /** The team sheet's words: a player under this condition is a gamble; a rating gap under this is "likely", beyond it a gamble. */
+  SELECTION_WORDS_TIRED_BELOW: 60,
+  SELECTION_WORDS_GAP: 5,
+
+  // ---------------------------------------------------------------------------
+  // Transfers (DESIGN.md "Transfers"): two windows, the director of football,
+  // every signing a bet. Serves: signingsBeatShare ≈ 40%, signingsShortShare
+  // ≈ 25%, and the population through the flip.
+  // ---------------------------------------------------------------------------
+
+  /** January: the calendar month, season weeks inclusive; the last is deadline day. */
+  JANUARY_WINDOW_WEEKS: [18, 21] as readonly [number, number],
+  /** Summer: from the last match to the first; deadline day is the last summer week. */
+  get SUMMER_WINDOW_WEEKS(): readonly [number, number] {
+    return [this.MATCH_WEEKS, this.SEASON_WEEKS - 1]
+  },
+  /** The director's judgement: base + per wealth + noise, clamped. Scouting level (phase 5) will add to it. */
+  DIRECTOR_JUDGEMENT_BASE: 35,
+  DIRECTOR_JUDGEMENT_PER_WEALTH: 0.4,
+  DIRECTOR_JUDGEMENT_SD: 8,
+  DIRECTOR_JUDGEMENT_RANGE: [15, 95] as readonly [number, number],
+  /** Cards a week in a window. DESIGN: up to three. */
+  DIRECTOR_CARDS_PER_WEEK: 3,
+  /** The estimate's error: sd = DIRECTOR_ESTIMATE_SD × (DIRECTOR_JUDGEMENT_SCALE_AT_ZERO − judgement / 100). At judgement 50 the sd is 3: 43% beat the estimate by SIGNING_BEAT_MARGIN, 25% fall short by SIGNING_SHORT_MARGIN. */
+  DIRECTOR_ESTIMATE_SD: 3,
+  DIRECTOR_JUDGEMENT_SCALE_AT_ZERO: 1.5,
+  /** The range on the card: this many rating points either side at judgement 50, scaled the same way. */
+  DIRECTOR_RANGE_HALF: 6,
+  /** A recommendation must promise at least this much over the weakest starter, and sit within reach of the squad's level. */
+  DIRECTOR_MIN_GAIN: 1.5,
+  DIRECTOR_REACH_ABOVE: 12,
+  DIRECTOR_REACH_BELOW: 4,
+  /** Candidates: real players at other clubs, free agents, and players from abroad generated at the level asked (this share of the cards). */
+  DIRECTOR_ABROAD_SHARE: 0.4,
+  /** Ages a generated candidate from abroad can have. */
+  ABROAD_AGE_RANGE: [21, 30] as readonly [number, number],
+  /** How many real players the director looks at before ranking. Serves: sim speed. */
+  DIRECTOR_SEARCH_LIMIT: 60,
+  /** The fee: value × premium for a contracted player; a share of it for one in his last year; nothing for a free agent. */
+  DIRECTOR_FEE_PREMIUM: 1.1,
+  EXPIRING_FEE_SHARE: 0.5,
+  /** A bargain is a fee under this share of value. */
+  BARGAIN_FEE_SHARE: 0.8,
+  /** The director's confidence: sure thing when the estimated gain clears this many half-widths of his range, likely above the smaller one. */
+  DIRECTOR_CONFIDENCE_SURE: 1.5,
+  DIRECTOR_CONFIDENCE_LIKELY: 0.5,
+  /** The wage the director offers: the player's demand, up by this share to move. */
+  SIGNING_WAGE_PREMIUM: 0.1,
+  SIGNING_CONTRACT_YEARS: 3,
+  /** The selling club's roll: base at fee = value, moved by the premium; halved in January for a starter. */
+  BID_CLUB_ACCEPT_BASE: 0.65,
+  BID_CLUB_ACCEPT_PER_PREMIUM: 1.0,
+  BID_CLUB_JANUARY_STARTER_MULT: 0.5,
+  BID_CLUB_ACCEPT_ABROAD: 0.8,
+  BID_ACCEPT_RANGE: [0.05, 0.95] as readonly [number, number],
+  /** The player's roll: base, a step per tier up or down, a bonus per +10% wage. */
+  BID_PLAYER_ACCEPT_BASE: 0.75,
+  BID_PLAYER_TIER_STEP: 0.15,
+  BID_PLAYER_WAGE_BONUS_PER_10PCT: 0.05,
+  /** The truth is out after this many matches; a hit beats the estimate by the first margin, a flop falls short by the second. */
+  SIGNING_REVEAL_MATCHES: 5,
+  SIGNING_BEAT_MARGIN: 0.5,
+  SIGNING_SHORT_MARGIN: 2,
+  /** A hit lifts credit and reputation; a flop costs credit (the board question your signings). */
+  SIGNING_HIT_CREDIT: 3,
+  SIGNING_HIT_REP: 0.5,
+  SIGNING_FLOP_CREDIT: -3,
+  /** A player sold who shines elsewhere (this season average over this many apps, within this many seasons) costs the seller reputation. */
+  SOLD_SHINES_RATING: 7.2,
+  SOLD_SHINES_MIN_APPS: 10,
+  SOLD_SHINES_SEASONS: 2,
+  SOLD_SHINES_REP: -1,
+  /** Sales the director proposes: on a bid, when the wage bill is over budget by this factor, or for a player this unsettled. */
+  WAGE_OVERRUN_FACTOR: 1.05,
+  UNSETTLED_MORALE: 35,
+  /** A big bid is this many times the player's value; refusing one for an unsettled player costs his morale and counts as a fallout. */
+  BIG_BID_SHARE: 1.4,
+  REFUSED_BIG_BID_MORALE: -10,
+  /** An AI director sells to a bid at this chance when the fee clears value; the human is asked. */
+  AI_SELL_ON_BID_P: 0.6,
+  /**
+   * AI clubs trade through their directors toward the level their wealth
+   * sets (the flip): a quota of bids per window, more the further below
+   * the level, none when above it. Serves: the population through the flip.
+   */
+  AI_SIGNINGS_SUMMER: 3,
+  AI_SIGNINGS_JANUARY: 1,
+  /** One more bid per this much of the gap below the level, up to the cap. */
+  AI_GAP_PER_SIGNING: 3,
+  AI_SIGNINGS_MAX: 6,
+  /** The director aims this far above the wealth level (0: the level itself; generation is pegged to it too). */
+  AI_TRADE_TARGET_BIAS: 0,
+  /**
+   * Ambition: the aim rises with wealth squared (× this at wealth 100), the
+   * way the old spend gains compounded for the rich. Without it the top
+   * tier sat at 68 ± 9 and home clubs won the European Cup in 2% of
+   * seasons (target 10–60%). Serves: europeanTitlesHomeShare, topTierLongTenures.
+   */
+  AI_TRADE_AMBITION: 12,
+  /** An AI club over its wage budget sells up to this many of its highest-paid at each window close. */
+  AI_WAGE_SALES_PER_CLOSE: 2,
+  /** A club this far above its level stops buying. */
+  AI_TRADE_HOLD_ABOVE: 3,
+  /** An AI director bids only for an estimated gain of at least this over the weakest starter. */
+  AI_APPROVE_MIN_GAIN: 1,
+  /** Share of an AI director's attempts that go abroad (generated at the level asked); the rest at home clubs and the pool. */
+  AI_ABROAD_SHARE: 0.5,
+  /** An AI club over its wage budget sells its highest-paid reserve at each window close. */
+  AI_SELL_ON_WAGES: true,
+  /** A club whose squad is at the tier's size plus this releases its lowest-value reserve to make room for a signing. */
+  SIGNING_MAKES_ROOM: true,
+  SIGNING_ROOM_OVER: 2,
+  /** The director's ranking: the estimate less this many points per whole pot the fee costs. */
+  DIRECTOR_FEE_WEIGHT: 4,
+  /** A candidate from abroad is generated this far above the floor the slot needs. */
+  DIRECTOR_ABROAD_GAIN: 2,
+  /** The club id a candidate from abroad carries until he signs or is forgotten. */
+  ABROAD_CLUB_ID: -1,
+
+  // ---------------------------------------------------------------------------
+  // Following you (DESIGN.md "Your players"). Serves: followMovesPerJobChange
+  // ≈ 0.5, never more than FOLLOW_MAX per move.
+  // ---------------------------------------------------------------------------
+
+  /** A tagged player asks to follow when his bond is at least this. */
+  FOLLOW_BOND_THRESHOLD: 10,
+  /** At most this many per move. DESIGN: two. */
+  FOLLOW_MAX: 2,
+  /** The old club's asking price: value × this. */
+  FOLLOW_ASKING_PREMIUM: 1.2,
+  /** An AI manager takes a follower who asks with this chance (the human is asked by a card). At 0.6, seed 1 gave 0.33 moves per job change (a third of asks complete after the two rolls); 0.85 aims at the 0.5 target. */
+  AI_FOLLOW_P: 0.85,
+
+  // ---------------------------------------------------------------------------
+  // Requests (DESIGN.md "Requests"): each a bet with a stated likelihood.
+  // Serves: the player's asks cost something and pay something.
+  // ---------------------------------------------------------------------------
+
+  /** The board: base chance, moved by credit over the threshold (per 30 credit, clamped ±1) and each refusal already this season. */
+  REQUEST_BOARD_BASE_P: 0.4,
+  REQUEST_BOARD_CREDIT_SWING: 0.35,
+  REQUEST_BOARD_CREDIT_SCALE: 30,
+  REQUEST_BOARD_PER_REFUSAL: -0.1,
+  REQUEST_BACKING_BONUS_P: 0.1,
+  REQUEST_P_RANGE: [0.05, 0.9] as readonly [number, number],
+  /** What a grant is worth: this share of the normal budget on the pot, this share of the wage budget, this much credit for backing. */
+  REQUEST_BUDGET_SHARE: 0.25,
+  REQUEST_WAGE_SHARE: 0.15,
+  REQUEST_BACKING_CREDIT: 3,
+  /** Granted raises expectation by this many places; refused costs this much credit; the third refusal in a season is a board row (difficult progress). */
+  REQUEST_GRANT_PLACES: 1,
+  REQUEST_REFUSAL_CREDIT: -2,
+  REQUEST_THIRD_REFUSAL: 3,
+  /** The director finds a buyer or a loan club at these chances in a window. */
+  REQUEST_SELL_P: 0.6,
+  REQUEST_LOAN_P: 0.55,
+  /** A buyer pays value × this. */
+  REQUEST_SELL_PREMIUM: 1.0,
+  /** Players: a contract talk from morale and bond; the captaincy from standing (top of the squad, a leader, seniority); playing time from morale. */
+  REQUEST_CONTRACT_BASE_P: 0.5,
+  REQUEST_CONTRACT_MORALE_SWING: 0.4,
+  REQUEST_CONTRACT_BOND_BONUS: 0.2,
+  REQUEST_CAPTAIN_BASE_P: 0.45,
+  REQUEST_CAPTAIN_TOP_RANK: 5,
+  REQUEST_CAPTAIN_TOP_BONUS: 0.3,
+  REQUEST_CAPTAIN_LEADER_BONUS: 0.2,
+  REQUEST_CAPTAIN_SENIOR_AGE: 27,
+  REQUEST_CAPTAIN_SENIOR_BONUS: 0.1,
+  REQUEST_PLAYING_BASE_P: 0.6,
+  REQUEST_PLAYING_MORALE_SWING: 0.3,
+  /** Morale on a player's yes or no. */
+  REQUEST_PLAYER_GRANT_MORALE: 6,
+  REQUEST_PLAYER_REFUSE_MORALE: -4,
+  /** A promise of playing time: this many starts within this many weeks, or it is a fallout (morale, bond, the count). */
+  PROMISE_STARTS: 3,
+  PROMISE_WEEKS: 6,
+  PROMISE_BROKEN_MORALE: -15,
+  PROMISE_KEPT_MORALE: 4,
+  /** Likelihood in words: a sure thing from this chance up, likely from the second. */
+  REQUEST_WORDS: [0.7, 0.45] as readonly [number, number],
+  /** Rows a search returns at most. */
+  SEARCH_LIMIT: 40,
 
   // ---------------------------------------------------------------------------
   // The score (DESIGN.md "The score"). Serves: Legacy calibration — a 30-year
@@ -1091,6 +1295,15 @@ export const T = {
     /** The European trophy is hard: home clubs win it in some seasons, and rarely from outside the top three of tier 1. */
     europeanTitlesHomeShare: { target: 0.3, min: 0.1, max: 0.6 },
     europeanTitlesOutsideTopThree: { target: 0.1, min: 0, max: 0.25 },
+    /** Decisions (DESIGN.md "Decisions are bets"): per kind, the bold options' mean effect within 10% of the cautious options' (in units of the bold spread), with at least 1.5× the variance. The lines report the worst kind. */
+    decisionFairnessGap: { target: 0, min: 0, max: 0.1 },
+    decisionVarianceRatio: { target: 3, min: 1.5, max: 1000 },
+    /** Signings (DESIGN.md "Transfers"): about 40% beat the director's estimate, about 25% fall short, scaled by his judgement (a starting point, not a real-world figure). */
+    signingsBeatShare: { target: 0.4, min: 0.3, max: 0.5 },
+    signingsShortShare: { target: 0.25, min: 0.15, max: 0.35 },
+    /** Following you (DESIGN.md "Your players"): follow-you moves average about one per two job changes and never exceed two per move. */
+    followMovesPerJobChange: { target: 0.5, min: 0.25, max: 0.8 },
+    followMaxPerMove: { target: 2, min: 0, max: 2 },
   } as const,
 
   /** How many of each kind the maker-to-winner comparison takes: the ten biggest makers against the ten biggest trophy-winners. */

@@ -270,7 +270,7 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
         break
       }
       case 'squad.summer':
-        if (myClub(e)) push(e, 'staff', renderText('staff', 'summer', { ageing: p['ageing'] as number, gravity: p['gravity'] as number, youthReleased: p['youthReleased'] as number, strength: p['strength'] as number }, e.week))
+        if (myClub(e)) push(e, 'staff', renderText('staff', 'summer', { youth: p['youth'] as number, strength: p['strength'] as number, avgAge: p['avgAge'] as number }, e.week))
         break
       case 'vacancy.opened': {
         const list = vacanciesByWeek.get(e.week) ?? []
@@ -310,6 +310,75 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
       case 'human.decided':
         if (p['byDefault'] === true) push(e, 'agent', renderText('agent', 'default_taken', { key: String(p['key']) }, e.week))
         break
+      case 'window.opened':
+        if (mine(e)) push(e, 'staff', renderText('director', `window_open_${String(p['window'])}`, { deadline: p['deadline'] as number, pot: p['pot'] as number, wages: p['wages'] as number }, e.week))
+        break
+      case 'bid.made':
+        if (mine(e)) push(e, 'staff', renderText('director', 'bid_made', { name: String(p['name']), fee: p['fee'] as number, club: (p['fromClubId'] as number) > 0 ? clubNameOf(world, p['fromClubId'] as number) : (p['fromClubId'] as number) === 0 ? 'the player' : 'his club abroad' }, e.week))
+        break
+      case 'transfer.completed':
+        if (mine(e)) push(e, 'staff', renderText('director', p['free'] === true ? 'bid_free' : 'bid_signed', { name: String(p['name']), fee: p['fee'] as number, club: (p['fromClubId'] as number) > 0 ? clubNameOf(world, p['fromClubId'] as number) : 'abroad', wage: p['wage'] as number, years: p['years'] as number, lo: p['lo'] as number, hi: p['hi'] as number }, e.week))
+        else if ((p['fee'] as number) >= T.TRANSFER_MILESTONE_FEE) push(e, 'news', renderText('director', p['free'] === true ? 'news_free' : 'news_signing', { club: clubNameOf(world, p['clubId'] as number), name: String(p['name']), from: (p['fromClubId'] as number) > 0 ? clubNameOf(world, p['fromClubId'] as number) : 'abroad', fee: p['fee'] as number }, e.week))
+        break
+      case 'bid.failed':
+        if (mine(e) && (p['reason'] === 'club' || p['reason'] === 'player')) push(e, 'staff', renderText('director', p['reason'] === 'club' ? 'bid_club_refused' : 'bid_player_refused', { name: String(p['name']), club: typeof p['fromClubId'] === 'number' && (p['fromClubId'] as number) > 0 ? clubNameOf(world, p['fromClubId'] as number) : 'His club' }, e.week))
+        break
+      case 'player.sold':
+        if (mine(e)) push(e, 'staff', renderText('director', 'sold', { name: String(p['name']), fee: p['fee'] as number, club: typeof p['toClubId'] === 'number' ? clubNameOf(world, p['toClubId'] as number) : 'a club abroad', pot: p['pot'] as number }, e.week))
+        break
+      case 'sale.refused':
+        if (mine(e)) push(e, 'staff', renderText('director', p['big'] === true && p['unsettled'] === true ? 'sale_refused_unsettled' : 'sale_refused', { name: String(p['name']) }, e.week))
+        break
+      case 'window.deadline':
+        if (mine(e)) push(e, 'staff', renderText('director', (p['signings'] as number) + (p['sales'] as number) > 0 ? 'deadline_busy' : 'deadline_quiet', { signings: p['signings'] as number, sales: p['sales'] as number, spend: p['spend'] as number, pot: p['pot'] as number }, e.week))
+        break
+      case 'signing.revealed':
+        if (mine(e)) push(e, p['verdict'] === 'flop' ? 'board' : 'staff', renderText('director', `reveal_${String(p['verdict'])}`, { name: String(p['name']), truth: Math.round(p['truth'] as number), estimate: Math.round(p['estimate'] as number) }, e.week))
+        break
+      case 'sold.shines':
+        if (mine(e)) push(e, 'press', renderText('director', 'sold_shines', { name: String(p['name']), club: clubNameOf(world, p['clubId'] as number) }, e.week))
+        break
+      case 'follow.moved':
+        if (mine(e)) push(e, 'staff', renderText('director', 'follow_moved', { name: String(p['name']), fee: p['fee'] as number, club: clubNameOf(world, p['clubId'] as number), wage: p['wage'] as number }, e.week))
+        else push(e, 'news', renderText('director', 'news_follow', { name: String(p['name']), manager: nameOf(p['managerId']), club: clubNameOf(world, p['clubId'] as number), fee: p['fee'] as number }, e.week))
+        break
+      case 'director.another':
+        if (mine(e)) push(e, 'staff', renderText('director', 'another', {}, e.week))
+        break
+      case 'director.note':
+        if (mine(e)) push(e, 'staff', renderText('director', String(p['note']), {}, e.week))
+        break
+      case 'request.answered': {
+        if (!mine(e)) break
+        const ask = String(p['ask'])
+        const vars: Record<string, string | number> = { name: String(p['name'] ?? ''), amount: (p['amount'] as number) ?? 0, pot: (p['pot'] as number) ?? 0, budget: (p['wageBudget'] as number) ?? 0, expectation: ordinal((p['expectation'] as number) ?? 0), refusals: (p['refusals'] as number) ?? 0, profile: String(p['profile'] ?? ''), fee: (p['fee'] as number) ?? 0, club: String(p['buyer'] ?? ''), starts: (p['starts'] as number) ?? 0, weeks: (p['weeks'] as number) ?? 0 }
+        const granted = p['granted'] === true
+        const key = ask === 'profile' ? 'profile_set' : ask === 'named' ? 'named_card' : ask === 'sell' ? (granted ? 'sell_found' : 'sell_none') : ask === 'loan' ? (granted ? 'loan_found' : 'loan_none') : `${ask}_${granted ? 'granted' : 'refused'}`
+        push(e, ask === 'budget' || ask === 'wages' || ask === 'backing' ? 'board' : ask === 'profile' || ask === 'named' || ask === 'sell' || ask === 'loan' ? 'staff' : 'players', renderText('requests', key, vars, e.week))
+        if (p['third'] === true) push(e, 'board', renderText('requests', 'third_refusal', {}, e.week))
+        break
+      }
+      case 'request.unavailable':
+        if (mine(e)) push(e, 'staff', renderText('requests', 'named_unavailable', { name: String(p['name'] ?? 'him'), why: renderText('requests', String(p['why']), {}, e.week) }, e.week))
+        break
+      case 'player.loanReturned':
+        if (mine(e)) push(e, 'staff', renderText('requests', 'loan_returned', { name: String(p['name']), club: clubNameOf(world, p['fromClubId'] as number) }, e.week))
+        break
+      case 'promise.kept':
+        if (mine(e)) push(e, 'players', renderText('requests', 'promise_kept', { name: String(p['name']) }, e.week))
+        break
+      case 'promise.broken':
+        if (mine(e)) push(e, 'players', renderText('requests', 'promise_broken', { name: String(p['name']) }, e.week))
+        break
+      case 'decision.rolled': {
+        // Only the bold rolls are news; the cautious ones come up even by design.
+        if (!mine(e) || p['bold'] !== true) break
+        const effect = p['effect'] as number
+        const unit = String(p['unit'])
+        const outcome = effect > 0.5 ? 'paid' : effect < -0.5 ? 'cost' : 'even'
+        push(e, 'staff', renderText('decisions', `rolled_${outcome}`, { label: String(p['label'] ?? p['key']), effect: `${effect > 0 ? '+' : ''}${effect}`, unit }, e.week))
+        break
+      }
       case 'career.ended':
         if (mine(e)) {
           // One message per ending; the generic line covers any reason without its own template.

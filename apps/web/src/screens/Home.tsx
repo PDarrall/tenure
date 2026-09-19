@@ -2,6 +2,9 @@ import { useState } from 'react'
 import {
   applicationInFlight,
   boardMood,
+  requestOptions,
+  wageBill,
+  windowState,
   clubNameOf,
   competitionLabel,
   inboxSince,
@@ -17,13 +20,16 @@ import {
   tunables,
   type Decision,
   type MatchSide,
+  type Position,
+  type Request,
+  type RequestOffer,
   type UnemployedActivity,
   type Vacancy,
   type World,
 } from '@tenure/engine'
-import { blockingUnanswered, humanMatch, humanSide, isApplying, markFor, watched, withActivity, withAnswer, withApply, withWithdraw, type Session } from '../controller.js'
+import { blockingUnanswered, humanMatch, humanSide, isApplying, markFor, requested, watched, withActivity, withAnswer, withApply, withRequest, withWithdraw, withoutRequest, type Session } from '../controller.js'
 import { bandLine, continueNext, humanClub, player, positionLabel, seasonLine, standingLine, weekLabel } from './common.js'
-import { Card, Chevron, Choices, Continue, Foot, Head, SectionLabel, Seg } from './ui.js'
+import { BetOptions, Card, Chevron, Choices, Continue, Foot, Head, SectionLabel, Seg } from './ui.js'
 import { OfferCard, defaultPick, offerOption, type OfferPick } from './FirstOffer.js'
 
 interface Props {
@@ -68,16 +74,20 @@ export function Home({ session, onChange, onContinue, onKickOff, saveNote, turns
       <Head eyebrow={seasonLine(world)} title={title} sub={sub} />
       <div className="scroll" aria-label="Home">
         <div className="stack g10 pt2">
+          {club && <WindowBanner world={world} />}
           {club && <FixtureCard session={session} />}
           {unemployed && <AgentCard session={session} onChange={onChange} />}
           {unemployed && <ActivityCard session={session} onChange={onChange} />}
           {cards.map((d) =>
             d.kind === 'offer' ? (
               <OfferCard key={d.id} world={world} offer={d} pick={pickFor(d)} onPick={(p) => setPicks({ ...picks, [d.id]: p })} answered={answers[d.id]} />
+            ) : d.kind === 'signing' ? (
+              <SigningCard key={d.id} decision={d} chosen={answers[d.id]} onChoose={(key) => onChange(withAnswer(session, d.id, key))} />
             ) : (
               <DecisionCard key={d.id} decision={d} chosen={answers[d.id]} onChoose={(key) => onChange(withAnswer(session, d.id, key))} />
             ),
           )}
+          {club && <RequestsCard session={session} onChange={onChange} />}
           {session.inputs.resign && <div className="note">You resign when you continue.</div>}
           {session.inputs.retire && <div className="note">You retire when you continue: the career ends and the score is banked.</div>}
           {saveNote && <div className="note">{saveNote}</div>}
@@ -100,7 +110,7 @@ export function Home({ session, onChange, onContinue, onKickOff, saveNote, turns
           ) : (
             <Choices
               title={forced.title}
-              options={forced.options.map((o) => ({ key: o.key, label: o.label, detail: o.detail, testId: o.key === forced.defaultKey ? 'choice-default' : undefined }))}
+              options={forced.options.map((o) => ({ key: o.key, label: o.key === forced.defaultKey ? `${o.label} (default)` : o.label, detail: o.confidence ? `${o.detail ? `${o.detail} · ` : ''}${o.confidence}` : o.detail, testId: o.key === forced.defaultKey ? 'choice-default' : undefined }))}
               onChoose={(key) => onChange(withAnswer(session, forced.id, key))}
             />
           )
@@ -253,9 +263,129 @@ function FixtureCard({ session }: { session: Session }) {
 }
 
 /** A decision card says what Continue will answer if you leave it; a forced one is answered below. */
+/** The window, when one is open: which, the days to the deadline, the pot and the wage bill (DESIGN.md "Transfers"). */
+function WindowBanner({ world }: { world: World }) {
+  const w = windowState(world)
+  const club = humanClub(world)
+  if (!w.open || !club) return null
+  const weeks = w.weeksToDeadline ?? 0
+  return (
+    <div className="banner" data-testid="window-banner" data-window={w.window} data-weeks={weeks}>
+      <span>
+        <span className="strong">{w.window === 'summer' ? 'Summer window' : 'January window'}</span> · {weeks === 0 ? 'deadline day' : `${weeks} week${weeks === 1 ? '' : 's'} to the deadline`}
+      </span>
+      <span className="ink2">
+        pot £{club.transferPot}m · wages £{wageBill(world, club)}m of £{club.wageBudget}m
+      </span>
+    </div>
+  )
+}
+
+/** A recommendation from the director (DESIGN.md "Transfers"): the player as ranges, fee, wage, reason, confidence, the pot after; approve, decline, ask for another. */
+function SigningCard({ decision, chosen, onChoose }: { decision: Decision; chosen: string | undefined; onChoose: (key: string) => void }) {
+  const p = decision.payload
+  const value = chosen ?? decision.defaultKey
+  const labelOf = (key: string | undefined) => decision.options.find((o) => o.key === key)?.label ?? key ?? ''
+  const reason = p['reason'] === 'request' ? 'what you asked for' : p['reason'] === 'bargain' ? 'a bargain' : 'the weakest slot'
+  return (
+    <Card label={`Director · optional · ${reason}`} testId="decision-signing">
+      <div className="h" data-testid="signing-name">{String(p['name'])}</div>
+      <div className="sub">
+        {String(p['position'])} · {String(p['age'])} · from {String(p['from'])} · {(p['traits'] as string[]).length ? (p['traits'] as string[]).join(', ') : 'no traits to speak of'}
+      </div>
+      <div className="triple" style={{ marginTop: 4 }}>
+        <div>
+          <span className="h bold">{String(p['lo'])}–{String(p['hi'])}</span>
+          <div className="label">Rating, his estimate</div>
+        </div>
+        <div>
+          <span className="h bold">{String(p['plo'])}–{String(p['phi'])}</span>
+          <div className="label">Potential</div>
+        </div>
+        <div>
+          <span className="h bold">{Number(p['fee']) > 0 ? `£${String(p['fee'])}m` : 'Free'}</span>
+          <div className="label">£{String(p['wage'])}k a week</div>
+        </div>
+      </div>
+      <div className="sub">
+        The director: <span className="strong">{String(p['confidence'])}</span>. Pot after: £{String(p['after'])}m of £{String(p['pot'])}m.
+      </div>
+      <BetOptions options={decision.options} value={value} defaultKey={decision.defaultKey} onChoose={onChoose} testId={(key) => `signing-${key}`} />
+      <div className="caption">Continue answers {labelOf(value)}.</div>
+    </Card>
+  )
+}
+
+/** What can be asked (DESIGN.md "Requests"): the board's three, the director's profile; the rest from a player's page or the shortlist. */
+function RequestsCard({ session, onChange }: { session: Session; onChange: (s: Session) => void }) {
+  const world = session.world
+  const [profile, setProfile] = useState<{ position: Position | 'any'; maxAge: number | null }>({ position: 'any', maxAge: null })
+  const rows = requestOptions(world)
+  if (rows.length === 0) return null
+  const queued = session.inputs.requests ?? []
+  const ask = (row: RequestOffer) => {
+    if (row.ask === 'profile') {
+      const req: Request = { to: 'director', ask: 'profile', profile: { ...(profile.position === 'any' ? {} : { position: profile.position }), ...(profile.maxAge === null ? {} : { maxAge: profile.maxAge }) } }
+      onChange(withRequest(session, req))
+      return
+    }
+    onChange(withRequest(session, { to: row.to, ask: row.ask }))
+  }
+  const cancel = (row: RequestOffer) => onChange(withoutRequest(session, { to: row.to, ask: row.ask }))
+  const direct = rows.filter((r) => !r.needsPlayer)
+  const byPlayer = rows.filter((r) => r.needsPlayer)
+  return (
+    <Card label="Requests · each a bet" testId="requests-card">
+      <div className="h">Ask</div>
+      {direct.map((row) => {
+        const on = requested(session, { to: row.to, ask: row.ask })
+        return (
+          <div className="ask-row" key={row.ask} data-testid={`ask-${row.ask}`} data-likely={row.likelihood.words}>
+            <div className="stack g2 grow">
+              <span className="row-name">
+                {row.label} <span className="ink3">· {fromLabel(row.to)}</span>
+              </span>
+              <span className="caption">
+                {row.detail} · <span className="strong">{row.likelihood.words}</span>
+              </span>
+              {row.ask === 'profile' && !on && (
+                <div className="field-row" style={{ marginTop: 4 }}>
+                  <Seg small options={[{ key: 'any', label: 'Any' }, { key: 'GK', label: 'GK' }, { key: 'D', label: 'D' }, { key: 'M', label: 'M' }, { key: 'F', label: 'F' }]} value={profile.position} onChange={(k) => setProfile({ ...profile, position: k as Position | 'any' })} testId={(k) => `profile-${k}`} />
+                  <select aria-label="Age at most" value={profile.maxAge ?? ''} onChange={(e) => setProfile({ ...profile, maxAge: e.target.value === '' ? null : Number(e.target.value) })}>
+                    <option value="">any age</option>
+                    {[21, 24, 27, 30].map((a) => (
+                      <option key={a} value={a}>
+                        under {a + 1}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            {on ? (
+              <button type="button" className="btn small" onClick={() => cancel(row)} data-testid={`cancel-${row.ask}`}>
+                Asked · cancel
+              </button>
+            ) : (
+              <button type="button" className="btn small" onClick={() => ask(row)} data-testid={`request-${row.ask}`} disabled={!row.likelihood.available}>
+                Ask
+              </button>
+            )}
+          </div>
+        )
+      })}
+      <div className="caption">
+        {byPlayer.map((r) => `${r.label} (${r.likelihood.available ? r.likelihood.words : 'the window is shut'})`).join(' · ')}: from a player's page, or the shortlist under Squad.
+      </div>
+      {queued.filter((r) => r.playerId !== undefined).length > 0 && <div className="note">You will also ask: {queued.filter((r) => r.playerId !== undefined).map((r) => `${r.ask} for ${world.players[(r.playerId as number) - 1]?.name ?? 'a player'}`).join(', ')}.</div>}
+    </Card>
+  )
+}
+
 function DecisionCard({ decision, chosen, onChoose }: { decision: Decision; chosen: string | undefined; onChoose: (key: string) => void }) {
   const labelOf = (key: string | undefined) => decision.options.find((o) => o.key === key)?.label ?? key ?? ''
-  const compact = decision.options.length <= 3 && decision.options.every((o) => o.label.length <= 12)
+  const bets = decision.options.some((o) => o.likely)
+  const compact = !bets && decision.options.length <= 3 && decision.options.every((o) => o.label.length <= 12)
   const showControl = !decision.blocking || chosen !== undefined
   const value = chosen ?? (decision.blocking ? null : decision.defaultKey)
   return (
@@ -264,7 +394,9 @@ function DecisionCard({ decision, chosen, onChoose }: { decision: Decision; chos
       <div className="sub">{decision.body}</div>
       {showControl && (
         <div style={{ marginTop: 2 }}>
-          {compact ? (
+          {bets ? (
+            <BetOptions options={decision.options} value={value} defaultKey={decision.defaultKey} onChoose={onChoose} testId={(key) => (key === decision.defaultKey ? 'option-default' : undefined)} />
+          ) : compact ? (
             <Seg small options={decision.options.map((o) => ({ key: o.key, label: o.label }))} value={value} onChange={onChoose} />
           ) : (
             <div className="choices stacked">

@@ -1,0 +1,95 @@
+{
+  "card_need": [
+    "{name}, {age}, {position}: the weakest slot in the eleven is his. Rated {lo}–{hi}, potential {plo}–{phi}. £{fee}m and £{wage}k a week; £{after}m left after."
+  ],
+  "card_request": [
+    "{name}, {age}, {position}: the profile you asked for. Rated {lo}–{hi}, potential {plo}–{phi}. £{fee}m and £{wage}k a week; £{after}m left after."
+  ],
+  "card_bargain": [
+    "{name}, {age}, {position}: a bargain at £{fee}m, rated {lo}–{hi}, potential {plo}–{phi}. £{wage}k a week; £{after}m left after."
+  ],
+  "sale_bid": [
+    "{club} have bid £{fee}m for {name} ({position}, {age}, rated {rating}). His value is about £{value}m.{unsettled}"
+  ],
+  "sale_wages": [
+    "The wage bill is £{bill}m against a budget of £{budget}m. {name} ({position}, {age}, £{wage}k a week) is the one to move; a buyer would pay about £{fee}m."
+  ],
+  "sale_unsettled": [
+    "{name} ({position}, {age}) is unsettled and the director would move him on for about £{fee}m before it spreads."
+  ],
+  "bid_made": [
+    "The bid for {name} is in: £{fee}m to {club}. The answer comes next week."
+  ],
+  "bid_signed": [
+    "{name} has signed: £{fee}m from {club}, £{wage}k a week for {years} years. The director says {lo}–{hi}; the first five matches will say the rest."
+  ],
+  "bid_free": [
+    "{name} has signed on a free, £{wage}k a week for {years} years. The director says {lo}–{hi}; the first five matches will say the rest."
+  ],
+  "bid_club_refused": [
+    "{club} turned the bid for {name} down. The director will look elsewhere."
+  ],
+  "bid_player_refused": [
+    "{name} would not come. The director will look elsewhere."
+  ],
+  "sold": [
+    "{name} has gone to {club} for £{fee}m. The pot is £{pot}m."
+  ],
+  "sale_refused": [
+    "You kept {name}."
+  ],
+  "sale_refused_unsettled": [
+    "You kept {name}. He wanted the move and the room knows it."
+  ],
+  "window_open_summer": [
+    "The summer window is open until week {deadline}. The director will bring names each week; the pot is £{pot}m and the wage budget £{wages}m."
+  ],
+  "window_open_january": [
+    "The January window is open for the month. The pot is £{pot}m; the director will bring names each week."
+  ],
+  "deadline_quiet": [
+    "Deadline day. Nothing moved: {signings} in, {sales} out."
+  ],
+  "deadline_busy": [
+    "Deadline day. The window shuts with {signings} in and {sales} out, £{spend}m spent, £{pot}m left in the pot."
+  ],
+  "reveal_hit": [
+    "{name} is better than the director said: rated {truth} against his {estimate}. The board are pleased with the signing."
+  ],
+  "reveal_flop": [
+    "{name} is not what the director said: rated {truth} against his {estimate}. The board are asking about your signings."
+  ],
+  "reveal_even": [
+    "Five matches in, {name} is about what the director said: {truth}."
+  ],
+  "sold_shines": [
+    "{name}, who you sold to {club}, is playing the season of his life there. It is noticed."
+  ],
+  "another": [
+    "Understood. The director will bring a different profile next week."
+  ],
+  "news_signing": [
+    "{club} sign {name} from {from} for £{fee}m."
+  ],
+  "news_free": [
+    "{club} sign {name} on a free."
+  ],
+  "no_room": [
+    "The squad is full: the director cannot bring anyone in until someone leaves."
+  ],
+  "no_money": [
+    "The pot is empty: the director has nothing to spend. Anything more is a request to the board."
+  ],
+  "follow_card": [
+    "{name} ({position}, {age}, rated {rating}) wants to come with you from {club}. They ask £{fee}m; he asks £{wage}k a week{loyal}. He would come in the next window."
+  ],
+  "follow_free": [
+    "{name} ({position}, {age}, rated {rating}) is a free agent and wants to come with you. £{wage}k a week{loyal}. He would come in the next window."
+  ],
+  "follow_moved": [
+    "{name} has followed you: £{fee}m to {club}, £{wage}k a week. The press have noticed."
+  ],
+  "news_follow": [
+    "{name} follows {manager} to {club} for £{fee}m."
+  ]
+}

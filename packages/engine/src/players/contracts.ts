@@ -11,11 +11,12 @@ import { T } from '../tunables.js'
 import { clamp, round1 } from '../world/gen.js'
 import { clubById, playerById, spellOf } from '../lookup.js'
 import { human, hasPending, queueDecision } from '../play/decisions.js'
+import { betFor, betOption, resolveBet } from '../play/bets.js'
 import { squadOf } from './select.js'
 import { hasTrait } from './traits.js'
 import { releasePlayer, valueFor } from './gen.js'
 import { moveOn } from '../season/squad.js'
-import type { Club, Decision, ManagerId, Player, World } from '../types.js'
+import type { Club, Decision, DecisionOption, Manager, ManagerId, Player, World } from '../types.js'
 
 /** What a player asks for a week: rating and age; the loyal ask less of a manager they are bonded to (the loyal rule). */
 export function wageDemand(p: Player, managerId: ManagerId | null = null): number {
@@ -54,10 +55,9 @@ export function queueNewDeal(world: World, p: Player, demand: number): Decision 
     title: `${p.name} wants a new deal`,
     body: `${p.name} (${p.position}, ${p.age}, rated ${Math.round(p.rating)}) is on £${p.contract.wage}k a week and asks for £${demand}k. Refuse and he will not take it well.`,
     options: [
-      { key: 'accept', label: 'Give him the new deal', detail: `£${demand}k a week for ${T.NEW_DEAL_YEARS} years` },
-      { key: 'refuse', label: 'Refuse', detail: 'morale down, the dressing room notices' },
+      betOption('newDeal', 'accept', 'Give him the new deal', betFor('newDeal', 'accept'), { name: p.name }, world.week, `£${demand}k a week for ${T.NEW_DEAL_YEARS} years`),
+      betOption('newDeal', 'refuse', 'Refuse', betFor('newDeal', 'refuse'), { name: p.name }, world.week, 'morale down, the dressing room notices'),
     ],
-    defaultKey: 'accept',
     blocking: false,
     payload: { playerId: p.id, demand },
   })
@@ -70,24 +70,27 @@ export function queueWantsAway(world: World, p: Player): Decision {
     title: `${p.name} wants to leave`,
     body: `${p.name} (${p.position}, ${p.age}, rated ${Math.round(p.rating)}) has started ${p.season.starts} of the season's games and wants first-team football elsewhere. His value is about £${p.value}m.`,
     options: [
-      { key: 'keep', label: 'Keep him', detail: 'he stays, unhappy' },
-      { key: 'sell', label: 'Let him go', detail: `£${p.value}m into the club's cash` },
+      betOption('wantsAway', 'keep', 'Keep him', betFor('wantsAway', 'keep'), { name: p.name }, world.week, 'he stays, unhappy'),
+      betOption('wantsAway', 'sell', 'Let him go', betFor('wantsAway', 'sell'), { name: p.name }, world.week, `£${p.value}m into the club's cash`),
     ],
-    defaultKey: 'keep',
     blocking: false,
     payload: { playerId: p.id, value: p.value },
   })
 }
 
+/** Does the club's rule keep this player at the end of his contract? The assistant's advice, and the AI's rule. */
+export function ruleKeeps(world: World, p: Player): boolean {
+  return p.rating >= strengthOf(world, p.clubId) - T.RELEASE_BELOW_STRENGTH
+}
+
+/** An expiring contract: the assistant's advice is the safe path, the other way the gamble, so the default follows the advice. */
 export function queueContract(world: World, p: Player, managerId: ManagerId): Decision {
   const demand = wageDemand(p, managerId)
-  const options = T.HUMAN_CONTRACT_YEARS_OPTIONS.filter((y) => y <= T.PLAYER_CONTRACT_YEARS[1]).map((years) => ({
-    key: `renew:${years}`,
-    label: `Renew for ${years} year${years === 1 ? '' : 's'}`,
-    detail: `£${demand}k a week`,
-  }))
-  options.push({ key: 'release', label: 'Release him', detail: 'gone in the summer' })
-  const keep = p.rating >= strengthOf(world, p.clubId) - T.RELEASE_BELOW_STRENGTH
+  const keep = ruleKeeps(world, p)
+  const options: DecisionOption[] = T.HUMAN_CONTRACT_YEARS_OPTIONS.filter((y) => y <= T.PLAYER_CONTRACT_YEARS[1]).map((years) =>
+    betOption('playerContract', `renew:${years}`, `Renew for ${years} year${years === 1 ? '' : 's'}`, betFor('playerContract', keep ? 'safe' : 'risky'), { name: p.name }, world.week, `£${demand}k a week`, 'renew'),
+  )
+  options.push(betOption('playerContract', 'release', 'Release him', betFor('playerContract', keep ? 'risky' : 'safe'), { name: p.name }, world.week, 'gone in the summer'))
   return queueDecision(world, {
     kind: 'playerContract',
     from: 'staff',
@@ -96,7 +99,7 @@ export function queueContract(world: World, p: Player, managerId: ManagerId): De
     options,
     defaultKey: keep ? `renew:${T.RENEW_YEARS_PLAYER}` : 'release',
     blocking: false,
-    payload: { playerId: p.id, demand },
+    payload: { playerId: p.id, demand, keep },
   })
 }
 
@@ -123,6 +126,36 @@ export function queuePlayerRequests(world: World, rng: Rng): void {
   }
 }
 
+/**
+ * AI clubs answer their players too, so the population rolls the same dice:
+ * a new deal is given when the wage bill allows, a wants-away is sold with
+ * AI_SELL_WANTS_AWAY_P. One request per club a month, the first found.
+ */
+export function aiPlayerRequests(world: World, rng: Rng): void {
+  for (const club of world.clubs) {
+    if (club.managerId === null) continue
+    const manager = world.managers[club.managerId - 1]
+    if (!manager || manager.isHuman) continue
+    const spell = spellOf(world, manager)
+    if (!spell) continue
+    const squad = squadOf(world, club)
+    // £k a week across the squad; the budget is £m a season.
+    const wageBill = squad.reduce((sum, p) => sum + p.contract.wage, 0)
+    for (const p of squad) {
+      if (wantsNewDeal(p, manager.id) && rng.chance(T.REQUEST_P)) {
+        const demand = wageDemand(p, manager.id)
+        const accept = ((wageBill - p.contract.wage + demand) * T.WAGE_WEEKS_PER_YEAR) / 1000 <= club.wageBudget
+        settleNewDeal(world, rng, p, demand, accept, manager.id)
+        break
+      }
+      if (wantsAway(p, club, spell.season.games) && rng.chance(T.REQUEST_P)) {
+        settleWantsAway(world, rng, p, club, rng.chance(T.AI_SELL_WANTS_AWAY_P), manager.id)
+        break
+      }
+    }
+  }
+}
+
 /** Before the last match week closes, every expiring contract at the human's club becomes a decision. */
 export function queueExpiringContracts(world: World): void {
   const club = humanClub(world)
@@ -136,27 +169,43 @@ export function queueExpiringContracts(world: World): void {
 }
 
 /** A refusal feeds the fallout count: the dressing room noticed (DESIGN: consequences feed the tenure model's fallout events). */
-function refusalFallout(world: World, p: Player, reason: string): void {
-  const me = human(world)
-  const spell = spellOf(world, me)
+function refusalFallout(world: World, p: Player, reason: string, managerId: ManagerId): void {
+  const spell = spellOf(world, world.managers[managerId - 1] as Manager)
   p.morale = round1(clamp(p.morale - T.REFUSAL_MORALE_LOSS, 0, 100))
   if (spell) spell.season.fallouts++
-  const tag = p.madeBy.find((m) => m.managerId === me.id)
+  const tag = p.madeBy.find((m) => m.managerId === managerId)
   if (tag) tag.bond = Math.max(0, tag.bond - T.BOND_REFUSAL_LOSS)
-  emit(world, 'player.refused', { playerId: p.id, clubId: p.clubId, managerId: me.id, name: p.name, reason, morale: p.morale, season: world.season })
+  emit(world, 'player.refused', { playerId: p.id, clubId: p.clubId, managerId, name: p.name, reason, morale: p.morale, season: world.season })
 }
 
-export function applyNewDeal(world: World, decision: Decision, accept: boolean): void {
+/** A new deal given or refused: the fixed gain or loss, then the dice on his morale. Human and AI alike. */
+export function settleNewDeal(world: World, rng: Rng, p: Player, demand: number, accept: boolean, managerId: ManagerId, decisionId?: number): void {
+  if (accept) {
+    p.contract = { years: T.NEW_DEAL_YEARS, wage: demand }
+    p.morale = round1(clamp(p.morale + T.NEW_DEAL_MORALE_GAIN, 0, 100))
+    const tag = p.madeBy.find((m) => m.managerId === managerId)
+    if (tag) tag.bond += T.BOND_RENEWAL
+    emit(world, 'player.renewed', { playerId: p.id, clubId: p.clubId, managerId, name: p.name, years: p.contract.years, wage: p.contract.wage, season: world.season })
+  } else refusalFallout(world, p, 'new deal', managerId)
+  resolveBet(world, rng, betFor('newDeal', accept ? 'accept' : 'refuse'), { kind: 'newDeal', key: accept ? 'accept' : 'refuse', managerId, playerId: p.id, bold: !accept, label: accept ? `a new deal for ${p.name}` : `refusing ${p.name}`, ...(decisionId !== undefined ? { decisionId } : {}) })
+}
+
+/** A wants-away kept or sold: the fee or the refusal, then the dice on the squad's morale. Human and AI alike. */
+export function settleWantsAway(world: World, rng: Rng, p: Player, club: Club, sell: boolean, managerId: ManagerId, decisionId?: number): void {
+  if (sell) {
+    const fee = valueFor(p.rating, p.age)
+    club.cash = round1(club.cash + fee)
+    releasePlayer(world, p, club)
+    emit(world, 'player.left', { playerId: p.id, clubId: club.id, managerId, name: p.name, rating: p.rating, fee, reason: 'sold', season: world.season })
+    moveOn(world, rng, p, club)
+  } else refusalFallout(world, p, 'wants away', managerId)
+  resolveBet(world, rng, betFor('wantsAway', sell ? 'sell' : 'keep'), { kind: 'wantsAway', key: sell ? 'sell' : 'keep', managerId, clubId: club.id, bold: sell, label: sell ? `selling ${p.name}` : `keeping ${p.name}`, ...(decisionId !== undefined ? { decisionId } : {}) })
+}
+
+export function applyNewDeal(world: World, rng: Rng, decision: Decision, accept: boolean): void {
   const p = playerById(world, decision.payload['playerId'] as number)
   if (!p || p.retired) return
-  const me = human(world)
-  if (accept) {
-    p.contract = { years: T.NEW_DEAL_YEARS, wage: decision.payload['demand'] as number }
-    p.morale = round1(clamp(p.morale + T.NEW_DEAL_MORALE_GAIN, 0, 100))
-    const tag = p.madeBy.find((m) => m.managerId === me.id)
-    if (tag) tag.bond += T.BOND_RENEWAL
-    emit(world, 'player.renewed', { playerId: p.id, clubId: p.clubId, managerId: me.id, name: p.name, years: p.contract.years, wage: p.contract.wage, season: world.season })
-  } else refusalFallout(world, p, 'new deal')
+  settleNewDeal(world, rng, p, decision.payload['demand'] as number, accept, human(world).id, decision.id)
 }
 
 export function applyWantsAway(world: World, rng: Rng, decision: Decision, sell: boolean): void {
@@ -164,22 +213,27 @@ export function applyWantsAway(world: World, rng: Rng, decision: Decision, sell:
   if (!p || p.retired) return
   const club = humanClub(world)
   if (!club || p.clubId !== club.id) return
-  if (sell) {
-    const fee = valueFor(p.rating, p.age)
-    club.cash = round1(club.cash + fee)
-    releasePlayer(world, p, club)
-    emit(world, 'player.left', { playerId: p.id, clubId: club.id, managerId: human(world).id, name: p.name, rating: p.rating, fee, reason: 'sold', season: world.season })
-    moveOn(world, rng, p, club)
-  } else refusalFallout(world, p, 'wants away')
+  settleWantsAway(world, rng, p, club, sell, human(world).id, decision.id)
 }
 
-export function applyContract(world: World, decision: Decision, key: string): void {
+/** The human's answer on an expiring contract: recorded for the summer, and the dice roll now (the news gets out). */
+export function applyContract(world: World, rng: Rng, decision: Decision, key: string): void {
   const state = world.human
   if (!state) return
   const playerId = decision.payload['playerId'] as number
+  const p = playerById(world, playerId)
+  const keep = decision.payload['keep'] === true
   if (key === 'release') state.contractChoices[playerId] = 'release'
   else {
     const years = Number(key.split(':')[1] ?? T.RENEW_YEARS_PLAYER)
     state.contractChoices[playerId] = { years: clamp(years, 1, T.PLAYER_CONTRACT_YEARS[1]), wage: decision.payload['demand'] as number }
   }
+  if (p && !p.retired) rollContract(world, rng, p, key !== 'release', keep, human(world).id, decision.id)
+}
+
+/** The dice on an expiring contract: safe when the answer follows the rule, risky otherwise; on his morale if he stays, the squad's if he goes. */
+export function rollContract(world: World, rng: Rng, p: Player, renew: boolean, ruleSaysKeep: boolean, managerId: ManagerId, decisionId?: number): void {
+  const safe = renew === ruleSaysKeep
+  const target = renew ? { playerId: p.id } : { clubId: p.clubId }
+  resolveBet(world, rng, betFor('playerContract', safe ? 'safe' : 'risky'), { kind: 'playerContract', key: renew ? 'renew' : 'release', managerId, ...target, bold: !safe, label: renew ? `renewing ${p.name}` : `releasing ${p.name}`, ...(decisionId !== undefined ? { decisionId } : {}) })
 }

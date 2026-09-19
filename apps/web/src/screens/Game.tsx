@@ -61,7 +61,7 @@ export function Game({ session, onChange, onContinue, onExport, onImport, onRese
   return (
     <main className="screen">
       {tab === 'home' && <Home session={session} onChange={onChange} onContinue={() => onContinue()} onKickOff={kickOff} saveNote={saveNote} turnsBack={turnsBack} onEarlier={() => setTurnsBack(turnsBack + 1)} />}
-      {tab === 'squad' && openPlayer === null && <Squad world={world} onOpen={(id) => setOpenPlayer(id)} />}
+      {tab === 'squad' && openPlayer === null && <Squad session={session} onChange={onChange} onOpen={(id) => setOpenPlayer(id)} />}
       {tab === 'squad' && openPlayer !== null && <PlayerProfile session={session} playerId={openPlayer} onChange={onChange} onBack={() => setOpenPlayer(null)} />}
       {tab === 'tactics' && <Tactics session={session} onChange={onChange} />}
       {tab === 'fixtures' && <Fixtures world={world} />}

@@ -22,6 +22,7 @@ import * as tenure from '../tenure/hooks.js'
 import { applyInputs } from '../play/inputs.js'
 import { human, pendingDecisions } from '../play/decisions.js'
 import { closeWeekHooks } from './week.js'
+import { ensureDirectors, isDeadlineWeek } from '../market/director.js'
 
 export interface TurnOptions {
   /** Play and close the whole week whatever the human's fixtures: advanceWeek for a career. */
@@ -200,6 +201,7 @@ export function advanceTurn(world: World, inputs: HumanInputs = {}, options: Tur
   // Saves from before phase 3(d) have no watched slot.
   if (world.human.watched === undefined) world.human.watched = null
   if (world.human.agentWithdrawn === undefined) world.human.agentWithdrawn = []
+  ensureDirectors(world)
   applyInputs(world, rng, inputs)
   const startStatus = statusKey(world)
   let fixturesPlayed = 0
@@ -240,6 +242,7 @@ export function advanceTurn(world: World, inputs: HumanInputs = {}, options: Tur
     if (options.wholeWeek) return fixturesPlayed
     const next = seasonWeek(world.week)
     if (next >= T.MATCH_WEEKS) return fixturesPlayed // into the summer
+    if (isDeadlineWeek(sw) && club !== null) return fixturesPlayed // deadline day is its own step, with its own inbox
     if (statusKey(world) !== startStatus) return fixturesPlayed // hired, sacked, moved or retired at the close: show it
     if (!hadFixture) return fixturesPlayed // a week with no fixture is its own step
     const clubNow = humanClubId(world)

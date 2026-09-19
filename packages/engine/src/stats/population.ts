@@ -177,6 +177,9 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
   const boughtFinishedShare = madePoints > 0 ? boughtFinished / madePoints : 0
   const match = matchAverages(world)
   const europe = europeanTitles(world)
+  const decisions = decisionFairness(world)
+  const follow = followStats(world)
+  const signings = signingStats(world)
   const lines: StatLine[] = [
     line('firstSpellMedianSeasons', 'Median first-spell length (seasons)', median(firstSpellLengths), 'seasons'),
     line('firstSpellInsideSeasonShare', 'First spells ending inside a season', firstSpells.length ? insideSeason / firstSpells.length : 0, 'share'),
@@ -201,6 +204,12 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     line('redsPerGame', 'Red cards per match', match.reds, 'number'),
     line('europeanTitlesHomeShare', 'Seasons the European title came home', europe.homeShare, 'share'),
     line('europeanTitlesOutsideTopThree', 'European titles won from outside the top three of tier 1', europe.outsideTopThree, 'share'),
+    line('decisionFairnessGap', `Decisions: worst gap between bold and cautious means net of sampling noise, in bold spreads (${decisions.worstGapKind})`, decisions.worstGap, 'number'),
+    line('decisionVarianceRatio', `Decisions: lowest bold-to-cautious variance ratio (${decisions.worstRatioKind})`, decisions.worstRatio, 'number'),
+    line('signingsBeatShare', "Signings that beat the director's estimate", signings.beat, 'share'),
+    line('signingsShortShare', "Signings that fell short of the director's estimate", signings.short, 'share'),
+    line('followMovesPerJobChange', 'Follow-you moves per job change', follow.perHire, 'number'),
+    line('followMaxPerMove', 'Most follow-you moves in one job change', follow.maxPerMove, 'count'),
   ]
 
   const endReasons: Record<string, number> = {}
@@ -259,6 +268,28 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     'european finals played': europe.seasons,
     'mean age at career end': ended.length ? ended.reduce((s, m) => s + m.age, 0) / ended.length : 0,
     'events logged': world.log.length,
+  }
+  extras['signings revealed'] = signings.revealed
+  extras['signings (transfers completed)'] = signings.transfers
+  extras['signings abroad'] = signings.abroad
+  extras['signings from the pool'] = signings.free
+  extras['bids failed'] = signings.failed
+  extras['mean strength tier 1'] = signings.tierStrength[0] ?? 0
+  extras['mean strength tier 3'] = signings.tierStrength[2] ?? 0
+  extras['mean strength tier 5'] = signings.tierStrength[4] ?? 0
+  extras['strength sd within tier 1'] = signings.tierSpread[0] ?? 0
+  extras['strength sd within tier 3'] = signings.tierSpread[2] ?? 0
+  extras['follow moves'] = follow.moves
+  extras['follow asks'] = follow.asks
+  extras['hires'] = follow.hires
+  for (const k of decisions.kinds) {
+    extras[`decision ${k.kind}: bold rolls`] = k.boldN
+    extras[`decision ${k.kind}: cautious rolls`] = k.cautiousN
+    extras[`decision ${k.kind}: bold mean`] = k.boldMean
+    extras[`decision ${k.kind}: cautious mean`] = k.cautiousMean
+    extras[`decision ${k.kind}: gap observed`] = k.gapObserved
+    extras[`decision ${k.kind}: gap net of noise`] = k.gap
+    extras[`decision ${k.kind}: variance ratio`] = k.ratio
   }
 
   return {
@@ -333,4 +364,131 @@ export function europeanTitles(world: World): { seasons: number; homeTitles: num
     if (typeof position === 'number' && position > 3) outside++
   }
   return { seasons, homeTitles, homeShare: seasons ? homeTitles / seasons : 0, outsideTopThree: homeTitles ? outside / homeTitles : 0 }
+}
+
+export interface DecisionKindFairness {
+  kind: string
+  boldN: number
+  cautiousN: number
+  boldMean: number
+  cautiousMean: number
+  boldSd: number
+  cautiousSd: number
+  /** |bold mean − cautious mean| in units of the bold spread, as observed. */
+  gapObserved: number
+  /** The same gap net of sampling noise (BET_GAP_SE_ALLOWANCE standard errors): what the line tests. */
+  gap: number
+  /** Bold variance over cautious variance. */
+  ratio: number
+}
+
+function meanSd(values: number[]): { mean: number; sd: number } {
+  if (values.length === 0) return { mean: 0, sd: 0 }
+  const mean = values.reduce((a, b) => a + b, 0) / values.length
+  const sd = Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length)
+  return { mean, sd }
+}
+
+/**
+ * DESIGN.md "Decisions are bets": per decision kind, across the AI
+ * population, the bold options' mean effect against the cautious options',
+ * and the variance ratio. Only AI rolls count; a kind needs BET_MIN_ROLLS on
+ * each side to be measured. The worst kind sets each line.
+ */
+export function decisionFairness(world: World): { kinds: DecisionKindFairness[]; worstGap: number; worstGapKind: string; worstRatio: number; worstRatioKind: string } {
+  const byKind = new Map<string, { bold: number[]; cautious: number[] }>()
+  for (const e of world.log) {
+    if (e.type !== 'decision.rolled' || e.payload['human'] === true) continue
+    const kind = String(e.payload['kind'])
+    const bucket = byKind.get(kind) ?? { bold: [], cautious: [] }
+    ;(e.payload['bold'] === true ? bucket.bold : bucket.cautious).push(e.payload['effect'] as number)
+    byKind.set(kind, bucket)
+  }
+  const kinds: DecisionKindFairness[] = []
+  for (const [kind, { bold, cautious }] of [...byKind.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const b = meanSd(bold)
+    const c = meanSd(cautious)
+    const diff = Math.abs(b.mean - c.mean)
+    const se = Math.sqrt((bold.length ? (b.sd * b.sd) / bold.length : 0) + (cautious.length ? (c.sd * c.sd) / cautious.length : 0))
+    kinds.push({
+      kind,
+      boldN: bold.length,
+      cautiousN: cautious.length,
+      boldMean: Math.round(b.mean * 1000) / 1000,
+      cautiousMean: Math.round(c.mean * 1000) / 1000,
+      boldSd: Math.round(b.sd * 1000) / 1000,
+      cautiousSd: Math.round(c.sd * 1000) / 1000,
+      gapObserved: b.sd > 0 ? Math.round((diff / b.sd) * 1000) / 1000 : 0,
+      gap: b.sd > 0 ? Math.round((Math.max(0, diff - T.BET_GAP_SE_ALLOWANCE * se) / b.sd) * 1000) / 1000 : 0,
+      ratio: c.sd > 0 ? Math.round(((b.sd * b.sd) / (c.sd * c.sd)) * 100) / 100 : bold.length > 0 ? 1000 : 0,
+    })
+  }
+  const measured = kinds.filter((k) => k.boldN >= T.BET_MIN_ROLLS && k.cautiousN >= T.BET_MIN_ROLLS)
+  let worstGap = 0
+  let worstGapKind = 'none'
+  let worstRatio = measured.length ? Infinity : 0
+  let worstRatioKind = 'none'
+  for (const k of measured) {
+    if (k.gap > worstGap) {
+      worstGap = k.gap
+      worstGapKind = k.kind
+    }
+    if (k.ratio < worstRatio) {
+      worstRatio = k.ratio
+      worstRatioKind = k.kind
+    }
+  }
+  if (worstRatio === Infinity) worstRatio = 0
+  return { kinds, worstGap, worstGapKind, worstRatio, worstRatioKind }
+}
+
+/** Following you (DESIGN.md "Your players"): moves per job change and the most in one move, from the log. */
+export function followStats(world: World): { moves: number; asks: number; hires: number; perHire: number; maxPerMove: number } {
+  let moves = 0
+  let asks = 0
+  let hires = 0
+  const perManagerHire = new Map<string, number>()
+  for (const e of world.log) {
+    if (e.type === 'vacancy.filled') hires++
+    else if (e.type === 'follow.asked') asks++
+    else if (e.type === 'follow.moved') {
+      moves++
+      const key = `${e.payload['managerId']}:${e.payload['clubId']}:${e.payload['season']}`
+      perManagerHire.set(key, (perManagerHire.get(key) ?? 0) + 1)
+    }
+  }
+  let maxPerMove = 0
+  for (const n of perManagerHire.values()) if (n > maxPerMove) maxPerMove = n
+  return { moves, asks, hires, perHire: hires ? Math.round((moves / hires) * 1000) / 1000 : 0, maxPerMove }
+}
+
+/** Signings (DESIGN.md "Transfers"): hits and flops among the AI's revealed signings, and where the squads sit. */
+export function signingStats(world: World): { revealed: number; beat: number; short: number; transfers: number; abroad: number; free: number; failed: number; tierStrength: number[]; tierSpread: number[] } {
+  let revealed = 0
+  let hits = 0
+  let flops = 0
+  let transfers = 0
+  let abroad = 0
+  let free = 0
+  let failed = 0
+  for (const e of world.log) {
+    if (e.type === 'signing.revealed' && e.payload['human'] !== true) {
+      revealed++
+      if (e.payload['verdict'] === 'hit') hits++
+      else if (e.payload['verdict'] === 'flop') flops++
+    } else if (e.type === 'transfer.completed') {
+      transfers++
+      if (e.payload['abroad'] === true) abroad++
+      if (e.payload['free'] === true) free++
+    } else if (e.type === 'bid.failed') failed++
+  }
+  const tierStrength: number[] = []
+  const tierSpread: number[] = []
+  for (let tier = 1; tier <= T.TIER_SIZES.length; tier++) {
+    const values = world.clubs.filter((c) => c.tier === tier).map((c) => c.squad.strength)
+    const mean = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0
+    tierStrength.push(Math.round(mean * 10) / 10)
+    tierSpread.push(values.length ? Math.round(Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length) * 10) / 10 : 0)
+  }
+  return { revealed, beat: revealed ? hits / revealed : 0, short: revealed ? flops / revealed : 0, transfers, abroad, free, failed, tierStrength, tierSpread }
 }

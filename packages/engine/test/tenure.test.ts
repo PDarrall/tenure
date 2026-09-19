@@ -249,7 +249,7 @@ describe('ways out', () => {
     keep.credit = 41
     world.week = keep.contract.endWeek
     world.season = Math.floor(world.week / T.SEASON_WEEKS) + 1
-    expect(checkExpiry(world, keep)).toBe(false)
+    expect(checkExpiry(world, createRng(1), keep)).toBe(false)
     expect(keep.contract.endWeek).toBeGreaterThan(world.week)
     expect(keep.contract.yearsAtSigning).toBe(T.RENEW_YEARS)
     const drop = freshSpell(world, 11)
@@ -257,7 +257,7 @@ describe('ways out', () => {
     drop.contract.endWeek = world.week
     const manager = managerById(world, drop.managerId)
     const rep = manager.reputation
-    expect(checkExpiry(world, drop)).toBe(true)
+    expect(checkExpiry(world, createRng(1), drop)).toBe(true)
     expect(drop.endReason).toBe('expired')
     expect(manager.reputation).toBe(rep + T.REP_RELEASED)
   })
@@ -370,7 +370,11 @@ describe('shocks and rare exits (forced rolls)', () => {
     expect(types).toContain('shock.boardRow')
     expect(spell.takeover).not.toBeNull()
     expect(spell.budgetMultiplier).toBeCloseTo(1 - T.CRISIS_BUDGET_CUT, 2)
-    expect(poor.squad.strength).toBe(Math.max(1, strength + T.STAR_SALE_STRENGTH))
+    // The star sale is a real sale: the best outfielder is gone, the fee is in the pot, strength follows the squad.
+    const sale = world.log.find((e) => e.type === 'shock.starSale')!
+    expect(sale.payload['playerId']).not.toBeNull()
+    expect(poor.playerIds).not.toContain(sale.payload['playerId'])
+    expect(poor.squad.strength).toBeLessThanOrEqual(strength)
     expect(spell.expectation).toBe(Math.min(24, expectation + T.CRISIS_EXPECTATION_EASE + T.STAR_SALE_EXPECTATION_EASE))
     expect(spell.season.boardRows).toBe(1)
     // A later takeover whose owner keeps the manager clears the pending replacement.
@@ -409,11 +413,15 @@ describe('shocks and rare exits (forced rolls)', () => {
     expect(resolved.type).toBe('shock.falloutResolved')
     if (manager.ability.motivation < T.AI_FALLOUT_SELL_BELOW_MOTIVATION) {
       expect(resolved.payload['choice']).toBe('sell')
-      expect(club.squad.strength).toBe(strength - T.FALLOUT_STRENGTH_LOSS)
+      expect(club.squad.strength).toBeLessThanOrEqual(strength) // he is gone; strength follows the squad
       expect(spell.ownership).toBeCloseTo(T.FALLOUT_OWNERSHIP_GAIN, 2)
     } else {
       expect(resolved.payload['choice']).toBe('back-down')
-      expect(club.squad.morale).toBe(morale - T.FALLOUT_MORALE_LOSS)
+      // The dressing room's morale is the roll: mean the back-down loss, within the clamp.
+      const dice = T.BETS.fallout.options['back-down']
+      expect(club.squad.morale).toBeGreaterThanOrEqual(morale + dice.mean - dice.sd * T.BET_ROLL_CLAMP - 0.1)
+      expect(club.squad.morale).toBeLessThanOrEqual(morale + dice.mean + dice.sd * T.BET_ROLL_CLAMP + 0.1)
+      expect(world.log.some((e) => e.type === 'decision.rolled' && e.payload['kind'] === 'fallout' && e.payload['key'] === 'back-down')).toBe(true)
     }
     maybeFallout(world, forcedRng(true), spell)
     expect(spell.season.fallouts).toBe(1) // once per losing run
@@ -425,7 +433,8 @@ describe('shocks and rare exits (forced rolls)', () => {
     const a = freshSpell(world, 16)
     a.credit = T.MUTUAL_WINDOW[0]
     expect(monthlyMutualConsent(world, forcedRng(false), a)).toBe(false)
-    expect(world.log.at(-1)!.type).toBe('manager.mutualOffered')
+    expect(world.log.some((e) => e.type === 'manager.mutualOffered' && e.payload['spellId'] === a.id)).toBe(true)
+    expect(world.log.at(-1)!.type).toBe('decision.rolled') // fighting on is a roll too
     expect(monthlyMutualConsent(world, forcedRng(true), a)).toBe(true)
     expect(a.endReason).toBe('mutual')
     const b = freshSpell(world, 17)

@@ -192,7 +192,10 @@ describe('hiring', () => {
       declined = approach(world, createRng(seed), m2, vacancy) === 'declined'
     }
     expect(declined).toBe(true)
-    expect(s2.credit).toBe(Math.min(s2.ceiling, credit + T.DECLINE_APPROACH_CREDIT))
+    // Declining is a bet with DESIGN's +3 as its mean: the credit lands within the roll's clamp of it.
+    const dice = T.BETS.approach.options.decline
+    expect(s2.credit).toBeGreaterThanOrEqual(Math.min(s2.ceiling, credit + dice.mean - dice.sd * T.BET_ROLL_CLAMP) - 0.1)
+    expect(s2.credit).toBeLessThanOrEqual(Math.min(s2.ceiling, credit + dice.mean + dice.sd * T.BET_ROLL_CLAMP) + 0.1)
     expect(s2.loyaltyBonus).toBe(T.LOYALTY_PER_DECLINE)
   })
 })
@@ -209,7 +212,10 @@ describe('unemployment and permadeath', () => {
     monthlyUnemployed(world, createRng(1), m)
     expect(m.status.kind === 'unemployed' && m.status.activity).toBe('punditry')
     expect(m.history.earnings).toBeCloseTo(T.PUNDITRY_INCOME_PER_MONTH)
-    expect(m.reputation).toBe(rep + T.UNEMPLOYED_DECAY * T.PUNDITRY_DECAY_SHARE)
+    // The slide, plus the month's dice on punditry (mean 0, within the clamp).
+    const punditry = T.BETS.activity.options.punditry
+    expect(Math.abs(m.reputation - (rep + T.UNEMPLOYED_DECAY * T.PUNDITRY_DECAY_SHARE))).toBeLessThanOrEqual(punditry.sd * T.BET_ROLL_CLAMP + 0.1)
+    expect(world.log.some((e) => e.type === 'decision.rolled' && e.payload['kind'] === 'activity' && e.payload['managerId'] === m.id)).toBe(true)
     const low = world.managers.find((x) => x.status.kind === 'unemployed' && x.id !== m.id)!
     low.reputation = 20
     world.week = T.AI_ASSISTANT_AFTER_MONTHS * T.MONTH_WEEKS
@@ -217,9 +223,12 @@ describe('unemployment and permadeath', () => {
     monthlyUnemployed(world, createRng(1), low)
     expect(low.status.kind === 'unemployed' && low.status.activity).toBe('assistant')
     expect(low.history.steppedDown).toBe(true)
-    expect(low.reputation).toBe(before + T.REP_STEP_DOWN)
+    const assistant = T.BETS.activity.options.assistant
+    const tolerance = assistant.sd * T.BET_ROLL_CLAMP + 0.1
+    expect(Math.abs(low.reputation - (before + T.REP_STEP_DOWN))).toBeLessThanOrEqual(tolerance)
+    const afterStep = low.reputation
     monthlyUnemployed(world, createRng(1), low)
-    expect(low.reputation).toBe(before + T.REP_STEP_DOWN) // decay stopped
+    expect(Math.abs(low.reputation - afterStep)).toBeLessThanOrEqual(tolerance) // decay stopped; only the small dice
   })
 
   it('ends the career after 24 months without a shortlist, at 72, and closes a live spell', () => {

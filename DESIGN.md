@@ -1,4 +1,4 @@
-# TENURE — design bible v0.6
+# TENURE — design bible v0.7
 
 Working title. A football management game about surviving a career. Depth of Football Chairman Pro 2; texture of Championship Manager 01/02.
 FEATURES.md lists what that means system by system, and what is deliberately out. It is the target; this document is the rules.
@@ -210,15 +210,36 @@ The tenure model reads results exactly as before. What the player controls: whic
 
 ## Transfers (phase 4)
 
-- A market: every player in the home pyramid, searchable by position, age, rating, price and availability; transfer-listed players and free agents flagged; a shortlist. A scout report on any player gives a potential range and a recommendation, with reach and accuracy set by the scouting level.
-- Buying: the selling club's asking price, then at most two rounds — offer, counter, accept or reject. Loans for a season with a wage share. Free agents sign for wages alone. A contract is a wage and a length; the player accepts if the wage meets his demand (rating, age, tier) and he expects to play. No agents, clauses or instalments.
-- Selling: list a player at an asking price and receive bids; AI clubs also bid unprompted for your best players; refuse a player three times and he is unsettled.
-- Two windows, summer and January. Nothing moves between them.
-- Budgets: transfer and wage budgets from the board by tier and wealth. The direction of strength flips here — club strength is derived from the squad — and AI clubs trade toward the level their wealth sets, so the population targets hold. That is tested.
+Two windows: summer, from the last match of one season to the first of the next; January, the calendar month. Nothing moves outside them except free agents, who can sign at any time.
+
+The director of football runs the market; the manager decides. Every club has a director of football with a judgement rating set by the club's scouting level and wealth. In a window he brings up to three recommendations a week, each a card: the player — name, age, position, rating and potential as ranges narrowed by the club's scouting level, traits — the fee and wage, the reason (the squad's need, the manager's request, or a bargain), his confidence in three words (sure thing, likely, gamble), and the budget after. The manager approves, declines, or asks for a different profile. An approved bid negotiates itself with one roll on the selling club and one on the player, and the answer arrives next turn. Sales work the same way: the director proposes a sale when a bid arrives, when the wage bill is over budget, or when a player is unsettled; the manager approves or refuses — and refusing a big bid for an unsettled player has its own downside.
+
+Every signing is a bet. His true rating and potential differ from the director's estimate by an amount scaled by the director's judgement, and they reveal over his first five matches. A hit lifts credit and reputation; a flop costs credit — the board question your signings — and wages for the length of the contract. A player sold who shines elsewhere costs reputation. The pot stays: transfer and wage budgets from the board by tier and wealth; the director keeps inside them; anything beyond is a request.
+
+Requests. The manager can ask at any time, and each ask is a bet with a stated likelihood:
+- The board: more transfer budget, more wage budget, a level upgrade (phase 5), backing in a dispute. Granted raises expectation; refused costs credit; a third refusal in a season adds progress toward "difficult".
+- The director: a target profile ("a striker under 24 by the deadline"), a named player from any club — a shortlist exists for this, searchable by position, age and rating — sell X, loan out Y. His answer depends on budget, the player's willingness and his own judgement, and shapes next week's recommendations.
+- Players: a new contract, the captaincy, a promise of playing time. A promise unkept is a fallout.
+
+AI clubs run the same director model, and their trading moves squads toward the level their wealth sets, which is what lets club strength be derived from the squad from this phase on. The population targets must hold through the flip, and that is tested.
+
+## Decisions are bets
+
+Nothing in this game is safe. Every decision card shows, for each option, what it will likely do, what could go wrong, and how confident the adviser is — in words, not numbers — and then the seeded dice decide. The roll and its outcome go in the event log, so the career page can say which gambles paid. The default option, the one Continue applies, is always the lowest-variance choice, never the best one: the cautious path costs upside, and the game says so on the card.
+
+This applies to every decision the game already has — the interview promise, the approach, the press question, the board warning, the fallout, the contract, the substitution, the kid in the eleven — and to every one transfers add. Results were always a roll; now so is everything else.
+
+Validation target: for each decision type, across the AI population, the bold options' mean effect lands within 10% of the cautious options', with at least 1.5× the variance. Gambles are fair, not free.
+
+## Interface
+
+- **One column, one button.** Every screen is a phone column: the season and week, the club and its standing line at the top, a scrolling body, one Continue button whose second line says what it will do, and five tabs — Home, Squad, Tactics, Fixtures, Career. The design canvas ("Tenure", System · light / dark) is the reference; its tokens live in one stylesheet.
+- **Decision cards show likely, downside and confidence** for each option, in words; the default is marked and is what Continue applies.
+- Home carries the week: the fixture card with the odds and the opposition report, the questions of the week as cards, the inbox; out of work, the agent's application, the month's choice and the vacancies. The match is one screen that plays on to the next pause; full time is its own screen.
 
 ## Club (phase 5)
 
-Four levels, 1 to 5: coaching (development speed), scouting (search reach and potential accuracy), medical (injury length), academy (youth intake quality). Wealth sets them; once a season the manager can ask the board to raise one, which is a credit gamble — a refusal costs credit, and a raise granted lifts expectation. Youth players arrive each summer from the academy level. Money is the board's business, reported in the inbox: balance, income by tier, attendance and prestige, wages, transfers; attendance grows with success. No stadium building or ticket prices. Insolvency is a shock, as specified in the tenure model.
+Four levels, 1 to 5: coaching (development speed), scouting (search reach, potential accuracy and the director of football's judgement), medical (injury length), academy (youth intake quality). Wealth sets them; once a season the manager can ask the board to raise one, which is a credit gamble — a refusal costs credit, and a raise granted lifts expectation. Youth players arrive each summer from the academy level. Money is the board's business, reported in the inbox: balance, income by tier, attendance and prestige, wages, transfers; attendance grows with success. No stadium building or ticket prices. Insolvency is a shock, as specified in the tenure model.
 
 ## Media, awards and history (phase 6)
 
@@ -237,6 +258,7 @@ The model is right when the AI population looks like the real one. Simulate 500 
 - Match: goals per game ≈ 2.7; home win / draw / away win ≈ 45 / 26 / 29; yellow cards ≈ 3–4 a match, reds ≈ 0.2 — all to verify against real league averages. The minute engine and the fast path agree within tolerance. A match plays in about a minute at full speed.
 - Players and tactics: the best XI per club averages club strength (until phase 4); every trait is read by a rule; match ratings average ≈ 6.9 with a spread of about 0.6; no formation or style beats the mean points per game by more than 10%.
 - Your players: across the AI population, the best maker's Legacy lands within 20% of the best trophy-winner's; buying finished players yields under 10% of players-made points; follow-you moves average about one per two job changes and never exceed two per move; a player under 24 who starts a season gains at least three times the rating of one who sits it out.
+- Decisions: for each decision type, bold options' mean effect within 10% of cautious options', with at least 1.5× the variance. Signings: about 40% beat the director's estimate, about 25% fall short, scaled by his judgement (a starting point, not a real-world figure).
 - After phase 4: the population targets still hold with strength derived from squads. After phase 5: fewer than 2% of clubs are insolvent in any season.
 
 These are starting targets from memory, to verify against the LMA's end-of-season reports and real league statistics before locking in. Encode them as tests.
@@ -247,7 +269,7 @@ These are starting targets from memory, to verify against the LMA's end-of-seaso
 1. Engine, headless sim, validation. (done)
 2. Browser play, deployed to GitHub Pages. (done)
 3. Match layer. (a) fixtures and one match per turn (done); (b) players, traits, positions, ratings, contracts, formations and tactics, tagging, growth with minutes, milestone news, the players-made line and its career-page list, with the one-shot model taking effective XI, bands, width, mentality and style until (c) replaces it; (c) the minute engine, the fast path, their validation; (d) the screens — squad, player profile, tactics, pre-match with the opposition report, the match view with commentary, stats, latest scores and controls — unstyled.
-4. Transfers, including players who follow you.
+4. Transfers: the windows, the director of football, requests, decisions as bets retrofitted to every existing decision, players who follow you, and the flip to strength derived from the squad.
 5. Club levels, youth, money.
 6. Media, awards, histories; the obituary's three names and the makers' list.
 7. Claude Design, then the designed web app replaces the unstyled one; JSON saves, shareable career page.

@@ -7,8 +7,8 @@
     "You sold {sold} senior player{soldPlural} for £{cash}m. The squad is thinner, and more yours."
   ],
   "summer": [
-    "Pre-season report: the squad aged a year ({ageing} for age), drifted {gravity} toward its natural level, and the academy added {youthReleased}. Strength now {strength}.",
-    "Pre-season: age {ageing}, gravity {gravity}, academy {youthReleased}. Squad strength {strength}."
+    "Pre-season report: the academy added {youth}, the squad is a year older, and the eleven now averages {strength} at {avgAge}.",
+    "Pre-season: {youth} up from the academy, the squad a year older; the eleven averages {strength}, mean age {avgAge}."
   ],
   "fallout": [
     "A senior player has gone to the press about you. The dressing room is watching how you respond."

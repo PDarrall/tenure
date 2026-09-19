@@ -140,9 +140,13 @@ function showDecisions(decisions: Decision[]): void {
   decisions.forEach((d, i) => {
     console.log(`  ${i + 1}${d.blocking ? '*' : ' '} [${d.from}] ${d.title}`)
     console.log(`     ${d.body}`)
-    d.options.forEach((o, j) => console.log(`       ${LETTERS[j]}) ${o.label}${o.detail ? ` — ${o.detail}` : ''}`))
+    d.options.forEach((o, j) => {
+      console.log(`       ${LETTERS[j]}) ${o.label}${o.detail ? ` — ${o.detail}` : ''}${o.key === d.defaultKey ? '  (default)' : ''}`)
+      // Every option is a bet: likely, downside, confidence (DESIGN.md "Decisions are bets").
+      if (o.likely) console.log(`          likely: ${o.likely}  downside: ${o.downside}  [${o.confidence}]`)
+    })
   })
-  if (decisions.some((d) => d.blocking)) console.log('  Answer the starred decisions before moving on: e.g. "1 b".')
+  if (decisions.some((d) => d.blocking)) console.log('  Answer the starred decisions before moving on: e.g. "1 b". The default is the cautious option; Enter takes it.')
 }
 
 function showVacancies(world: World): void {

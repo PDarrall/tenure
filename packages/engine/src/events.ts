@@ -23,6 +23,7 @@ const NEWS = new Set([
   'vacancy.opened',
   'vacancy.filled',
   'shock.takeover',
+  'window.closed',
   'human.decision',
   'human.decided',
   'human.input',

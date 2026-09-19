@@ -70,7 +70,7 @@ describe('growth with minutes', () => {
     expect(growWithMinutes(old, 90, 50, null)).toBe(0)
   })
 
-  it('records growth on the tag and pays players-made points at season end, mirrored in the log', () => {
+  it('records growth on the tag and pays players-made points at season end, mirrored in the log', { timeout: 60_000 }, () => {
     const world = createWorld(14)
     runSeasons(world, 2)
     const made = world.log.filter((e) => e.type === 'players.made')

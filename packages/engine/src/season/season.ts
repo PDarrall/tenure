@@ -15,7 +15,7 @@ import { createMatch, factsOf, scoreline, type MatchState, type SideSetup } from
 import { freshSeasonStats } from '../players/gen.js'
 import { milestone, seasonMilestones, settleSeasonGrowth, tierAboveMilestones } from '../players/made.js'
 import { drawRound, isFinal, seedCups } from './cups.js'
-import { decayMorale, runHumanWindow, runWindow, summerFreeAgents, summerSquad, updateMorale, type WindowSummary } from './squad.js'
+import { decayMorale, summerFreeAgents, summerSquad, updateMorale } from './squad.js'
 import { awardHonour, settleLeagues } from './promotion.js'
 import { dropOpponentSquad, ensureOpponentSquad } from './europe.js'
 import { europeanOpponentById } from '../lookup.js'
@@ -586,28 +586,6 @@ export function endSeason(world: World, rng: Rng, extrasFor: ExtrasFor = noExtra
     relegated: [...outcome.relegated],
   })
   return outcome
-}
-
-export type BudgetMultiplierFor = (clubId: ClubId) => number
-const flatBudget: BudgetMultiplierFor = () => 1
-
-/** The human's club follows the player's plan when one is set; every other club is AI-run. */
-function windowFor(world: World, rng: Rng, club: Club, summer: boolean, multiplier: number): WindowSummary {
-  const state = world.human
-  if (state && club.managerId === state.managerId && state.windowChoice) {
-    const summary = runHumanWindow(world, rng, club, summer, multiplier, state.windowChoice)
-    state.windowChoice = null
-    return summary
-  }
-  return runWindow(world, rng, club, summer, multiplier)
-}
-
-export function summerWindow(world: World, rng: Rng, multiplierFor: BudgetMultiplierFor = flatBudget): WindowSummary[] {
-  return world.clubs.map((club) => windowFor(world, rng, club, true, multiplierFor(club.id)))
-}
-
-export function winterWindow(world: World, rng: Rng): WindowSummary[] {
-  return world.clubs.map((club) => windowFor(world, rng, club, false, 1))
 }
 
 export { tableFor }

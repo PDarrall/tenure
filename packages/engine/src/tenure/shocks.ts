@@ -8,10 +8,10 @@ import { addCredit } from './credit.js'
 import { easeExpectation } from './expectation.js'
 import { thresholdFor } from './spell.js'
 import { queueFallout } from '../play/decisions.js'
-import { anchorSquad } from '../players/gen.js'
-import { clubFormation, squadOf } from '../players/select.js'
-import { releasePlayer } from '../players/gen.js'
-import { moveOn } from '../season/squad.js'
+import { rollKind } from '../play/bets.js'
+import { squadOf } from '../players/select.js'
+import { refreshStrength } from '../season/squad.js'
+import { sellPlayer } from '../market/director.js'
 import { tagOf } from '../players/made.js'
 
 function drawOwnerType(rng: Rng): OwnerType {
@@ -63,13 +63,18 @@ export function monthlyShocks(world: World, rng: Rng, spell: Spell): void {
   }
 
   if (lowWealth && rng.chance(T.STAR_SALE_P)) {
-    club.squad.strength = round1(clamp(club.squad.strength + T.STAR_SALE_STRENGTH, 1, 100))
-    anchorSquad(world, club, club.squad.strength, clubFormation(world, club))
+    // The owner sells the best outfielder over the board's head: the fee lands in the pot, the side is what is left.
+    const star = squadOf(world, club).filter((p) => p.position !== 'GK').sort((a, b) => b.rating - a.rating || a.id - b.id)[0]
+    if (star) sellPlayer(world, rng, star, club, star.value, null, null)
+    refreshStrength(world, club)
     easeExpectation(world, spell, T.STAR_SALE_EXPECTATION_EASE)
     emit(world, 'shock.starSale', {
       clubId: club.id,
       managerId: spell.managerId,
       spellId: spell.id,
+      playerId: star ? star.id : null,
+      name: star ? star.name : null,
+      fee: star ? star.value : 0,
       strength: club.squad.strength,
       expectation: spell.expectation,
       season: world.season,
@@ -104,24 +109,19 @@ export function maybeFallout(world: World, rng: Rng, spell: Spell): void {
   resolveFallout(world, spell, rng, manager.ability.motivation < T.AI_FALLOUT_SELL_BELOW_MOTIVATION)
 }
 
-/** Settle a fallout: sell the player (ownership up, strength down) or back down (morale down). */
+/** Settle a fallout: sell the player (ownership up, strength down) or back down; either way the dressing room's morale is the roll. */
 export function resolveFallout(world: World, spell: Spell, rng: Rng, sell: boolean): void {
   if (spell.post.kind !== 'home') return
   const club = clubById(world, spell.post.clubId)
   const manager = managerById(world, spell.managerId)
   const senior = spell.falloutPlayerId === null || spell.falloutPlayerId === undefined ? undefined : playerById(world, spell.falloutPlayerId)
   spell.falloutPlayerId = null
+  rollKind(world, rng, 'fallout', sell ? 'sell' : 'back-down', { managerId: manager.id, spellId: spell.id, clubId: club.id, label: sell ? 'sell him' : 'back down' })
   if (sell) {
     spell.ownership = round1(clamp(spell.ownership + T.FALLOUT_OWNERSHIP_GAIN, 0, 1) * 100) / 100
-    club.squad.strength = round1(clamp(club.squad.strength - T.FALLOUT_STRENGTH_LOSS, 1, 100))
-    if (senior && senior.clubId === club.id) {
-      releasePlayer(world, senior, club)
-      emit(world, 'player.left', { playerId: senior.id, clubId: club.id, managerId: manager.id, name: senior.name, rating: senior.rating, fee: senior.value, reason: 'sold', season: world.season })
-      moveOn(world, rng, senior, club)
-    }
-    anchorSquad(world, club, club.squad.strength, clubFormation(world, club))
+    if (senior && senior.clubId === club.id) sellPlayer(world, rng, senior, club, senior.value, manager.id, null)
+    refreshStrength(world, club)
   } else {
-    club.squad.morale = round1(clamp(club.squad.morale - T.FALLOUT_MORALE_LOSS, 0, 100))
     // Backing down is taking his side: the bond deepens if he is one of yours.
     if (senior) {
       const tag = tagOf(senior, manager.id)
