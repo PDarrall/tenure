@@ -13,6 +13,7 @@ import { renderText } from '../text/render.js'
 import { plainOption } from './bets.js'
 import { hasPending, humanState, pendingDecisions, queueDecision } from './decisions.js'
 import { humanClub, placeBid, proposeSale, proposeSignings, refuseSale, sellPlayer, wageBill, windowAt, type Candidate, type SaleProposal, type WindowName } from '../market/director.js'
+import { bidToFollow, type Follower } from '../market/follow.js'
 import { seasonWeek } from '../season/calendar.js'
 
 /** A recommendation card: the player as ranges, fee, wage, reason, confidence, the pot after. */
@@ -184,4 +185,37 @@ export function applySale(world: World, rng: Rng, decision: Decision, key: strin
   const bidderId = (decision.payload['bidderId'] as number | null) ?? null
   if (key === 'approve') sellPlayer(world, rng, p, mine.club, fee, mine.manager.id, bidderId)
   else refuseSale(world, p, mine.club, { fee, unsettled: decision.payload['unsettled'] === true, bidderId }, mine.manager.id)
+}
+
+/** A follower's card at a hire: approve and the bid goes in at the next window, or decline. */
+export function queueFollow(world: World, f: Follower, club: { id: number }): Decision {
+  const p = f.player
+  const from = p.clubId > 0 ? clubById(world, p.clubId).name : 'the free-agent pool'
+  const body = renderText('director', p.clubId === 0 ? 'follow_free' : 'follow_card', { name: p.name, position: p.position, age: p.age, rating: Math.round(p.rating), club: from, fee: f.fee, wage: f.wage, loyal: f.loyal ? ' (loyal: he asks less of you)' : '' }, world.week)
+  return queueDecision(world, {
+    kind: 'follow',
+    from: 'director',
+    title: `${p.name} wants to follow you`,
+    body,
+    options: [
+      plainOption('follow', 'approve', f.fee > 0 ? `Bring him (£${f.fee}m)` : 'Bring him (a free)', p.clubId === 0 ? 'sure thing' : 'likely', {}, world.week, `£${f.wage}k a week`),
+      plainOption('follow', 'decline', 'Leave him where he is', 'sure thing', {}, world.week),
+    ],
+    defaultKey: 'decline',
+    blocking: false,
+    payload: { playerId: p.id, name: p.name, position: p.position, age: p.age, rating: Math.round(p.rating), fromClubId: p.clubId, from, fee: f.fee, wage: f.wage, bond: f.bond, loyal: f.loyal, clubId: club.id },
+  })
+}
+
+export function applyFollow(world: World, decision: Decision, key: string): void {
+  const mine = humanClub(world)
+  const p = playerById(world, decision.payload['playerId'] as PlayerId)
+  if (!mine || !p || p.retired || p.clubId === mine.club.id) return
+  if (key !== 'approve') {
+    emit(world, 'follow.declined', { playerId: p.id, name: p.name, managerId: mine.manager.id, clubId: mine.club.id, season: world.season })
+    return
+  }
+  const fee = decision.payload['fee'] as number
+  const wage = decision.payload['wage'] as number
+  bidToFollow(world, mine.club, mine.manager, { player: p, bond: decision.payload['bond'] as number, fee, wage, loyal: decision.payload['loyal'] === true })
 }

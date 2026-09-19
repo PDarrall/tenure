@@ -178,6 +178,7 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
   const match = matchAverages(world)
   const europe = europeanTitles(world)
   const decisions = decisionFairness(world)
+  const follow = followStats(world)
   const lines: StatLine[] = [
     line('firstSpellMedianSeasons', 'Median first-spell length (seasons)', median(firstSpellLengths), 'seasons'),
     line('firstSpellInsideSeasonShare', 'First spells ending inside a season', firstSpells.length ? insideSeason / firstSpells.length : 0, 'share'),
@@ -204,6 +205,8 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     line('europeanTitlesOutsideTopThree', 'European titles won from outside the top three of tier 1', europe.outsideTopThree, 'share'),
     line('decisionFairnessGap', `Decisions: worst gap between bold and cautious means net of sampling noise, in bold spreads (${decisions.worstGapKind})`, decisions.worstGap, 'number'),
     line('decisionVarianceRatio', `Decisions: lowest bold-to-cautious variance ratio (${decisions.worstRatioKind})`, decisions.worstRatio, 'number'),
+    line('followMovesPerJobChange', 'Follow-you moves per job change', follow.perHire, 'number'),
+    line('followMaxPerMove', 'Most follow-you moves in one job change', follow.maxPerMove, 'count'),
   ]
 
   const endReasons: Record<string, number> = {}
@@ -263,6 +266,9 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     'mean age at career end': ended.length ? ended.reduce((s, m) => s + m.age, 0) / ended.length : 0,
     'events logged': world.log.length,
   }
+  extras['follow moves'] = follow.moves
+  extras['follow asks'] = follow.asks
+  extras['hires'] = follow.hires
   for (const k of decisions.kinds) {
     extras[`decision ${k.kind}: bold rolls`] = k.boldN
     extras[`decision ${k.kind}: cautious rolls`] = k.cautiousN
@@ -421,4 +427,24 @@ export function decisionFairness(world: World): { kinds: DecisionKindFairness[];
   }
   if (worstRatio === Infinity) worstRatio = 0
   return { kinds, worstGap, worstGapKind, worstRatio, worstRatioKind }
+}
+
+/** Following you (DESIGN.md "Your players"): moves per job change and the most in one move, from the log. */
+export function followStats(world: World): { moves: number; asks: number; hires: number; perHire: number; maxPerMove: number } {
+  let moves = 0
+  let asks = 0
+  let hires = 0
+  const perManagerHire = new Map<string, number>()
+  for (const e of world.log) {
+    if (e.type === 'vacancy.filled') hires++
+    else if (e.type === 'follow.asked') asks++
+    else if (e.type === 'follow.moved') {
+      moves++
+      const key = `${e.payload['managerId']}:${e.payload['clubId']}`
+      perManagerHire.set(key, (perManagerHire.get(key) ?? 0) + 1)
+    }
+  }
+  let maxPerMove = 0
+  for (const n of perManagerHire.values()) if (n > maxPerMove) maxPerMove = n
+  return { moves, asks, hires, perHire: hires ? Math.round((moves / hires) * 1000) / 1000 : 0, maxPerMove }
 }

@@ -265,5 +265,17 @@
   ],
   "sale_refuse_downside": [
     "An unsettled player kept against a big bid takes the room down with him."
+  ],
+  "follow_approve_likely": [
+    "The bid goes in at the next window; he comes if his club sells and the pot holds."
+  ],
+  "follow_approve_downside": [
+    "The fee and the wage come out of what the director has to work with."
+  ],
+  "follow_decline_likely": [
+    "He stays where he is; the bond holds."
+  ],
+  "follow_decline_downside": [
+    "A player who asked and was refused remembers it a little."
   ]
 }

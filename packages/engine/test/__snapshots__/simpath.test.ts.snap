@@ -1,5 +1,5 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`the population simulation path > produces the same state after one season of seed 7 1`] = `"97473a1a"`;
+exports[`the population simulation path > produces the same state after one season of seed 7 1`] = `"73d663d1"`;
 
-exports[`the population simulation path > produces the same state after two seasons of seed 1 1`] = `"fe84240f"`;
+exports[`the population simulation path > produces the same state after two seasons of seed 1 1`] = `"3a11f745"`;

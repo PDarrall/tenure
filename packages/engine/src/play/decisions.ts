@@ -21,7 +21,7 @@ import { setActivity } from '../market/unemployment.js'
 import { applyContract, applyNewDeal, applyWantsAway } from '../players/contracts.js'
 import { ordinal, renderText } from '../text/render.js'
 import { betFor, betOption, markDefault, plainOption, resolveBet } from './bets.js'
-import { applySale, applySigning } from './transfers.js'
+import { applyFollow, applySale, applySigning } from './transfers.js'
 
 export function human(world: World): Manager {
   if (!world.human) throw new Error('no human in this world')
@@ -300,6 +300,9 @@ export function applyAnswer(world: World, rng: Rng, decision: Decision, rawKey: 
       break
     case 'sale':
       applySale(world, rng, decision, key)
+      break
+    case 'follow':
+      applyFollow(world, decision, key)
       break
     case 'press': {
       const spell = spellOf(world, manager)

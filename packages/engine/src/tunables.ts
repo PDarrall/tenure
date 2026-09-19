@@ -1165,6 +1165,20 @@ export const T = {
   ABROAD_CLUB_ID: -1,
 
   // ---------------------------------------------------------------------------
+  // Following you (DESIGN.md "Your players"). Serves: followMovesPerJobChange
+  // ≈ 0.5, never more than FOLLOW_MAX per move.
+  // ---------------------------------------------------------------------------
+
+  /** A tagged player asks to follow when his bond is at least this. */
+  FOLLOW_BOND_THRESHOLD: 10,
+  /** At most this many per move. DESIGN: two. */
+  FOLLOW_MAX: 2,
+  /** The old club's asking price: value × this. */
+  FOLLOW_ASKING_PREMIUM: 1.2,
+  /** An AI manager takes a follower who asks with this chance (the human is asked by a card). At 0.6, seed 1 gave 0.33 moves per job change (a third of asks complete after the two rolls); 0.85 aims at the 0.5 target. */
+  AI_FOLLOW_P: 0.85,
+
+  // ---------------------------------------------------------------------------
   // Requests (DESIGN.md "Requests"): each a bet with a stated likelihood.
   // Serves: the player's asks cost something and pay something.
   // ---------------------------------------------------------------------------
@@ -1294,6 +1308,9 @@ export const T = {
     /** Decisions (DESIGN.md "Decisions are bets"): per kind, the bold options' mean effect within 10% of the cautious options' (in units of the bold spread), with at least 1.5× the variance. The lines report the worst kind. */
     decisionFairnessGap: { target: 0, min: 0, max: 0.1 },
     decisionVarianceRatio: { target: 3, min: 1.5, max: 1000 },
+    /** Following you (DESIGN.md "Your players"): follow-you moves average about one per two job changes and never exceed two per move. */
+    followMovesPerJobChange: { target: 0.5, min: 0.25, max: 0.8 },
+    followMaxPerMove: { target: 2, min: 0, max: 2 },
   } as const,
 
   /** How many of each kind the maker-to-winner comparison takes: the ten biggest makers against the ten biggest trophy-winners. */

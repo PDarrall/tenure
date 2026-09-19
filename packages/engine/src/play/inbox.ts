@@ -338,6 +338,10 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
       case 'sold.shines':
         if (mine(e)) push(e, 'press', renderText('director', 'sold_shines', { name: String(p['name']), club: clubNameOf(world, p['clubId'] as number) }, e.week))
         break
+      case 'follow.moved':
+        if (mine(e)) push(e, 'staff', renderText('director', 'follow_moved', { name: String(p['name']), fee: p['fee'] as number, club: clubNameOf(world, p['clubId'] as number), wage: p['wage'] as number }, e.week))
+        else push(e, 'news', renderText('director', 'news_follow', { name: String(p['name']), manager: nameOf(p['managerId']), club: clubNameOf(world, p['clubId'] as number), fee: p['fee'] as number }, e.week))
+        break
       case 'director.another':
         if (mine(e)) push(e, 'staff', renderText('director', 'another', {}, e.week))
         break

@@ -79,5 +79,17 @@
   ],
   "no_money": [
     "The pot is empty: the director has nothing to spend. Anything more is a request to the board."
+  ],
+  "follow_card": [
+    "{name} ({position}, {age}, rated {rating}) wants to come with you from {club}. They ask £{fee}m; he asks £{wage}k a week{loyal}. He would come in the next window."
+  ],
+  "follow_free": [
+    "{name} ({position}, {age}, rated {rating}) is a free agent and wants to come with you. £{wage}k a week{loyal}. He would come in the next window."
+  ],
+  "follow_moved": [
+    "{name} has followed you: £{fee}m to {club}, £{wage}k a week. The press have noticed."
+  ],
+  "news_follow": [
+    "{name} follows {manager} to {club} for £{fee}m."
   ]
 }

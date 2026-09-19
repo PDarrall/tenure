@@ -300,6 +300,8 @@ export interface Bid {
   managerId: ManagerId | null
   /** Why the director proposed him; kept for the news. */
   reason: SigningReason
+  /** A player following his manager to a new club (DESIGN.md "Following you"): no estimate to reveal, the old club's asking price. */
+  follow?: boolean
 }
 
 export type SigningReason = 'need' | 'request' | 'bargain'
@@ -673,6 +675,7 @@ export type DecisionKind =
   | 'wantsAway'
   | 'signing'
   | 'sale'
+  | 'follow'
 
 /** How sure the adviser is of an option, in words (DESIGN.md "Decisions are bets"). */
 export type Confidence = 'sure thing' | 'likely' | 'gamble'

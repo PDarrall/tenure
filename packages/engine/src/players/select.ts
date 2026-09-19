@@ -242,6 +242,9 @@ export function xiBands(world: World, xi: readonly PlayerId[], formation: Format
   }
 }
 
+/** Two effective ratings within this are a tie (floating-point noise from a penalty subtraction must not flip a pick, or anchoring oscillates). */
+const TIE_EPSILON = 1e-6
+
 /** The best XI mean in a formation: the anchoring number (DESIGN.md "club strength stays the master number"). */
 export function bestXiMean(world: World, club: { playerIds: PlayerId[] }, formation: Formation): number {
   const pool = squadOf(world, club)
@@ -254,7 +257,7 @@ export function bestXiMean(world: World, club: { playerIds: PlayerId[] }, format
     for (const p of pool) {
       if (taken.has(p.id)) continue
       const r = p.rating - positionPenalty(p, slot)
-      if (r > bestRating) {
+      if (r > bestRating + TIE_EPSILON) {
         best = p
         bestRating = r
       }

@@ -127,6 +127,13 @@ describe('500 AI careers (DESIGN.md validation targets, to verify)', () => {
     }
   })
 
+  it('follow-you moves average about one per two job changes and never exceed two per move', () => {
+    const per = line('followMovesPerJobChange')
+    const most = line('followMaxPerMove')
+    expect(per.pass, describeLine(per)).toBe(true)
+    expect(most.pass, describeLine(most)).toBe(true)
+  })
+
   it('decisions are bets: per kind, bold options land within 10% of cautious ones with at least 1.5× the variance', () => {
     const gap = line('decisionFairnessGap')
     const ratio = line('decisionVarianceRatio')

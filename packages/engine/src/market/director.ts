@@ -23,7 +23,8 @@ import { tagPlayer, milestone } from '../players/made.js'
 import { addCredit } from '../tenure/credit.js'
 import { bumpReputation } from '../tenure/exits.js'
 import { averageRating } from '../match/aftermath.js'
-import { normalBudget, moveOn } from '../season/squad.js'
+import { normalBudget, moveOn, topUpSquad, trimSquad } from '../season/squad.js'
+import { anchorSquad } from '../players/gen.js'
 
 // ---------------------------------------------------------------------------
 // Windows
@@ -401,8 +402,9 @@ export function completeSigning(world: World, rng: Rng, bid: Bid, p: Player, buy
   p.contract = { years: bid.years, wage: bid.wage }
   p.season = { ...p.season, clubId: buyer.id, tier: buyer.tier }
   const director = buyer.director
-  const { estimate, potentialEstimate } = estimateOf(rng, director, p)
-  p.scouted = { estimate, potentialEstimate, halfWidth: rangeHalf(director.judgement), matchesSeen: 0, revealed: false, fee, fromClubId: from, managerId: bid.managerId, week: world.week }
+  const { estimate, potentialEstimate } = bid.follow ? { estimate: p.rating, potentialEstimate: p.potential } : estimateOf(rng, director, p)
+  // A follower is known: nothing to reveal. Anyone else is the director's bet.
+  p.scouted = bid.follow ? null : { estimate, potentialEstimate, halfWidth: rangeHalf(director.judgement), matchesSeen: 0, revealed: false, fee, fromClubId: from, managerId: bid.managerId, week: world.week }
   const manager = bid.managerId === null ? undefined : managerById(world, bid.managerId)
   if (manager) tagPlayer(world, p, manager, buyer, 'signed')
   if (fee >= T.TRANSFER_MILESTONE_FEE) milestone(world, p, 'transfer', { fee, fromClubId: from, toClubId: buyer.id })
@@ -422,14 +424,16 @@ export function completeSigning(world: World, rng: Rng, bid: Bid, p: Player, buy
     free: from === 0,
     abroad: from === T.ABROAD_CLUB_ID,
     estimate,
-    lo: Math.round(estimate - p.scouted.halfWidth),
-    hi: Math.round(estimate + p.scouted.halfWidth),
+    lo: Math.round(estimate - (p.scouted ? p.scouted.halfWidth : 0)),
+    hi: Math.round(estimate + (p.scouted ? p.scouted.halfWidth : 0)),
     reason: bid.reason,
+    follow: bid.follow === true,
     clubP: round1(rolls.clubP * 100) / 100,
     playerP: round1(rolls.playerP * 100) / 100,
     pot: buyer.transferPot,
     season: world.season,
   })
+  if (bid.follow) emit(world, 'follow.moved', { playerId: p.id, name: p.name, managerId: bid.managerId, clubId: buyer.id, fromClubId: from, fee, wage: bid.wage, season: world.season })
 }
 
 // ---------------------------------------------------------------------------
@@ -579,11 +583,21 @@ export function settleSoldShines(world: World): void {
 // The window's close
 // ---------------------------------------------------------------------------
 
-/** Deadline day: every bid has been answered; candidates from abroad nobody signed are forgotten; the summary goes in the log. */
+/**
+ * Deadline day: every bid has been answered; candidates from abroad nobody
+ * signed are forgotten; every squad is back at its tier's size (the
+ * reserves fill from the pool and the academy, the surplus goes); the
+ * summary goes in the log.
+ */
 export function closeWindow(world: World, rng: Rng, window: WindowName): void {
-  void rng
   for (const p of world.players) {
     if (p && !p.retired && p.abroad && p.clubId === T.ABROAD_CLUB_ID) forgetPlayer(world, p)
+  }
+  for (const club of world.clubs) {
+    trimSquad(world, rng, club)
+    topUpSquad(world, rng, club)
+    // Strength is still the master number for AI clubs until the flip; the human's side is what it is.
+    if (!(world.human && club.managerId === world.human.managerId)) anchorSquad(world, club, club.squad.strength, clubFormation(world, club))
   }
   const opened = openedWeek(world, window)
   for (const club of world.clubs) {
