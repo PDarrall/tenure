@@ -3,6 +3,7 @@ import { careerSummary, competitionName, ordinal, type World } from '@tenure/eng
 import { withResign, withRetire, type Session } from '../controller.js'
 import { bandLine, player, seasonLine } from './common.js'
 import { Head, SectionLabel, Star, Stat } from './ui.js'
+import { buildStamp } from '../build.js'
 
 const BACKGROUND: Record<string, string> = { 'ex-pro': 'Ex-pro', coach: 'Coach', analyst: 'Analyst' }
 const TAG_NAMES: Record<string, string> = {
@@ -207,6 +208,7 @@ export function Career({ session, onChange, onExport, onImport, onReset }: Props
           {session.inputs.resign && <div className="caption">You resign when you continue. The board will not stand in your way.</div>}
           {session.inputs.retire && <div className="caption">You retire when you continue: the career ends and the score is banked.</div>}
         </div>
+        <div className="build-stamp" data-testid="build-stamp">{buildStamp()}</div>
         <div className="tail" />
       </div>
     </>

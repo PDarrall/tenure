@@ -25,6 +25,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Stamp the build with the short commit hash and today's date
+        run: |
+          echo "VITE_COMMIT=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+          echo "VITE_DEPLOYED=$(date -u '+%-d %b %Y')" >> "$GITHUB_ENV"
       - run: pnpm --filter @tenure/web build
       - uses: actions/configure-pages@v5
         with:

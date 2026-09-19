@@ -50,6 +50,8 @@ test('a season on an iPad: the match view, subs, mentality, a cup tie, a contrac
   await page.getByTestId('tab-career').click()
   await expect(page.getByText(/Players made/).first()).toBeVisible()
   await expect(page.getByText(/Legacy/).first()).toBeVisible()
+  // The version stamp at the foot: the commit and date the Pages workflow injects, "dev" in a local build.
+  await expect(page.getByTestId('build-stamp')).toHaveText(/^Build (dev|[0-9a-f]{7})/)
 
   // Renew a contract: open the squad, the first player in his last year, talk terms.
   await page.getByTestId('tab-squad').click()
