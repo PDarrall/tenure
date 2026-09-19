@@ -111,6 +111,8 @@ test('a summer window: one signing approved, one declined, one "ask for another"
   const first = cards.first()
   await expect(first.getByText(/Likely/).first()).toBeVisible()
   await expect(first.getByText(/Downside/).first()).toBeVisible()
+  // Each stacked option sizes to its content: the bet lines stay inside their button (styles.css `.choices.stacked .choice`).
+  expect(await first.locator('.choices.stacked .choice').evaluateAll((els) => els.filter((el) => el.scrollHeight > el.clientHeight + 1).length)).toBe(0)
   await expect(first.locator('[data-default="true"]')).toHaveCount(1)
   await expect(first.locator('[data-default="true"]')).toHaveAttribute('data-key', 'decline')
 
