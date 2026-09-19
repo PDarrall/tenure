@@ -4,7 +4,7 @@ import { createWorld } from '../src/world/gen.js'
 import { createRng, type Rng } from '../src/rng.js'
 import { runSeasons, runWeeks } from '../src/sim/advance.js'
 import { lineupFor } from '../src/season/season.js'
-import { bestReplacement, createMatch, factsOf, runToEnd, setMentality, substitute, tick, type MatchState, type SideSetup } from '../src/match/minute.js'
+import { bestReplacement, createMatch, factsOf, injuredNeedingChange, runToEnd, runToEndWithDefaults, runToNextPause, setMentality, substitute, tick, type MatchState, type SideSetup } from '../src/match/minute.js'
 import { T } from '../src/tunables.js'
 import type { Club, World } from '../src/types.js'
 
@@ -23,6 +23,14 @@ function sameTierPair(world: World, rng: Rng): [Club, Club] {
     const away = rng.pick(world.clubs)
     if (home.id !== away.id && home.tier === away.tier) return [home, away]
   }
+}
+
+/** The same human-home match every time from one seed: the pair, the lineups and the match's own generator all follow the seed. */
+function seededMatch(seed: number): MatchState {
+  const world = createWorld(seed)
+  const rng = createRng(seed)
+  const [home, away] = sameTierPair(world, rng)
+  return matchBetween(world, rng, home, away, true)
 }
 
 function tickTo(state: MatchState, minute: number): void {
@@ -131,7 +139,7 @@ describe('the minute engine over many matches', () => {
     expect(onTarget).toBeLessThan(shots)
   })
 
-  it('pauses at goals, red cards, injuries, half time and full time, and not at fouls', () => {
+  it('pauses at goals, red cards, half time and full time, and not at fouls; an injury pauses only when it is the human\'s to answer', () => {
     const kinds = new Map<string, { pause: number; total: number }>()
     for (const m of matches) {
       for (const e of m.events) {
@@ -141,12 +149,13 @@ describe('the minute engine over many matches', () => {
         kinds.set(e.kind, k)
       }
     }
-    for (const kind of ['goal', 'red', 'injury', 'halftime', 'fulltime']) {
+    for (const kind of ['goal', 'red', 'halftime', 'fulltime']) {
       const k = kinds.get(kind)
       expect(k, kind).toBeDefined()
       expect(k!.pause, kind).toBe(k!.total)
     }
-    for (const kind of ['foul', 'yellow', 'save', 'miss', 'block', 'sub', 'mentality']) {
+    // Nobody here is human: the AI replaces its injured at once, so nothing stops.
+    for (const kind of ['injury', 'foul', 'yellow', 'save', 'miss', 'block', 'sub', 'mentality']) {
       const k = kinds.get(kind)
       expect(k, kind).toBeDefined()
       expect(k!.pause, kind).toBe(0)
@@ -314,6 +323,58 @@ describe('decisions during a match', () => {
     expect(facts.players.find((p) => p.playerId === sub.id)!.minutes).toBeGreaterThan(0)
     expect(facts.players.find((p) => p.playerId === sub.id)!.started).toBe(false)
     expect(facts.players.find((p) => p.playerId === starter.id)!.minutes).toBeLessThan(state.played)
+  })
+
+  it('to key events: each call plays to the next pause and returns what stopped it', () => {
+    const m = seededMatch(31)
+    const stops: string[] = []
+    let calls = 0
+    while (!m.over && calls++ < 60) {
+      const events = runToNextPause(m)
+      expect(events.length).toBeGreaterThan(0)
+      // The call stops on the minute of its first pause: every pausing event it returns is from that minute.
+      const pausing = events.filter((e) => e.pause)
+      expect(pausing.length).toBeGreaterThanOrEqual(1)
+      expect(new Set(pausing.map((e) => `${m.half}-${e.minute}`)).size).toBe(1)
+      stops.push(pausing[pausing.length - 1]!.kind)
+    }
+    expect(m.over).toBe(true)
+    expect(stops).toContain('halftime')
+    expect(stops[stops.length - 1]).toBe('fulltime')
+    expect(stops.every((k) => ['goal', 'red', 'injury', 'halftime', 'fulltime', 'shootout'].includes(k))).toBe(true)
+    // The same match, minute by minute, lands on the same result and the same events.
+    const again = seededMatch(31)
+    runToEnd(again)
+    expect(again.events.map((e) => e.text)).toEqual(m.events.map((e) => e.text))
+  })
+
+  it('to full time with defaults: the assistant replaces the human side\'s injury with the best on the bench', () => {
+    // Find a match where the human side is injured while it still has a change to make.
+    let found: { seed: number; minute: number; playerId: number } | null = null
+    for (let seed = 40; seed < 400 && !found; seed++) {
+      const m = seededMatch(seed)
+      runToEnd(m)
+      const inj = m.events.find((e) => e.kind === 'injury' && e.side === 'home')
+      if (inj && inj.minute < 45 && m.home.subsUsed === 0) found = { seed, minute: inj.minute, playerId: inj.playerId! }
+    }
+    expect(found).not.toBeNull()
+    const { seed, minute, playerId } = found!
+    // Plain: the human side plays on with ten, and the injury needs a change.
+    const plain = seededMatch(seed)
+    tickTo(plain, minute)
+    expect(injuredNeedingChange(plain, 'home').map((p) => p.id)).toEqual([playerId])
+    expect(plain.events.find((e) => e.kind === 'injury' && e.side === 'home')!.pause).toBe(true)
+    // With defaults: the best on the bench takes his slot in the same minute, and the pause is not the view's concern.
+    const assisted = seededMatch(seed)
+    const wanted = bestReplacement(plain, 'home', playerId)
+    runToEndWithDefaults(assisted)
+    const sub = assisted.events.find((e) => e.kind === 'sub' && e.side === 'home' && e.minute === minute)
+    expect(sub).toBeDefined()
+    expect(sub!.playerId).toBe(wanted)
+    expect(assisted.home.subsUsed).toBeGreaterThanOrEqual(1)
+    expect(assisted.home.players.find((p) => p.id === playerId)!.on).toBe(false)
+    expect(injuredNeedingChange(assisted, 'home')).toEqual([])
+    expect(assisted.over).toBe(true)
   })
 
   it('settles a level cup tie on penalties', () => {
