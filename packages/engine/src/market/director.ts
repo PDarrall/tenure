@@ -239,6 +239,8 @@ export interface ProposeOptions {
   /** Share of the cards from abroad. */
   abroadShare?: number
   index?: MarketIndex
+  /** Where to look: anywhere (the default), the free-agent pool only, or other clubs only (targets for a window). */
+  pool?: 'any' | 'free' | 'clubs'
 }
 
 /**
@@ -265,8 +267,11 @@ export function proposeSignings(world: World, rng: Rng, club: Club, count: numbe
     const floor = Math.max(need.rating + T.DIRECTOR_MIN_GAIN, aim - T.DIRECTOR_REACH_BELOW)
     const fromAbroad = i >= count - abroadCards
     let best: Candidate | null = null
+    const pool = options.pool ?? 'any'
     const consider = (p: Player, reason: SigningReason) => {
       if (used.has(p.id) || p.retired || p.clubId === club.id) return
+      if (pool === 'free' && p.clubId !== 0) return
+      if (pool === 'clubs' && p.clubId <= 0) return
       if (p.position !== need.slot.position) return
       if (p.rating < floor || p.rating > ceiling) return
       const fee = feeFor(p)
@@ -282,7 +287,7 @@ export function proposeSignings(world: World, rng: Rng, club: Club, count: numbe
       const score = (c: Candidate) => c.estimate - (c.fee / Math.max(1, club.transferPot)) * T.DIRECTOR_FEE_WEIGHT
       if (!best || score(candidate) > score(best)) best = candidate
     }
-    if (fromAbroad) {
+    if (fromAbroad && pool === 'any') {
       const target = clamp(Math.max(floor + T.DIRECTOR_ABROAD_GAIN, aim), floor, ceiling)
       consider(abroadCandidate(world, rng, club, need, target), 'need')
     } else {
@@ -354,14 +359,18 @@ export function playerAcceptP(world: World, p: Player, buyer: Club, wage: number
   return clamp(prob, T.BID_ACCEPT_RANGE[0], T.BID_ACCEPT_RANGE[1])
 }
 
-/** Every bid negotiates itself: one roll on the club, one on the player; the answer is logged. */
+/** Every bid negotiates itself: one roll on the club, one on the player; the answer is logged. Outside a window only bids for free agents resolve; the rest wait. */
 export function resolveBids(world: World, rng: Rng): void {
+  const window = windowAt(seasonWeek(world.week))
   const pending = world.bids
   world.bids = []
-  const window = windowAt(seasonWeek(world.week))
   for (const bid of pending) {
     const buyer = clubById(world, bid.clubId)
     const p = playerById(world, bid.playerId)
+    if (!window && p && !p.retired && p.clubId !== 0) {
+      world.bids.push(bid)
+      continue
+    }
     if (!p || p.retired || p.clubId === buyer.id) {
       emit(world, 'bid.failed', { bidId: bid.id, clubId: buyer.id, managerId: bid.managerId, playerId: bid.playerId, name: p ? p.name : '?', reason: 'gone', season: world.season })
       continue

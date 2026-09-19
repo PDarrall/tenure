@@ -370,6 +370,24 @@ export interface TargetProfile {
 /** A request (DESIGN.md "Requests"): to the board, the director or a player; each a bet with a stated likelihood. */
 export type RequestAsk = 'budget' | 'wages' | 'backing' | 'profile' | 'named' | 'sell' | 'loan' | 'contract' | 'captaincy' | 'playingTime'
 
+/** A signing agreed in principle outside a window: the director's card as it stood, confirmed as a bid when the window opens. */
+export interface AgreedTarget {
+  playerId: PlayerId
+  fromClubId: number
+  name: string
+  position: Position
+  fee: number
+  wage: number
+  estimate: number
+  potentialEstimate: number
+  halfWidth: number
+  reason: SigningReason
+  confidence: Confidence
+  gain: number
+  need: FormationSlot
+  week: number
+}
+
 export interface Request {
   to: 'board' | 'director' | 'player'
   ask: RequestAsk
@@ -837,6 +855,8 @@ export interface HumanState {
   shortlist?: PlayerId[]
   /** Candidates declined this window, so the director does not bring the same name back. */
   declinedPlayers?: PlayerId[]
+  /** Targets agreed in principle outside a window (DESIGN.md "Transfers", On arrival): bids the day the window opens unless cancelled. */
+  agreedTargets?: AgreedTarget[]
   /** Promises of playing time still to be kept. */
   promises?: PlayingPromise[]
 }
@@ -884,6 +904,8 @@ export interface HumanInputs {
   requests?: Request[]
   shortlistAdd?: PlayerId[]
   shortlistRemove?: PlayerId[]
+  /** Agreed targets the manager calls off before the window opens. */
+  cancelAgreed?: PlayerId[]
   activity?: UnemployedActivity
   resign?: boolean
   retire?: boolean

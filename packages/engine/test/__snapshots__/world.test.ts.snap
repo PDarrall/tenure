@@ -122,7 +122,7 @@ exports[`world generation > seed 1 always produces the same world 1`] = `
   ],
   "europe": [],
   "events": 119,
-  "hash": "7b5031cd",
+  "hash": "c2579ec2",
   "managers": [
     "1 Nathan Ellison (home, 57, ex-pro) rep=93 employed@1",
     "2 Ben Lightfoot (home, 42, analyst) rep=76 employed@2",

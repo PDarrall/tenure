@@ -14,10 +14,17 @@ import { plainOption } from './bets.js'
 import { hasPending, humanState, pendingDecisions, queueDecision } from './decisions.js'
 import { humanClub, placeBid, proposeSale, proposeSignings, refuseSale, sellPlayer, wageBill, windowAt, type Candidate, type SaleProposal, type WindowName } from '../market/director.js'
 import { bidToFollow, type Follower } from '../market/follow.js'
+import { agreeTarget } from '../market/arrival.js'
 import { seasonWeek } from '../season/calendar.js'
 
+/** How a card is answered when no window is open (DESIGN.md "Transfers", On arrival): a free agent signs now; a target is agreed in principle for the window. */
+export interface CardFlags {
+  signNow?: boolean
+  agreed?: boolean
+}
+
 /** A recommendation card: the player as ranges, fee, wage, reason, confidence, the pot after. */
-export function queueSigning(world: World, c: Candidate, pot: number): Decision {
+export function queueSigning(world: World, c: Candidate, pot: number, flags: CardFlags = {}): Decision {
   const p = c.player
   const lo = Math.round(c.estimate - c.halfWidth)
   const hi = Math.round(c.estimate + c.halfWidth)
@@ -25,8 +32,10 @@ export function queueSigning(world: World, c: Candidate, pot: number): Decision 
   const phi = Math.round(c.potentialEstimate + c.halfWidth)
   const after = Math.round((pot - c.fee) * 10) / 10
   const from = p.clubId > 0 ? clubById(world, p.clubId).name : p.abroad ? 'abroad' : 'a free agent'
-  const body = renderText('director', `card_${c.reason}`, { name: p.name, age: p.age, position: p.position, lo, hi, plo, phi, fee: c.fee, wage: c.wage, after }, world.week)
-  const approve: DecisionOption = plainOption('signing', 'approve', c.fee > 0 ? `Approve the bid (£${c.fee}m)` : 'Approve (a free)', c.confidence, {}, world.week, `the director: ${c.confidence}`)
+  const key = flags.signNow ? 'card_free_now' : flags.agreed ? 'card_agreed' : `card_${c.reason}`
+  const body = renderText('director', key, { name: p.name, age: p.age, position: p.position, lo, hi, plo, phi, fee: c.fee, wage: c.wage, after }, world.week)
+  const approveLabel = flags.signNow ? 'Sign him now (a free)' : flags.agreed ? `Agree in principle (£${c.fee}m at the window)` : c.fee > 0 ? `Approve the bid (£${c.fee}m)` : 'Approve (a free)'
+  const approve: DecisionOption = plainOption('signing', 'approve', approveLabel, c.confidence, {}, world.week, `the director: ${c.confidence}`)
   const options: DecisionOption[] = [approve, plainOption('signing', 'decline', 'Decline', 'sure thing', {}, world.week), plainOption('signing', 'another', 'Ask for a different profile', 'sure thing', {}, world.week)]
   return queueDecision(world, {
     kind: 'signing',
@@ -61,6 +70,8 @@ export function queueSigning(world: World, c: Candidate, pot: number): Decision 
       pot,
       after,
       need: c.need.slot,
+      signNow: flags.signNow === true,
+      agreed: flags.agreed === true,
     },
   })
 }
@@ -149,10 +160,6 @@ export function applySigning(world: World, decision: Decision, key: string): voi
   if (!mine || !p || p.retired) return
   const { club, manager } = mine
   if (key === 'approve') {
-    if (!windowAt(seasonWeek(world.week))) {
-      emit(world, 'bid.failed', { clubId: club.id, managerId: manager.id, playerId, name: p.name, reason: 'closed', season: world.season })
-      return
-    }
     const candidate: Candidate = {
       player: p,
       fee: decision.payload['fee'] as number,
@@ -164,6 +171,16 @@ export function applySigning(world: World, decision: Decision, key: string): voi
       confidence: decision.payload['confidence'] as Candidate['confidence'],
       gain: decision.payload['gain'] as number,
       need: { slot: decision.payload['need'] as Candidate['need']['slot'], playerId: null, rating: 0 },
+    }
+    const open = windowAt(seasonWeek(world.week)) !== null
+    // A free agent signs whenever; a target outside a window is agreed for the window; anything else needs the window open.
+    if (decision.payload['agreed'] === true && !open) {
+      agreeTarget(world, club, manager, candidate)
+      return
+    }
+    if (!open && p.clubId !== 0) {
+      emit(world, 'bid.failed', { clubId: club.id, managerId: manager.id, playerId, name: p.name, reason: 'closed', season: world.season })
+      return
     }
     placeBid(world, club, candidate, manager.id)
     return

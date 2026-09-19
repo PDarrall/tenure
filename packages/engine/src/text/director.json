@@ -91,5 +91,32 @@
   ],
   "news_follow": [
     "{name} follows {manager} to {club} for £{fee}m."
+  ],
+  "card_free_now": [
+    "{name}, {position}, {age}: a free agent, no fee, £{wage}k a week. He can sign this week; I read him at {lo}–{hi}, potential {plo}–{phi}."
+  ],
+  "card_agreed": [
+    "{name}, {position}, {age}: I read him at {lo}–{hi}, potential {plo}–{phi}. £{fee}m and £{wage}k a week. The window is shut: agree it in principle and the bid goes in the day it opens, £{after}m left after."
+  ],
+  "assessment": [
+    "{director}, your director of football: cover needed at {needs}. I would sell {sell}. {when}."
+  ],
+  "assessment_no_sales": [
+    "{director}, your director of football: cover needed at {needs}. Nobody I would sell. {when}."
+  ],
+  "target_agreed": [
+    "Agreed in principle: {name} from {club} for £{fee}m, the bid to go in when the window opens."
+  ],
+  "target_confirmed": [
+    "The window is open: the bid for {name} ({club}, £{fee}m) goes in."
+  ],
+  "target_lapsed": [
+    "{name} has moved on; the agreement in principle lapses."
+  ],
+  "target_lapsed_money": [
+    "The pot no longer covers {name}; the agreement in principle lapses."
+  ],
+  "target_cancelled": [
+    "You called off the move for {name}."
   ]
 }

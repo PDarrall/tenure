@@ -236,7 +236,9 @@ describe('players over seasons', () => {
     const live = livePlayers(world).length
     const inClubs = world.clubs.reduce((n, c) => n + c.playerIds.length, 0) + world.europeanOpponents.reduce((n, o) => n + o.playerIds.length, 0)
     const pool = livePlayers(world).filter((p) => p.clubId === 0).length
-    expect(live).toBe(inClubs + pool)
+    // The summer window runs into the season: candidates from abroad wait in the world until its deadline.
+    const abroad = livePlayers(world).filter((p) => p.abroad && p.clubId === T.ABROAD_CLUB_ID).length
+    expect(live).toBe(inClubs + pool + abroad)
     // Dropped records leave holes, not ghosts: a retired player is kept only if somebody made him, and only made players wait in the pool.
     const keptRetired = world.players.filter((p): p is Player => p !== null && p.retired)
     expect(kept).toBe(live + keptRetired.length)

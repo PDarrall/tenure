@@ -8,6 +8,7 @@ import { rngFromState } from '../src/rng.js'
 import { tick, substitute, setMentality, bestReplacement } from '../src/match/minute.js'
 import { digestWorld } from '../src/digest.js'
 import { seasonWeek } from '../src/season/calendar.js'
+import { decidesTie } from '../src/season/season.js'
 import { T } from '../src/tunables.js'
 import type { World } from '../src/types.js'
 
@@ -114,11 +115,14 @@ describe('a watched match week', () => {
     // A career log keeps only the human's matches; the fixtures show the rest of each week went on the fast path in the same turn.
     const mine = a.log.filter((e) => e.type === 'match.played' && e.payload['watched'] === true)
     expect(mine.length).toBeGreaterThanOrEqual(12)
+    const club = humanClubId(a)
     for (const e of mine) {
       const sw = e.week % T.SEASON_WEEKS
       const thatWeek = a.fixtures.filter((f) => f.week === sw && f.competition === 'league')
       expect(thatWeek.length).toBeGreaterThan(12)
-      expect(thatWeek.every((f) => f.played)).toBe(true)
+      // The slot the human played in (a week has a weekend and a midweek; the other slot may still be to come).
+      const own = thatWeek.find((f) => f.homeId === club || f.awayId === club)!
+      expect(thatWeek.filter((f) => f.slot === own.slot).every((f) => f.played)).toBe(true)
     }
   })
 
@@ -126,13 +130,18 @@ describe('a watched match week', () => {
     const world = createCareer(5, { name: 'Watcher', background: 'ex-pro' })
     getJob(world)
     let cupSeen = false
-    for (let i = 0; i < 40 && !cupSeen; i++) {
+    for (let i = 0; i < 60 && !cupSeen; i++) {
       untilPreMatch(world, 60)
       const w = world.human!.watched!
       if (w.slot.kind === 'cup') {
-        cupSeen = true
         expect(w.prepared).toHaveLength(1)
-        expect(w.prepared[0]!.knockout).toBe(true)
+        // A group match or a first leg settles nothing tonight; a one-off tie or a second leg does.
+        expect(w.prepared[0]!.knockout).toBe(decidesTie(w.prepared[0]!.fixture))
+        if (!w.prepared[0]!.knockout) {
+          advanceTurn(world, {}, { watch: true })
+          continue
+        }
+        cupSeen = true
         // Going back: the slot is forgotten and read again on the next Continue.
         discardWatched(world)
         expect(world.human!.watched).toBeNull()
@@ -143,7 +152,12 @@ describe('a watched match week', () => {
         const cupEvents = world.log.slice(before).filter((e) => e.type === 'match.played' && e.payload['competition'] !== 'league')
         expect(cupEvents.length).toBeGreaterThan(0)
         expect(cupEvents.some((e) => e.payload['watched'] === true)).toBe(true)
-        expect(world.log.slice(before).some((e) => e.type === 'cup.exit')).toBe(true)
+        // The whole round is played and settled with the human's tie: nothing of it is left, and the human is out or drawn on.
+        const competition = w.slot.competition
+        const cup = world.cups.find((c) => c.competition === competition)!
+        expect(world.fixtures.filter((f) => f.competition === competition && f.week === w.seasonWeek && !f.played)).toHaveLength(0)
+        expect(cup.roundsPlayed).toBeGreaterThan(w.prepared[0]!.fixture.round - 1)
+        expect(world.log.slice(before).some((e) => e.type === 'cup.exit' || e.type === 'cup.tie' || e.type === 'cup.bye' || e.type === 'cup.won')).toBe(true)
       } else {
         advanceTurn(world, {}, { watch: true })
       }

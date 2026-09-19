@@ -14,6 +14,7 @@ import { assignTag } from './tags.js'
 import { hasPending, queueApproach, queueOffer } from '../play/decisions.js'
 import { rollKind } from '../play/bets.js'
 import { askToFollow } from './follow.js'
+import { aiArrival, humanArrival } from './arrival.js'
 
 /** The AI's interview promise: promotion when the squad is a contender, stability when it is a struggler. */
 export function aiPromise(world: World, vacancy: Vacancy): Promise {
@@ -127,6 +128,9 @@ export function hire(world: World, rng: Rng, manager: Manager, vacancy: Vacancy,
     refreshStrength(world, club)
     // Your players (DESIGN.md "Following you"): the ones bonded to the manager ask to come.
     askToFollow(world, rng, manager, club)
+    // The director's first cards come the week the job starts (DESIGN.md "Transfers", On arrival).
+    if (manager.isHuman && world.human) humanArrival(world, rng, club, manager)
+    else aiArrival(world, rng, club, manager)
   }
   vacancy.filledWeek = world.week
   vacancy.hiredManagerId = manager.id

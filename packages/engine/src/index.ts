@@ -38,6 +38,8 @@ export type { SideFacts, PlayerFacts, SideStats, Scorer, SideInput } from './mat
 export { createMatch, tick, runToEnd, runToNextPause, runToEndWithDefaults, injuredNeedingChange, substitute, setMentality, bestReplacement, factsOf, liveBands, sideView, pressureTarget, scoreline } from './match/minute.js'
 export type { MatchState, MatchSide, MatchPlayer, MatchEvent, EventKind, SideSetup } from './match/minute.js'
 export { matchPlayOf, setMatchPlay } from './play/inputs.js'
+export { assessSquad, agreeTarget, cancelAgreed, confirmAgreedTargets, humanArrival, aiArrival } from './market/arrival.js'
+export type { Assessment } from './market/arrival.js'
 export { tableFor, positionOf } from './season/table.js'
 export { renderMatch } from './text/render.js'
 export { clubById, homeClub, managerById, spellById, spellOf, managerAt, europeanOpponentById, anyClubName, playerById } from './lookup.js'

@@ -361,6 +361,25 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
         if (mine(e)) push(e, 'staff', renderText('director', 'follow_moved', { name: String(p['name']), fee: p['fee'] as number, club: clubNameOf(world, p['clubId'] as number), wage: p['wage'] as number }, e.week))
         else push(e, 'news', renderText('director', 'news_follow', { name: String(p['name']), manager: nameOf(p['managerId']), club: clubNameOf(world, p['clubId'] as number), fee: p['fee'] as number }, e.week))
         break
+      case 'director.assessment': {
+        if (!mine(e)) break
+        const needs = (p['needs'] as { position: string; side: string; name: string | null }[]).map((n) => `${n.position}${n.position === 'GK' ? '' : n.side}${n.name ? ` (${n.name})` : ''}`).join(' and ')
+        const sell = (p['sell'] as { name: string; fee: number }[]).map((x) => `${x.name} (£${x.fee}m)`).join(', ')
+        push(e, 'staff', renderText('director', sell ? 'assessment' : 'assessment_no_sales', { director: String(p['director']), needs, sell, when: p['window'] ? 'Bids follow' : 'A free agent to sign now and targets for the window follow' }, e.week))
+        break
+      }
+      case 'target.agreed':
+        if (mine(e)) push(e, 'staff', renderText('director', 'target_agreed', { name: String(p['name']), fee: p['fee'] as number, club: (p['fromClubId'] as number) > 0 ? clubNameOf(world, p['fromClubId'] as number) : 'the pool' }, e.week))
+        break
+      case 'target.confirmed':
+        if (mine(e)) push(e, 'staff', renderText('director', 'target_confirmed', { name: String(p['name']), fee: p['fee'] as number, club: String(p['from']) }, e.week))
+        break
+      case 'target.lapsed':
+        if (mine(e)) push(e, 'staff', renderText('director', p['why'] === 'money' ? 'target_lapsed_money' : 'target_lapsed', { name: String(p['name']) }, e.week))
+        break
+      case 'target.cancelled':
+        if (mine(e)) push(e, 'staff', renderText('director', 'target_cancelled', { name: String(p['name']) }, e.week))
+        break
       case 'director.another':
         if (mine(e)) push(e, 'staff', renderText('director', 'another', {}, e.week))
         break

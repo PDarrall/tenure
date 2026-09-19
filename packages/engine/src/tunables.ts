@@ -1093,6 +1093,13 @@ export const T = {
   DIRECTOR_JUDGEMENT_RANGE: [15, 95] as readonly [number, number],
   /** Cards a week in a window. DESIGN: up to three. */
   DIRECTOR_CARDS_PER_WEEK: 3,
+  /** On arrival (DESIGN.md "Transfers"): the assessment names this many positions needing cover and this many players he would sell; up to this many cards, of which this many free agents to sign now when no window is open. */
+  ARRIVAL_NEEDS: 2,
+  ARRIVAL_SELL_NAMES: 3,
+  ARRIVAL_CARDS: 3,
+  ARRIVAL_FREE_CARDS: 1,
+  /** An AI manager arriving outside a window signs up to this many free agents to his needs, so the population keeps trading. */
+  AI_ARRIVAL_FREE_AGENTS: 1,
   /** The estimate's error: sd = DIRECTOR_ESTIMATE_SD × (DIRECTOR_JUDGEMENT_SCALE_AT_ZERO − judgement / 100). At judgement 50 the sd is 3: 43% beat the estimate by SIGNING_BEAT_MARGIN, 25% fall short by SIGNING_SHORT_MARGIN. */
   DIRECTOR_ESTIMATE_SD: 3,
   DIRECTOR_JUDGEMENT_SCALE_AT_ZERO: 1.5,

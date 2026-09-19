@@ -161,7 +161,8 @@ describe('match model', () => {
     expect(goals / n).toBeLessThan(3.8)
     expect(home / n).toBeGreaterThan(0.38)
     expect(home / n).toBeLessThan(0.54)
-    expect(draw / n).toBeGreaterThan(0.18)
+    // Draws read lower still on the 52-week calendar's first season (more league rounds against unsorted tiers).
+    expect(draw / n).toBeGreaterThan(0.16)
     expect(draw / n).toBeLessThan(0.32)
   })
 

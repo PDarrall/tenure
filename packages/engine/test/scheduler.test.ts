@@ -66,7 +66,8 @@ describe('the cups', () => {
   const world = createWorld(3)
   runSeasons(world, 1)
   const cup = (name: string) => world.cups.find((c) => c.competition === name)!
-  const tierOf = (id: number) => world.clubs[id - 1]?.tier ?? null
+  // Tiers as the draw read them: the season's end has moved clubs up and down since.
+  const tiersOf = (e: { payload: Record<string, unknown> }) => [e.payload['homeTier'] as number | null, e.payload['awayTier'] as number | null]
 
   it('every competition is resolved and every trophy awarded', () => {
     for (const c of world.cups) {
@@ -82,7 +83,7 @@ describe('the cups', () => {
 
   it('the Cup: tiers 4–5 in round one, tier 3 in two, tiers 1–2 in three; single ties; neutral semi-finals and final', () => {
     const ties = world.log.filter((e) => e.type === 'cup.tie' && e.payload['competition'] === 'nationalCup')
-    const tiersIn = (round: number) => new Set(ties.filter((e) => e.payload['round'] === round).flatMap((e) => [tierOf(e.payload['homeId'] as number), tierOf(e.payload['awayId'] as number)]))
+    const tiersIn = (round: number) => new Set(ties.filter((e) => e.payload['round'] === round).flatMap(tiersOf))
     expect([...tiersIn(1)].sort()).toEqual([4, 5])
     expect(tiersIn(2).has(3)).toBe(true)
     expect(tiersIn(2).has(1) || tiersIn(2).has(2)).toBe(false)
@@ -98,13 +99,13 @@ describe('the cups', () => {
 
   it('the League Cup: tiers 2–4 in round one, tier 1 in two, its clubs in Europe in three; two-leg semi-finals', () => {
     const ties = world.log.filter((e) => e.type === 'cup.tie' && e.payload['competition'] === 'leagueCup')
-    const clubsIn = (round: number) => new Set(ties.filter((e) => e.payload['round'] === round).flatMap((e) => [e.payload['homeId'] as number, e.payload['awayId'] as number]))
+    const entrants = (round: number) => ties.filter((e) => e.payload['round'] === round).flatMap((e) => [{ id: e.payload['homeId'] as number, tier: e.payload['homeTier'] as number | null }, { id: e.payload['awayId'] as number, tier: e.payload['awayTier'] as number | null }])
     const europe = new Set([...world.log.filter((e) => e.type === 'europe.group').flatMap((e) => e.payload['clubIds'] as number[])].filter((id) => id < T.EUROPEAN_OPPONENT_ID_BASE))
-    for (const id of clubsIn(1)) expect([2, 3, 4]).toContain(tierOf(id))
-    const tierOneEntering = [...clubsIn(2)].filter((id) => tierOf(id) === 1)
+    for (const { tier } of entrants(1)) expect([2, 3, 4]).toContain(tier)
+    const tierOneEntering = entrants(2).filter((c) => c.tier === 1)
     expect(tierOneEntering.length).toBeGreaterThan(0)
-    for (const id of tierOneEntering) expect(europe.has(id)).toBe(false)
-    const round3Tier1 = [...clubsIn(3)].filter((id) => tierOf(id) === 1 && europe.has(id))
+    for (const { id } of tierOneEntering) expect(europe.has(id)).toBe(false)
+    const round3Tier1 = entrants(3).filter((c) => c.tier === 1 && europe.has(c.id))
     expect(round3Tier1.length).toBeGreaterThan(0)
     expect(ties.filter((e) => e.payload['round'] === 6).every((e) => e.payload['legs'] === 2)).toBe(true)
     expect(ties.filter((e) => e.payload['round'] === 6)).toHaveLength(2)
@@ -148,17 +149,16 @@ describe('two legs and neutral ground', () => {
   it('a second leg is settled on aggregate, the shoot-out only when level over both', () => {
     const home = side(1, 60)
     const away = side(2, 60)
-    // Level on the night but 3–0 up from the first leg: no shoot-out.
-    let shootouts = 0
+    // 3–0 up from the first leg: a level night settles nothing on penalties; only a level aggregate does.
     let levelNights = 0
     for (let seed = 1; seed <= 60; seed++) {
       const rng = createRng(seed)
       const out = playMatch(rng, home, away, true, { aggregate: { home: 3, away: 0 } })
+      const levelAggregate = out.homeGoals + 3 === out.awayGoals
       if (out.homeGoals === out.awayGoals) levelNights++
-      if (out.shootoutWinnerId !== undefined) shootouts++
+      expect(out.shootoutWinnerId !== undefined, `seed ${seed}: ${out.homeGoals}-${out.awayGoals}`).toBe(levelAggregate)
     }
     expect(levelNights).toBeGreaterThan(0)
-    expect(shootouts).toBe(0)
     // Down 0–2 from the first leg and winning 2–0 on the night: level on aggregate, so a shoot-out.
     let seen = false
     for (let seed = 1; seed <= 400 && !seen; seed++) {
