@@ -4,14 +4,25 @@ import { T } from '../tunables.js'
 import { clamp, gravityTarget, round1 } from '../world/gen.js'
 import { managerAt } from '../lookup.js'
 import type { Club, Formation, FormationSlot, Manager, Player, Position, Result, Tier, World } from '../types.js'
-import { anchorSquad, forgetPlayer, makePlayer, pickFreeAgent, positionMix, releasePlayer, signFreeAgent, squadSizeFor, valueFor, freeAgents } from '../players/gen.js'
-import { clubFormation, squadOf, autoPick } from '../players/select.js'
+import { forgetPlayer, makePlayer, pickFreeAgent, positionMix, releasePlayer, signFreeAgent, squadSizeFor, valueFor, freeAgents } from '../players/gen.js'
+import { bestXiMean, clubFormation, squadOf, autoPick } from '../players/select.js'
 import { slotsOf } from '../players/formations.js'
 import { rollContract, wageDemand as contractWageDemand } from '../players/contracts.js'
 import { milestone, tagPlayer } from '../players/made.js'
 
 export function managerOf(world: World, club: Club): Manager | undefined {
   return managerAt(world, club)
+}
+
+/**
+ * The level a club's wealth sets (DESIGN.md "Transfers": AI clubs trade
+ * toward it). Generated players — reserves, academy graduates, candidates
+ * from abroad — are pegged to it rather than to the squad's current
+ * strength, so a squad that has grown past its means is refilled from
+ * below and one that has fallen behind is refilled from above.
+ */
+export function levelOf(club: Club): number {
+  return clamp(gravityTarget(club.wealth), 1, 100)
 }
 
 /** The transfer budget a club normally has for a summer, £m. */
@@ -36,172 +47,74 @@ export function decayMorale(club: Club): void {
 export interface WindowSummary {
   clubId: number
   managerId: number | null
-  spend: number
-  gain: number
-  /** Share of the first XI replaced. */
+  /** Share of the first XI replaced over the window. */
   turnover: number
+}
+
+/**
+ * Strength is derived from the squad (DESIGN.md "Transfers", the flip): the
+ * best XI's mean in the club's formation, cached on the club for the table,
+ * the odds and the structural target. Refreshed after anything that moves a
+ * player, and weekly as players grow.
+ */
+export function refreshStrength(world: World, club: Club): number {
+  const formation = clubFormation(world, club)
+  const squad = squadOf(world, club)
+  club.squad.strength = squad.length ? round1(clamp(bestXiMean(world, club, formation), 1, 100)) : 1
+  club.squad.size = squad.length
+  const xi = autoPick(world, club, formation).xi
+  const ages = xi.map((id) => world.players[id - 1]?.age ?? 0).filter((a) => a > 0)
+  if (ages.length) club.squad.avgAge = round1(ages.reduce((a, b) => a + b, 0) / ages.length)
+  return club.squad.strength
+}
+
+export function refreshStrengths(world: World): void {
+  for (const club of world.clubs) refreshStrength(world, club)
+}
+
+/** The first XI replaced over a window: the share of the XI at the window's open who are not in it at the close. */
+export function windowTurnover(world: World, club: Club): number {
+  const before = club.xiAtWindowOpen ?? []
+  if (before.length === 0) return 0
+  const now = new Set(autoPick(world, club, clubFormation(world, club)).xi)
+  const gone = before.filter((id) => !now.has(id)).length
+  return round1((gone / before.length) * 100) / 100
+}
+
+export interface SummerSquadSummary {
   youth: number
 }
 
 /**
- * A transfer window for an AI club: spend the pot, take the diminishing
- * strength gain, churn the squad, and in summer promote academy players.
+ * Summer for a club: the academy promotes (by the manager's development
+ * ability), then the players age, decline, retire and settle their
+ * contracts; strength follows from what is left.
  */
-export function runWindow(world: World, rng: Rng, club: Club, summer: boolean, budgetMultiplier: number): WindowSummary {
-  const manager = managerOf(world, club)
-  const dealing = manager ? manager.ability.dealing : T.SCALE_MIDPOINT
-  const development = manager ? manager.ability.development : T.SCALE_MIDPOINT
-  const normal = normalBudget(club)
-  const pot = summer ? normal * budgetMultiplier : normal * T.WINTER_BUDGET_SHARE
-  const spend = round1(Math.max(0, pot * (summer ? T.AI_SPEND_FRACTION : 1)))
-  const r = normal > 0 ? spend / normal : 0
-  const gain = round1(((T.SPEND_GAIN_MAX * r) / (r + 1)) * (1 + (T.DEALING_EFFECT * (dealing - T.SCALE_MIDPOINT)) / T.SCALE_MIDPOINT))
-  let turnover = summer ? T.TURNOVER_BASE + T.TURNOVER_PER_BUDGET * r : T.TURNOVER_PER_BUDGET * r
-  turnover = clamp(turnover, 0, T.TURNOVER_MAX)
-
-  let youth = 0
-  if (summer) {
-    youth = clamp(Math.floor((development - T.YOUTH_DEVELOPMENT_OFFSET) / T.YOUTH_DEVELOPMENT_STEP), 0, T.YOUTH_MAX_PER_SUMMER)
-    club.squad.academyInXi = youth
-    club.thisSeason.academyPromoted = youth
-    club.pendingYouthGain = round1(club.pendingYouthGain + T.YOUTH_GAIN_PER_PLAYER * youth)
-    if (T.ACADEMY_COUNTS_AS_SIGNING) turnover = clamp(turnover + youth / T.FIRST_XI, 0, 1)
-  }
-
-  const oldAge = club.squad.avgAge
-  const seniorShare = summer ? Math.max(0, turnover - youth / T.FIRST_XI) : turnover
-  club.squad.avgAge = round1(
-    oldAge * (1 - turnover) + T.SIGNING_AGE * seniorShare + (summer ? (T.ACADEMY_AGE * youth) / T.FIRST_XI : 0),
-  )
-  club.squad.strength = round1(clamp(club.squad.strength + gain - T.YOUTH_COST_PER_PLAYER * youth, 1, 100))
-  club.netSpendThisSeason = round1(club.netSpendThisSeason + spend)
-
-  const summary: WindowSummary = {
-    clubId: club.id,
-    managerId: club.managerId,
-    spend,
-    gain,
-    turnover: round1(turnover * 100) / 100,
-    youth,
-  }
-  emit(world, 'squad.window', { ...summary, summer, season: world.season })
-  applyWindowToSquad(world, rng, club, turnover, youth, 0)
-  return summary
-}
-
-/**
- * The player's window: a share of the pot, a number of academy promotions,
- * and senior sales that raise cash and hand the XI to the manager.
- */
-export function runHumanWindow(
-  world: World,
-  rng: Rng,
-  club: Club,
-  summer: boolean,
-  budgetMultiplier: number,
-  choice: { spend: number; youth: number; sell: number },
-): WindowSummary {
-  const manager = managerOf(world, club)
-  const dealing = manager ? manager.ability.dealing : T.SCALE_MIDPOINT
-  const normal = normalBudget(club)
-  const pot = summer ? normal * budgetMultiplier : normal * T.WINTER_BUDGET_SHARE
-  const spend = round1(Math.max(0, pot * clamp(choice.spend, 0, 1)))
-  const r = normal > 0 ? spend / normal : 0
-  const gain = round1(((T.SPEND_GAIN_MAX * r) / (r + 1)) * (1 + (T.DEALING_EFFECT * (dealing - T.SCALE_MIDPOINT)) / T.SCALE_MIDPOINT))
-  const youth = summer ? clamp(Math.floor(choice.youth), 0, T.YOUTH_MAX_PER_SUMMER) : 0
-  const sold = clamp(Math.floor(choice.sell), 0, T.FIRST_XI)
-  let turnover = summer ? T.TURNOVER_BASE + T.TURNOVER_PER_BUDGET * r : T.TURNOVER_PER_BUDGET * r
-  turnover = clamp(turnover + sold / T.FIRST_XI, 0, T.TURNOVER_MAX)
-  if (summer && youth > 0) {
-    club.squad.academyInXi = youth
-    club.thisSeason.academyPromoted = youth
-    club.pendingYouthGain = round1(club.pendingYouthGain + T.YOUTH_GAIN_PER_PLAYER * youth)
-    if (T.ACADEMY_COUNTS_AS_SIGNING) turnover = clamp(turnover + youth / T.FIRST_XI, 0, 1)
-  }
-  const cash = round1(sold * T.SELL_CASH_SHARE_OF_BUDGET * normal)
-  club.cash = round1(club.cash + cash)
-  const oldAge = club.squad.avgAge
-  const seniorShare = Math.max(0, turnover - youth / T.FIRST_XI)
-  club.squad.avgAge = round1(oldAge * (1 - turnover) + T.SIGNING_AGE * seniorShare + (T.ACADEMY_AGE * youth) / T.FIRST_XI)
-  club.squad.strength = round1(clamp(club.squad.strength + gain - T.YOUTH_COST_PER_PLAYER * youth - T.SELL_STRENGTH_PER_PLAYER * sold, 1, 100))
-  club.netSpendThisSeason = round1(club.netSpendThisSeason + spend - cash)
-  const summary: WindowSummary = { clubId: club.id, managerId: club.managerId, spend, gain, turnover: round1(turnover * 100) / 100, youth }
-  emit(world, 'squad.window', { ...summary, summer, sold, cash, human: true, season: world.season })
-  applyWindowToSquad(world, rng, club, turnover, youth, sold)
-  return summary
-}
-
-export interface SummerSquadSummary {
-  ageing: number
-  gravity: number
-  youthReleased: number
-}
-
-/** Summer squad drift before the window: release youth gains, age, gravitate. */
 export function summerSquad(world: World, rng: Rng, club: Club): SummerSquadSummary {
-  const youthReleased = club.pendingYouthGain
-  club.pendingYouthGain = 0
-  club.squad.avgAge = round1(club.squad.avgAge + T.AGE_DRIFT)
-  let ageing = 0
-  if (club.squad.avgAge > T.PEAK_AGE[1]) ageing = -rng.int(T.AGEING_LOSS[0], T.AGEING_LOSS[1])
-  else if (club.squad.avgAge < T.PEAK_AGE[0]) ageing = T.YOUNG_SQUAD_GROWTH
-  const gravity = round1(T.GRAVITY_RATE * (gravityTarget(club.wealth) - club.squad.strength))
-  club.squad.strength = round1(clamp(club.squad.strength + youthReleased + ageing + gravity, 1, 100))
-  club.squad.academyInXi = 0
-  emit(world, 'squad.summer', { clubId: club.id, youthReleased, ageing, gravity, strength: club.squad.strength })
-  summerPlayers(world, rng, club)
-  return { ageing, gravity, youthReleased }
-}
-
-
-/** The starting XI's ids, the assistant's pick in the club's formation. */
-function firstXi(world: World, club: Club): number[] {
-  return autoPick(world, club, clubFormation(world, club)).xi
-}
-
-/**
- * Turnover in player terms: the abstract window replaces a share of the XI
- * with generated signings at the club's new level, and promotes academy
- * players. Strength is the master number, so the squad is re-anchored after.
- */
-export function applyWindowToSquad(world: World, rng: Rng, club: Club, turnover: number, youth: number, sold: number): void {
   const manager = managerOf(world, club)
-  const xi = firstXi(world, club)
-  const leaving = Math.min(xi.length, Math.round(turnover * T.FIRST_XI))
-  // Sold players go first (the manager's own sale), then the churn from the lowest-value starters.
-  const starters = xi.map((id) => world.players[id - 1]).filter((p): p is Player => p !== null && p !== undefined)
-  starters.sort((a, b) => a.value - b.value || a.id - b.id)
-  const out = starters.slice(0, leaving)
-  for (const p of out) {
-    releasePlayer(world, p, club)
-    emit(world, 'player.left', { playerId: p.id, clubId: club.id, name: p.name, rating: p.rating, fee: p.value, reason: sold > 0 ? 'sold' : 'window', season: world.season })
-    moveOn(world, rng, p, club)
-  }
+  const development = manager ? manager.ability.development : T.SCALE_MIDPOINT
+  const youth = clamp(Math.floor((development - T.YOUTH_DEVELOPMENT_OFFSET) / T.YOUTH_DEVELOPMENT_STEP), 0, T.YOUTH_MAX_PER_SUMMER)
+  club.squad.academyInXi = youth
+  club.thisSeason.academyPromoted = youth
+  club.pendingYouthGain = 0
+  promoteAcademy(world, rng, club, youth)
+  summerPlayers(world, rng, club)
+  emit(world, 'squad.summer', { clubId: club.id, youth, strength: club.squad.strength, avgAge: club.squad.avgAge })
+  return { youth }
+}
+
+/** Academy graduates: generated below the squad's level with potential to grow, tagged as the manager's. */
+export function promoteAcademy(world: World, rng: Rng, club: Club, youth: number): void {
+  const manager = managerOf(world, club)
   const formation = clubFormation(world, club)
   const slots = slotsOf(formation)
-  const signings = leaving - Math.min(leaving, youth)
-  for (let i = 0; i < signings; i++) {
-    const slot = neededSlot(world, club, formation)
-    const fromPool = signFromPool(world, club, slot.position)
-    const p =
-      fromPool ??
-      makePlayer(world, rng, club.id, club.tier, {
-        position: slot.position,
-        side: slot.side,
-        age: T.SIGNING_AGE + rng.int(-3, 3),
-        rating: club.squad.strength + rng.normal(0, T.STARTER_RATING_SD),
-      })
-    if (!fromPool) club.playerIds.push(p.id)
-    emit(world, 'player.signed', { playerId: p.id, clubId: club.id, managerId: manager ? manager.id : null, name: p.name, rating: p.rating, fee: p.value, season: world.season })
-    if (manager) tagPlayer(world, p, manager, club, 'signed')
-  }
   for (let i = 0; i < youth; i++) {
     const slot = slots[1 + rng.int(0, slots.length - 2)]!
     const p = makePlayer(world, rng, club.id, club.tier, {
       position: slot.position,
       side: slot.side,
       age: rng.int(T.ACADEMY_AGE_RANGE[0], T.ACADEMY_AGE_RANGE[1]),
-      rating: club.squad.strength - T.ACADEMY_RATING_GAP + rng.normal(0, T.STARTER_RATING_SD),
+      rating: levelOf(club) - T.ACADEMY_RATING_GAP + rng.normal(0, T.STARTER_RATING_SD),
       academy: true,
     })
     p.potential = Math.min(100, p.potential + T.ACADEMY_POTENTIAL_BONUS)
@@ -209,8 +122,6 @@ export function applyWindowToSquad(world: World, rng: Rng, club: Club, turnover:
     emit(world, 'player.promoted', { playerId: p.id, clubId: club.id, managerId: manager ? manager.id : null, name: p.name, rating: p.rating, season: world.season })
     if (manager) tagPlayer(world, p, manager, club, 'promoted')
   }
-  trimSquad(world, rng, club)
-  anchorSquad(world, club, club.squad.strength, formation)
 }
 
 /**
@@ -310,7 +221,7 @@ export function summerPlayers(world: World, rng: Rng, club: Club): void {
     p.value = valueFor(p.rating, p.age)
   }
   topUpSquad(world, rng, club)
-  anchorSquad(world, club, club.squad.strength, clubFormation(world, club))
+  refreshStrength(world, club)
 }
 
 /** A squad short of the tier's size takes generated backups. */
@@ -366,7 +277,7 @@ export function topUpSquad(world: World, rng: Rng, club: Club): void {
       position: slot.position,
       side: slot.side,
       age: rng.int(T.PLAYER_AGE_RANGE[0], T.PLAYER_AGE_RANGE[1]),
-      rating: club.squad.strength - T.BACKUP_RATING_GAP + rng.normal(0, T.BACKUP_RATING_SD),
+      rating: levelOf(club) - T.BACKUP_RATING_GAP + rng.normal(0, T.BACKUP_RATING_SD),
     })
     club.playerIds.push(p.id)
   }

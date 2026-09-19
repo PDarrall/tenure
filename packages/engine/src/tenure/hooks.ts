@@ -227,7 +227,7 @@ export function afterWinterWindow(world: World, summaries: WindowSummary[]): voi
   }
 }
 
-/** The budget multiplier the summer window should use for a club. */
+/** The budget multiplier the summer pot takes for a club: the promise its manager made. */
 export function budgetMultiplierFor(world: World, clubId: number): number {
   const club = homeClub(world, clubId)
   if (!club || club.managerId === null) return 1

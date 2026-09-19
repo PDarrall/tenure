@@ -179,6 +179,7 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
   const europe = europeanTitles(world)
   const decisions = decisionFairness(world)
   const follow = followStats(world)
+  const signings = signingStats(world)
   const lines: StatLine[] = [
     line('firstSpellMedianSeasons', 'Median first-spell length (seasons)', median(firstSpellLengths), 'seasons'),
     line('firstSpellInsideSeasonShare', 'First spells ending inside a season', firstSpells.length ? insideSeason / firstSpells.length : 0, 'share'),
@@ -205,6 +206,8 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     line('europeanTitlesOutsideTopThree', 'European titles won from outside the top three of tier 1', europe.outsideTopThree, 'share'),
     line('decisionFairnessGap', `Decisions: worst gap between bold and cautious means net of sampling noise, in bold spreads (${decisions.worstGapKind})`, decisions.worstGap, 'number'),
     line('decisionVarianceRatio', `Decisions: lowest bold-to-cautious variance ratio (${decisions.worstRatioKind})`, decisions.worstRatio, 'number'),
+    line('signingsBeatShare', "Signings that beat the director's estimate", signings.beat, 'share'),
+    line('signingsShortShare', "Signings that fell short of the director's estimate", signings.short, 'share'),
     line('followMovesPerJobChange', 'Follow-you moves per job change', follow.perHire, 'number'),
     line('followMaxPerMove', 'Most follow-you moves in one job change', follow.maxPerMove, 'count'),
   ]
@@ -266,6 +269,16 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     'mean age at career end': ended.length ? ended.reduce((s, m) => s + m.age, 0) / ended.length : 0,
     'events logged': world.log.length,
   }
+  extras['signings revealed'] = signings.revealed
+  extras['signings (transfers completed)'] = signings.transfers
+  extras['signings abroad'] = signings.abroad
+  extras['signings from the pool'] = signings.free
+  extras['bids failed'] = signings.failed
+  extras['mean strength tier 1'] = signings.tierStrength[0] ?? 0
+  extras['mean strength tier 3'] = signings.tierStrength[2] ?? 0
+  extras['mean strength tier 5'] = signings.tierStrength[4] ?? 0
+  extras['strength sd within tier 1'] = signings.tierSpread[0] ?? 0
+  extras['strength sd within tier 3'] = signings.tierSpread[2] ?? 0
   extras['follow moves'] = follow.moves
   extras['follow asks'] = follow.asks
   extras['hires'] = follow.hires
@@ -440,11 +453,42 @@ export function followStats(world: World): { moves: number; asks: number; hires:
     else if (e.type === 'follow.asked') asks++
     else if (e.type === 'follow.moved') {
       moves++
-      const key = `${e.payload['managerId']}:${e.payload['clubId']}`
+      const key = `${e.payload['managerId']}:${e.payload['clubId']}:${e.payload['season']}`
       perManagerHire.set(key, (perManagerHire.get(key) ?? 0) + 1)
     }
   }
   let maxPerMove = 0
   for (const n of perManagerHire.values()) if (n > maxPerMove) maxPerMove = n
   return { moves, asks, hires, perHire: hires ? Math.round((moves / hires) * 1000) / 1000 : 0, maxPerMove }
+}
+
+/** Signings (DESIGN.md "Transfers"): hits and flops among the AI's revealed signings, and where the squads sit. */
+export function signingStats(world: World): { revealed: number; beat: number; short: number; transfers: number; abroad: number; free: number; failed: number; tierStrength: number[]; tierSpread: number[] } {
+  let revealed = 0
+  let hits = 0
+  let flops = 0
+  let transfers = 0
+  let abroad = 0
+  let free = 0
+  let failed = 0
+  for (const e of world.log) {
+    if (e.type === 'signing.revealed' && e.payload['human'] !== true) {
+      revealed++
+      if (e.payload['verdict'] === 'hit') hits++
+      else if (e.payload['verdict'] === 'flop') flops++
+    } else if (e.type === 'transfer.completed') {
+      transfers++
+      if (e.payload['abroad'] === true) abroad++
+      if (e.payload['free'] === true) free++
+    } else if (e.type === 'bid.failed') failed++
+  }
+  const tierStrength: number[] = []
+  const tierSpread: number[] = []
+  for (let tier = 1; tier <= T.TIER_SIZES.length; tier++) {
+    const values = world.clubs.filter((c) => c.tier === tier).map((c) => c.squad.strength)
+    const mean = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0
+    tierStrength.push(Math.round(mean * 10) / 10)
+    tierSpread.push(values.length ? Math.round(Math.sqrt(values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length) * 10) / 10 : 0)
+  }
+  return { revealed, beat: revealed ? hits / revealed : 0, short: revealed ? flops / revealed : 0, transfers, abroad, free, failed, tierStrength, tierSpread }
 }

@@ -247,6 +247,10 @@ export interface Club {
   director: Director
   /** £m left to spend this season: the board's budget for the summer, topped up for January, plus sales. */
   transferPot: number
+  /** The first XI when the window opened, for the turnover at its close. */
+  xiAtWindowOpen?: PlayerId[]
+  /** Bids the director has placed this window (AI clubs trade to a quota). */
+  windowBids?: number
 }
 
 /** One per club. His judgement scales how far his estimates sit from the truth. */

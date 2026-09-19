@@ -557,3 +557,82 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   1,000-game careers 17 against 15) and clubs per career stays red as it
   has been since phase 1; the flip retunes the population through the
   directors' trading, and the numbers are in the PR.
+
+## Transfers (DESIGN v0.7)
+
+- The director's judgement comes from wealth alone until phase 5 brings a
+  scouting level (DIRECTOR_JUDGEMENT_BASE + DIRECTOR_JUDGEMENT_PER_WEALTH ×
+  wealth, with noise). Old saves get one per club from wealth, no noise.
+- Candidates are real players at other home clubs and in the free-agent
+  pool, plus players "from abroad" generated at the level asked (a share
+  of the cards, DIRECTOR_ABROAD_SHARE); an unsigned candidate from abroad
+  is forgotten on deadline day. The world has no foreign leagues, so
+  abroad is where new quality comes from and where a player sold without
+  a named buyer goes (into the pool, for a club at his level).
+- The estimate's error is normal with sd 3 at judgement 50 (scaled by
+  1.5 − judgement/100); a hit beats the estimate by SIGNING_BEAT_MARGIN
+  (0.5), a flop falls short by SIGNING_SHORT_MARGIN (2), so about 43% hit
+  and 25% flop at judgement 50. "About 40% / about 25%" is met by the
+  margins, not by a skewed error.
+- The fee is value × DIRECTOR_FEE_PREMIUM for a contracted player, half
+  of value for one in his last year, nothing for a free agent; the wage
+  offered is his demand plus SIGNING_WAGE_PREMIUM. There is no haggling
+  (FEATURES: agents, clauses, instalments, haggling rounds ✗).
+- The two rolls: the selling club accepts at BID_CLUB_ACCEPT_BASE moved by
+  the premium over value, halved in January for one of its starters; the
+  player at BID_PLAYER_ACCEPT_BASE, a step per tier up or down, a bonus
+  per 10% on the wage. The answer arrives at the next close.
+- Cards come at the close of the week before each window week except
+  deadline day and the summer's first week (the season closes at that
+  week's close, and the squads change with it), so the summer's first
+  cards are seen in its second week. A bid approved on deadline day is
+  answered at that day's close, inside the window.
+- Deadline day is its own step in the career loop: the turn stops after
+  the deadline week's close whatever the next week holds. On it, every
+  squad is brought back to its tier's size (reserves from the pool and
+  generated backups, the surplus released).
+- Sales: the director proposes one when a bid is in, the wage bill is
+  over WAGE_OVERRUN_FACTOR × budget, or a player's morale is under
+  UNSETTLED_MORALE. A big bid is BIG_BID_SHARE × value; refusing one for
+  an unsettled player costs him REFUSED_BIG_BID_MORALE and counts as a
+  fallout. A player sold who then averages SOLD_SHINES_RATING over
+  SOLD_SHINES_MIN_APPS at his new club within SOLD_SHINES_SEASONS costs the
+  seller SOLD_SHINES_REP once.
+- The pot is the board's normal budget × the promise's multiplier each
+  summer, plus WINTER_BUDGET_SHARE of it for January, plus sales; the
+  abstract "cash" stays as a record. Academy promotions follow the
+  manager's development ability for every club, the human's included: the
+  old window plan (spend / rebuild / youth / sell / hold) is gone, since
+  the director's cards are the plan.
+- Requests: the likelihood is stated in words (sure thing / likely /
+  gamble at REQUEST_WORDS) and the chance is in the state for the
+  interface. Board asks depend on credit over the threshold, the owner's
+  ambition and refusals already this season. A named player is served as
+  a bid at the close (the roll is the deal's own). "Loan out" is a season
+  at a club at his level with a return at the season's end; nothing else
+  about loans exists. The captaincy has no effect in the match yet; it is
+  the armband on the team sheet. Ratings in the search are shown as the
+  director's range around the truth (no noise: the search is a list, the
+  card is his opinion). AI managers make no requests, so requests are not
+  in the fairness lines.
+- Following you: the bond threshold is FOLLOW_BOND_THRESHOLD (10, the
+  loyal threshold); the asking price is value × FOLLOW_ASKING_PREMIUM;
+  the move waits for the next window and negotiates like any other bid,
+  so nothing moves between windows. AI managers take a follower who asks
+  with AI_FOLLOW_P. A follower is known, so nothing is revealed.
+- The flip: club strength is the best XI's mean in the club's formation,
+  refreshed weekly and after every move; a new manager's formation can
+  change it. Anchoring, gravity, the abstract summer ageing, the spend
+  gain and the turnover churn are gone; anchoring remains only at genesis
+  (and for European opponents generated for a tie). Generated players —
+  reserves, academy graduates, candidates from abroad — are pegged to the
+  wealth level (0.85 × wealth), not to the squad's current strength:
+  pegged to strength, growth with minutes ratcheted every squad upward
+  (tier 5 reached 57 in 49 seasons) and the tiers collapsed into one
+  another. AI directors aim at the level plus AI_TRADE_AMBITION ×
+  (wealth/100)²: without the ambition term the top tier sat at 68 ± 9 and
+  home clubs won the European Cup in 2% of seasons. A club above its aim
+  by AI_TRADE_HOLD_ABOVE buys nothing; one over its wage budget sells its
+  highest-paid at each close. The star-sale shock and a fallout's sale
+  now sell the player for real. The numbers before and after are in the
+  PR.

@@ -154,10 +154,11 @@ describe('match model', () => {
     }
     const n = league.length
     expect(n).toBeGreaterThan(2000)
-    // A first season carries wide strength gaps (tiers are not yet sorted), so it reads above the
+    // A first season carries wide strength gaps (tiers are not yet sorted, and since the flip the
+    // squads move through the January window and grow week by week), so it reads above the
     // 2.7 and 45 / 26 / 29 the fast path is calibrated to on settled worlds; these bands only catch a break.
     expect(goals / n).toBeGreaterThan(2.3)
-    expect(goals / n).toBeLessThan(3.6)
+    expect(goals / n).toBeLessThan(3.8)
     expect(home / n).toBeGreaterThan(0.38)
     expect(home / n).toBeLessThan(0.54)
     expect(draw / n).toBeGreaterThan(0.18)
@@ -279,18 +280,19 @@ describe('a full season', () => {
     }
   })
 
-  it('keeps squads in range and moves them through ageing, gravity and windows', () => {
+  it('keeps squads in range and moves them through ageing, the academy and the windows', () => {
     const summers = world.log.filter((e) => e.type === 'squad.summer')
-    const windows = world.log.filter((e) => e.type === 'squad.window')
     expect(summers).toHaveLength(world.clubs.length)
-    expect(windows).toHaveLength(world.clubs.length * 2)
     for (const club of world.clubs) {
       expect(club.squad.strength).toBeGreaterThan(0)
       expect(club.squad.strength).toBeLessThanOrEqual(100)
       expect(club.squad.avgAge).toBeGreaterThan(17)
       expect(club.squad.avgAge).toBeLessThan(36)
     }
-    expect(windows.some((e) => (e.payload['youth'] as number) >= 4)).toBe(true)
+    expect(summers.some((e) => (e.payload['youth'] as number) >= 4)).toBe(true)
+    // The windows moved players: bids, signings, a deadline for both windows.
+    expect(world.log.some((e) => e.type === 'transfer.completed')).toBe(true)
+    expect(world.log.filter((e) => e.type === 'window.closed')).toHaveLength(2)
   })
 
   it('starts the next season with fresh fixtures and tables', () => {

@@ -1,5 +1,5 @@
 import type { Rng } from '../rng.js'
-import { anchorSquad } from '../players/gen.js'
+import { refreshStrength } from '../season/squad.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import { clamp } from '../world/gen.js'
@@ -121,10 +121,10 @@ export function hire(world: World, rng: Rng, manager: Manager, vacancy: Vacancy,
   const spell = startSpell(world, rng, manager, vacancy.post, { years, promise, crisis: vacancy.crisis, salary })
   // The promise is a bet: how the board read it, rolled onto credit at hire.
   rollKind(world, rng, 'offer', promise, { managerId: manager.id, spellId: spell.id, label: `promise ${promise}` })
-  // The squad is the club's strength in the new manager's formation: re-anchor so nobody inherits a side that does not fit.
   if (vacancy.post.kind === 'home') {
     const club = clubById(world, vacancy.post.clubId)
-    anchorSquad(world, club, club.squad.strength, manager.isHuman && world.human ? world.human.tactic.formation : manager.preferredFormation)
+    // The squad is what it is: its strength is read in the new manager's formation.
+    refreshStrength(world, club)
     // Your players (DESIGN.md "Following you"): the ones bonded to the manager ask to come.
     askToFollow(world, rng, manager, club)
   }

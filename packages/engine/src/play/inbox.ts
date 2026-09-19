@@ -270,7 +270,7 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
         break
       }
       case 'squad.summer':
-        if (myClub(e)) push(e, 'staff', renderText('staff', 'summer', { ageing: p['ageing'] as number, gravity: p['gravity'] as number, youthReleased: p['youthReleased'] as number, strength: p['strength'] as number }, e.week))
+        if (myClub(e)) push(e, 'staff', renderText('staff', 'summer', { youth: p['youth'] as number, strength: p['strength'] as number, avgAge: p['avgAge'] as number }, e.week))
         break
       case 'vacancy.opened': {
         const list = vacanciesByWeek.get(e.week) ?? []

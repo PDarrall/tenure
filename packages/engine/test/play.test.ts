@@ -142,22 +142,21 @@ describe('a human career', () => {
     expect(world.log.some((e) => e.type === 'board.note' && e.payload['managerId'] === player.id) || player.status.kind !== 'employed').toBe(true)
   })
 
-  it('takes the window plan when the human answers it', () => {
+  it('the director brings cards in a window and an approved bid is answered at the close', () => {
     const world = createCareer(4, { name: 'Test Player', background: 'coach' })
     const player = me(world)
     getFirstJob(world, () => 'top-half:4')
-    let window: Decision | undefined
-    for (let i = 0; i < 2 * T.SEASON_WEEKS && !window; i++) {
+    let card: Decision | undefined
+    for (let i = 0; i < 2 * T.SEASON_WEEKS && !card; i++) {
       if (player.status.kind !== 'employed') break
       advanceWeek(world)
-      window = pendingDecisions(world).find((d) => d.kind === 'summerWindow')
+      card = pendingDecisions(world).find((d) => d.kind === 'signing')
     }
-    if (!window || player.status.kind !== 'employed') return // sacked before a summer: nothing to plan
-    advanceWeek(world, { answers: { [window.id]: 'rebuild' } })
-    const event = world.log.filter((e) => e.type === 'squad.window' && e.payload['human'] === true).at(-1)
-    expect(event).toBeDefined()
-    expect(event!.payload['youth']).toBe(T.YOUTH_MAX_PER_SUMMER)
-    expect(world.human!.windowChoice).toBeNull()
+    if (!card || player.status.kind !== 'employed') return // sacked before a window: nothing to buy
+    expect(card.options.map((o) => o.key)).toEqual(['approve', 'decline', 'another'])
+    advanceWeek(world, { answers: { [card.id]: 'approve' } })
+    expect(world.log.some((e) => e.type === 'bid.made' && e.payload['managerId'] === player.id)).toBe(true)
+    expect(world.log.some((e) => (e.type === 'transfer.completed' || e.type === 'bid.failed') && e.payload['managerId'] === player.id)).toBe(true)
   })
 
   it('resigns, chooses an activity, and retires', () => {

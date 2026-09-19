@@ -17,14 +17,13 @@ import type { Bid, Club, Confidence, Director, FormationSlot, Manager, Player, P
 import { seasonWeek } from '../season/calendar.js'
 import { slotsOf } from '../players/formations.js'
 import { autoPick, clubFormation, effectiveRating, squadOf } from '../players/select.js'
-import { freeAgents, makePlayer, releasePlayer, squadSizeFor, valueFor, forgetPlayer } from '../players/gen.js'
+import { makePlayer, releasePlayer, squadSizeFor, valueFor, forgetPlayer } from '../players/gen.js'
 import { wageDemand } from '../players/contracts.js'
 import { tagPlayer, milestone } from '../players/made.js'
 import { addCredit } from '../tenure/credit.js'
 import { bumpReputation } from '../tenure/exits.js'
 import { averageRating } from '../match/aftermath.js'
-import { normalBudget, moveOn, topUpSquad, trimSquad } from '../season/squad.js'
-import { anchorSquad } from '../players/gen.js'
+import { levelOf, normalBudget, moveOn, refreshStrength, topUpSquad, trimSquad, windowTurnover, type WindowSummary } from '../season/squad.js'
 
 // ---------------------------------------------------------------------------
 // Windows
@@ -128,6 +127,8 @@ export function wageBill(world: World, club: Club): number {
 export function refreshPot(world: World, club: Club, window: WindowName, multiplier: number): void {
   const normal = normalBudget(club)
   club.transferPot = round1(window === 'summer' ? normal * multiplier : club.transferPot + normal * T.WINTER_BUDGET_SHARE)
+  club.xiAtWindowOpen = [...autoPick(world, club, clubFormation(world, club)).xi]
+  club.windowBids = 0
   emit(world, 'window.pot', { clubId: club.id, window, pot: club.transferPot, wageBudget: club.wageBudget, wageBill: wageBill(world, club), season: world.season })
 }
 
@@ -213,26 +214,49 @@ function abroadCandidate(world: World, rng: Rng, club: Club, need: Need, target:
   return p
 }
 
+/** Every player at a home club or in the pool, by position, strongest first: built once per close so every director's search is a walk down a band. */
+export type MarketIndex = Record<Position, Player[]>
+
+export function marketIndex(world: World): MarketIndex {
+  const index: MarketIndex = { GK: [], D: [], M: [], F: [] }
+  for (const p of world.players) {
+    if (!p || p.retired || p.clubId < 0 || p.abroad || p.loan) continue
+    index[p.position].push(p)
+  }
+  for (const position of ['GK', 'D', 'M', 'F'] as const) index[position].sort((a, b) => b.rating - a.rating || a.id - b.id)
+  return index
+}
+
+export interface ProposeOptions {
+  /** The level the director searches around: the squad's own by default; an AI director aims at its wealth level. */
+  aim?: number
+  /** Share of the cards from abroad. */
+  abroadShare?: number
+  index?: MarketIndex
+}
+
 /**
  * Up to `count` recommendations: the weakest slots first, the manager's
  * profile if one is set, a share from abroad. Real candidates come from
  * other home clubs and the free-agent pool, inside the pot and the wage
  * budget.
  */
-export function proposeSignings(world: World, rng: Rng, club: Club, count: number, profile: TargetProfile | null | undefined, exclude: Set<PlayerId>, window: WindowName): Candidate[] {
+export function proposeSignings(world: World, rng: Rng, club: Club, count: number, profile: TargetProfile | null | undefined, exclude: Set<PlayerId>, window: WindowName, options: ProposeOptions = {}): Candidate[] {
   const director = club.director
   const wanted = needs(world, club)
   if (wanted.length === 0) return []
   const strength = club.squad.strength
+  const aim = Math.max(strength, options.aim ?? strength)
   const bill = wageBill(world, club)
   const half = rangeHalf(director.judgement)
   const out: Candidate[] = []
   const used = new Set<PlayerId>(exclude)
-  const abroadCards = Math.round(count * T.DIRECTOR_ABROAD_SHARE)
-  const ceiling = strength + T.DIRECTOR_REACH_ABOVE
+  const abroadCards = Math.round(count * (options.abroadShare ?? T.DIRECTOR_ABROAD_SHARE))
+  const ceiling = aim + T.DIRECTOR_REACH_ABOVE
+  const index = options.index ?? marketIndex(world)
   for (let i = 0; i < count; i++) {
     const need = profile?.position ? (wanted.find((n) => n.slot.position === profile.position) ?? wanted[0]!) : wanted[i % wanted.length]!
-    const floor = Math.max(need.rating + T.DIRECTOR_MIN_GAIN, strength - T.DIRECTOR_REACH_BELOW)
+    const floor = Math.max(need.rating + T.DIRECTOR_MIN_GAIN, aim - T.DIRECTOR_REACH_BELOW)
     const fromAbroad = i >= count - abroadCards
     let best: Candidate | null = null
     const consider = (p: Player, reason: SigningReason) => {
@@ -253,20 +277,18 @@ export function proposeSignings(world: World, rng: Rng, club: Club, count: numbe
       if (!best || score(candidate) > score(best)) best = candidate
     }
     if (fromAbroad) {
-      const target = clamp(Math.max(floor + T.DIRECTOR_ABROAD_GAIN, strength), floor, ceiling)
+      const target = clamp(Math.max(floor + T.DIRECTOR_ABROAD_GAIN, aim), floor, ceiling)
       consider(abroadCandidate(world, rng, club, need, target), 'need')
     } else {
+      // Down the band from the ceiling: the strongest affordable first, a limited look.
       let seen = 0
-      for (const other of world.clubs) {
-        if (other.id === club.id) continue
-        for (const p of squadOf(world, other)) {
-          if (seen >= T.DIRECTOR_SEARCH_LIMIT) break
-          if (p.position !== need.slot.position || p.rating < floor || p.rating > ceiling) continue
-          seen++
-          consider(p, 'need')
-        }
+      for (const p of index[need.slot.position]) {
+        if (p.rating > ceiling) continue
+        if (p.rating < floor) break
+        if (seen >= T.DIRECTOR_SEARCH_LIMIT) break
+        seen++
+        consider(p, p.clubId === 0 ? 'bargain' : 'need')
       }
-      for (const p of freeAgents(world)) consider(p, 'bargain')
     }
     if (best) {
       const found = best as Candidate
@@ -408,6 +430,8 @@ export function completeSigning(world: World, rng: Rng, bid: Bid, p: Player, buy
   const manager = bid.managerId === null ? undefined : managerById(world, bid.managerId)
   if (manager) tagPlayer(world, p, manager, buyer, 'signed')
   if (fee >= T.TRANSFER_MILESTONE_FEE) milestone(world, p, 'transfer', { fee, fromClubId: from, toClubId: buyer.id })
+  refreshStrength(world, buyer)
+  if (seller) refreshStrength(world, seller)
   emit(world, 'player.signed', { playerId: p.id, clubId: buyer.id, managerId: bid.managerId, name: p.name, rating: p.rating, fee, season: world.season })
   emit(world, 'transfer.completed', {
     bidId: bid.id,
@@ -541,6 +565,7 @@ export function sellPlayer(world: World, rng: Rng, p: Player, from: Club, fee: n
   world.bids = world.bids.filter((b) => b.playerId !== p.id)
   p.lastClubId = from.id
   moveOn(world, rng, p, from)
+  refreshStrength(world, from)
 }
 
 /** Refusing: nothing moves; a big bid refused for an unsettled player costs his morale and counts as a fallout. */
@@ -596,8 +621,7 @@ export function closeWindow(world: World, rng: Rng, window: WindowName): void {
   for (const club of world.clubs) {
     trimSquad(world, rng, club)
     topUpSquad(world, rng, club)
-    // Strength is still the master number for AI clubs until the flip; the human's side is what it is.
-    if (!(world.human && club.managerId === world.human.managerId)) anchorSquad(world, club, club.squad.strength, clubFormation(world, club))
+    refreshStrength(world, club)
   }
   const opened = openedWeek(world, window)
   for (const club of world.clubs) {
@@ -617,6 +641,47 @@ export function closeWindow(world: World, rng: Rng, window: WindowName): void {
     }
   }
   emit(world, 'window.closed', { window, season: world.season })
+}
+
+// ---------------------------------------------------------------------------
+// AI clubs: the same director, trading toward the level wealth sets
+// ---------------------------------------------------------------------------
+
+/** One window-week round for an AI club: a bid toward its wealth level while its quota lasts; a sale when the wage bill is over. */
+export function aiTradeRound(world: World, rng: Rng, club: Club, window: WindowName, index: MarketIndex): void {
+  if (club.managerId === null) return
+  const manager = managerById(world, club.managerId)
+  if (manager.isHuman) return
+  // The wage budget binds: over it, the highest-paid go, starters included, up to a few a close.
+  for (let n = 0; T.AI_SELL_ON_WAGES && n < T.AI_WAGE_SALES_PER_CLOSE && wageBill(world, club) > club.wageBudget * T.WAGE_OVERRUN_FACTOR; n++) {
+    const priciest = squadOf(world, club).sort((a, b) => b.contract.wage - a.contract.wage || a.id - b.id)[0]
+    if (!priciest || squadOf(world, club).length <= T.FIRST_XI) break
+    sellPlayer(world, rng, priciest, club, priciest.value, manager.id, null)
+  }
+  const target = levelOf(club) + T.AI_TRADE_TARGET_BIAS + T.AI_TRADE_AMBITION * (club.wealth / 100) ** 2
+  const gap = target - club.squad.strength
+  if (gap < -T.AI_TRADE_HOLD_ABOVE) return
+  const quota = Math.min(T.AI_SIGNINGS_MAX, (window === 'summer' ? T.AI_SIGNINGS_SUMMER : T.AI_SIGNINGS_JANUARY) + Math.ceil(Math.max(0, gap) / T.AI_GAP_PER_SIGNING))
+  const placed = club.windowBids ?? 0
+  if (placed >= quota) return
+  const pending = new Set(world.bids.filter((b) => b.clubId === club.id).map((b) => b.playerId))
+  const cards = proposeSignings(world, rng, club, 1, null, pending, window, { aim: target, abroadShare: T.AI_ABROAD_SHARE, index })
+  for (const c of cards) {
+    if (c.gain < T.AI_APPROVE_MIN_GAIN) continue
+    placeBid(world, club, c, manager.id)
+    club.windowBids = placed + 1
+  }
+}
+
+/** Every AI club's round at a window-week close. */
+export function aiTradeRounds(world: World, rng: Rng, window: WindowName): void {
+  const index = marketIndex(world)
+  for (const club of world.clubs) aiTradeRound(world, rng, club, window, index)
+}
+
+/** The window's summaries for the tenure model: the first XI's turnover per club. */
+export function windowSummaries(world: World): WindowSummary[] {
+  return world.clubs.map((club) => ({ clubId: club.id, managerId: club.managerId, turnover: windowTurnover(world, club) }))
 }
 
 /** The global week the current window opened. */

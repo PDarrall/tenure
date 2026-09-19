@@ -218,13 +218,7 @@ export const T = {
   /** League rounds per tier, index 0 = tier 1. DESIGN: 38 or 46. */
   LEAGUE_ROUNDS_BY_TIER: [38, 46, 46, 46, 46] as readonly number[],
 
-  /** Season week of the winter window (played after that week's matches). */
-  WINTER_WINDOW_WEEK: 20,
 
-  /** Season week of the summer window: the second summer week. */
-  get SUMMER_WINDOW_WEEK(): number {
-    return this.MATCH_WEEKS + 1
-  },
 
   /** Season weeks each cup round is played in. Last entry is the final. */
   NATIONAL_CUP_ROUND_WEEKS: [3, 8, 13, 18, 23, 28, 35] as readonly number[],
@@ -591,7 +585,8 @@ export const T = {
 
   /** Anchoring tolerance the tests allow after rounding to one decimal; below the minimum strength the rating floor gets in the way. */
   ANCHOR_TOLERANCE: 0.15,
-  ANCHOR_MIN_STRENGTH: 10,
+  /** Genesis squads under this strength sit on the rating floor and cannot be anchored exactly; the anchoring test skips them. */
+  ANCHOR_MIN_STRENGTH: 12,
   /** Anchoring passes, and the residue below which it stops. */
   ANCHOR_PASSES: 4,
   ANCHOR_RESIDUE: 0.02,
@@ -618,59 +613,31 @@ export const T = {
   // and blame, and the long-tenure targets through strength maintenance.
   // ---------------------------------------------------------------------------
 
-  /** Peak age band. Squads older than the top lose strength each summer. */
-  PEAK_AGE: [25, 29] as readonly [number, number],
 
-  /** Strength lost per summer by a squad past its peak, uniform. DESIGN: 3–5. */
-  AGEING_LOSS: [3, 5] as readonly [number, number],
 
-  /** Strength gained per summer by a squad younger than the peak band. */
-  YOUNG_SQUAD_GROWTH: 1,
 
-  /** Mean age rises by this each summer before turnover. */
-  AGE_DRIFT: 1,
 
-  /** Mean age of incoming signings; turnover pulls the squad toward it. */
-  SIGNING_AGE: 26,
 
   /** Mean age of promoted academy players. */
   ACADEMY_AGE: 19,
 
-  /** Share of the gap to the gravity target closed each summer. Serves: 2–4 long top-tier tenures (a flat top produced none). */
-  GRAVITY_RATE: 0.5,
 
   /** Transfer budget in £m per season = coefficient × wealth². Serves: earnings, big-spender ranks. */
   TRANSFER_BUDGET_PER_WEALTH_SQ: 0.012,
 
-  /** Spend returns: gain = SPEND_GAIN_MAX × r / (r + 1), r = spend / normal budget. Diminishing. */
-  SPEND_GAIN_MAX: 6,
 
-  /** Dealing ability multiplies spend gain: 1 + this × (dealing − 50) / 50. */
-  DEALING_EFFECT: 0.3,
 
-  /** AI spends this share of its summer budget. */
-  AI_SPEND_FRACTION: 1,
   /** The winter pot is this share of the normal budget. DESIGN: two windows. */
   WINTER_BUDGET_SHARE: 0.3,
 
-  /** First-XI turnover each summer = base + slope × (spend / normal budget), capped. */
-  TURNOVER_BASE: 0.15,
-  TURNOVER_PER_BUDGET: 0.25,
-  TURNOVER_MAX: 0.7,
 
   /** Academy players promoted into the XI = floor((development − offset) / step), clamped 0–max. */
   YOUTH_DEVELOPMENT_OFFSET: 25,
   YOUTH_DEVELOPMENT_STEP: 12,
   YOUTH_MAX_PER_SUMMER: 5,
 
-  /** Strength gained next season per academy player in the XI (slow, cheap). */
-  YOUTH_GAIN_PER_PLAYER: 0.6,
 
-  /** Strength lost now per academy player replacing a senior (they are raw). */
-  YOUTH_COST_PER_PLAYER: 0.4,
 
-  /** Age needed for a youth-promoted player to count as a signing for ownership. */
-  ACADEMY_COUNTS_AS_SIGNING: true,
 
   // ---------------------------------------------------------------------------
   // Prestige and wealth drift (DESIGN.md: prestige "slow-moving").
@@ -785,13 +752,10 @@ export const T = {
   CRISIS_EXPECTATION_EASE: 3,
   /** Forced star sale: only at low-wealth clubs. */
   STAR_SALE_P: 0.01,
-  STAR_SALE_STRENGTH: -5,
   STAR_SALE_EXPECTATION_EASE: 1,
   /** Dressing-room fallout rolls once per losing run of this length. */
   FALLOUT_TRIGGER_DEFEATS: 4,
   FALLOUT_P: 0.25,
-  /** Back down or sell: the squad's morale is the roll in BETS.fallout. Sell: ownership up, strength down, "difficult" progress. */
-  FALLOUT_STRENGTH_LOSS: 3,
   FALLOUT_OWNERSHIP_GAIN: 1 / 11,
   /** AI sells the player when its motivation ability is below this. */
   AI_FALLOUT_SELL_BELOW_MOTIVATION: 50,
@@ -1074,9 +1038,6 @@ export const T = {
   /** The team sheet's words: a player under this condition is a gamble; a rating gap under this is "likely", beyond it a gamble. */
   SELECTION_WORDS_TIRED_BELOW: 60,
   SELECTION_WORDS_GAP: 5,
-  /** Selling a senior player: strength lost and £m raised (scaled by the club's normal budget). */
-  SELL_STRENGTH_PER_PLAYER: 3,
-  SELL_CASH_SHARE_OF_BUDGET: 0.4,
 
   // ---------------------------------------------------------------------------
   // Transfers (DESIGN.md "Transfers"): two windows, the director of football,
@@ -1154,6 +1115,35 @@ export const T = {
   REFUSED_BIG_BID_MORALE: -10,
   /** An AI director sells to a bid at this chance when the fee clears value; the human is asked. */
   AI_SELL_ON_BID_P: 0.6,
+  /**
+   * AI clubs trade through their directors toward the level their wealth
+   * sets (the flip): a quota of bids per window, more the further below
+   * the level, none when above it. Serves: the population through the flip.
+   */
+  AI_SIGNINGS_SUMMER: 3,
+  AI_SIGNINGS_JANUARY: 1,
+  /** One more bid per this much of the gap below the level, up to the cap. */
+  AI_GAP_PER_SIGNING: 3,
+  AI_SIGNINGS_MAX: 6,
+  /** The director aims this far above the wealth level (0: the level itself; generation is pegged to it too). */
+  AI_TRADE_TARGET_BIAS: 0,
+  /**
+   * Ambition: the aim rises with wealth squared (× this at wealth 100), the
+   * way the old spend gains compounded for the rich. Without it the top
+   * tier sat at 68 ± 9 and home clubs won the European Cup in 2% of
+   * seasons (target 10–60%). Serves: europeanTitlesHomeShare, topTierLongTenures.
+   */
+  AI_TRADE_AMBITION: 12,
+  /** An AI club over its wage budget sells up to this many of its highest-paid at each window close. */
+  AI_WAGE_SALES_PER_CLOSE: 2,
+  /** A club this far above its level stops buying. */
+  AI_TRADE_HOLD_ABOVE: 3,
+  /** An AI director bids only for an estimated gain of at least this over the weakest starter. */
+  AI_APPROVE_MIN_GAIN: 1,
+  /** Share of an AI director's attempts that go abroad (generated at the level asked); the rest at home clubs and the pool. */
+  AI_ABROAD_SHARE: 0.5,
+  /** An AI club over its wage budget sells its highest-paid reserve at each window close. */
+  AI_SELL_ON_WAGES: true,
   /** A club whose squad is at the tier's size plus this releases its lowest-value reserve to make room for a signing. */
   SIGNING_MAKES_ROOM: true,
   SIGNING_ROOM_OVER: 2,
@@ -1308,6 +1298,9 @@ export const T = {
     /** Decisions (DESIGN.md "Decisions are bets"): per kind, the bold options' mean effect within 10% of the cautious options' (in units of the bold spread), with at least 1.5× the variance. The lines report the worst kind. */
     decisionFairnessGap: { target: 0, min: 0, max: 0.1 },
     decisionVarianceRatio: { target: 3, min: 1.5, max: 1000 },
+    /** Signings (DESIGN.md "Transfers"): about 40% beat the director's estimate, about 25% fall short, scaled by his judgement (a starting point, not a real-world figure). */
+    signingsBeatShare: { target: 0.4, min: 0.3, max: 0.5 },
+    signingsShortShare: { target: 0.25, min: 0.15, max: 0.35 },
     /** Following you (DESIGN.md "Your players"): follow-you moves average about one per two job changes and never exceed two per move. */
     followMovesPerJobChange: { target: 0.5, min: 0.25, max: 0.8 },
     followMaxPerMove: { target: 2, min: 0, max: 2 },

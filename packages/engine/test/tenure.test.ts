@@ -370,7 +370,11 @@ describe('shocks and rare exits (forced rolls)', () => {
     expect(types).toContain('shock.boardRow')
     expect(spell.takeover).not.toBeNull()
     expect(spell.budgetMultiplier).toBeCloseTo(1 - T.CRISIS_BUDGET_CUT, 2)
-    expect(poor.squad.strength).toBe(Math.max(1, strength + T.STAR_SALE_STRENGTH))
+    // The star sale is a real sale: the best outfielder is gone, the fee is in the pot, strength follows the squad.
+    const sale = world.log.find((e) => e.type === 'shock.starSale')!
+    expect(sale.payload['playerId']).not.toBeNull()
+    expect(poor.playerIds).not.toContain(sale.payload['playerId'])
+    expect(poor.squad.strength).toBeLessThanOrEqual(strength)
     expect(spell.expectation).toBe(Math.min(24, expectation + T.CRISIS_EXPECTATION_EASE + T.STAR_SALE_EXPECTATION_EASE))
     expect(spell.season.boardRows).toBe(1)
     // A later takeover whose owner keeps the manager clears the pending replacement.
@@ -409,7 +413,7 @@ describe('shocks and rare exits (forced rolls)', () => {
     expect(resolved.type).toBe('shock.falloutResolved')
     if (manager.ability.motivation < T.AI_FALLOUT_SELL_BELOW_MOTIVATION) {
       expect(resolved.payload['choice']).toBe('sell')
-      expect(club.squad.strength).toBe(strength - T.FALLOUT_STRENGTH_LOSS)
+      expect(club.squad.strength).toBeLessThanOrEqual(strength) // he is gone; strength follows the squad
       expect(spell.ownership).toBeCloseTo(T.FALLOUT_OWNERSHIP_GAIN, 2)
     } else {
       expect(resolved.payload['choice']).toBe('back-down')

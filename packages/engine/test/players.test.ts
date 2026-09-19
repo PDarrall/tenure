@@ -219,7 +219,7 @@ describe('traits', () => {
 })
 
 describe('players over seasons', () => {
-  it('keeps every squad at size and anchored through windows and summers, and forgets nobody who matters', () => {
+  it('keeps every squad at size through windows and summers, strength is the best XI, and forgets nobody who matters', () => {
     const world = createWorld(6)
     runSeasons(world, 2)
     for (const club of world.clubs) {
@@ -227,7 +227,8 @@ describe('players over seasons', () => {
       expect(squad).toHaveLength(T.SQUAD_SIZE_BY_TIER[club.tier - 1] as number)
       const manager = club.managerId === null ? null : world.managers[club.managerId - 1]!
       const formation = manager ? manager.preferredFormation : club.formation
-      if (club.squad.strength >= T.ANCHOR_MIN_STRENGTH) expect(Math.abs(bestXiMean(world, club, formation) - club.squad.strength), club.name).toBeLessThanOrEqual(T.ANCHOR_TOLERANCE + 0.1)
+      // Strength is derived from the squad (the flip): the best XI's mean in the club's formation, to a tenth.
+      expect(Math.abs(bestXiMean(world, club, formation) - club.squad.strength), club.name).toBeLessThanOrEqual(0.06)
       for (const p of squad) expect(p.age).toBeLessThan(T.PLAYER_RETIRE_AT + 1)
     }
     const kept = world.players.filter((p) => p !== null).length
