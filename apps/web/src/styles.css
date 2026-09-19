@@ -131,6 +131,16 @@ p {
   height: 12px;
   flex-shrink: 0;
 }
+/* The version stamp at the foot of the Career tab: small, grey, out of the way. */
+.build-stamp {
+  margin-top: auto;
+  padding: 16px 0 4px;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--ink3);
+  text-align: center;
+  flex-shrink: 0;
+}
 .foot {
   padding: 10px 20px;
   flex-shrink: 0;
