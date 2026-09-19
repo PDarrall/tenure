@@ -1,0 +1,33 @@
+/*
+ * Tenure · v2 tokens (design/v2). Additive to apps/web/src/styles.css: the v1
+ * palette holds; these carry one meaning each. Green wins, amber draws, the
+ * accent loses and is live and is yours. The tints are the result card's
+ * ground as it lands. The monogram sits behind a source's letters.
+ */
+:root {
+  --win: #167a38;
+  --draw: #9c5e08;
+  --loss: var(--accent);
+  --win-tint: rgba(22, 122, 56, 0.1);
+  --draw-tint: rgba(156, 94, 8, 0.1);
+  --loss-tint: rgba(200, 57, 26, 0.1);
+  --mono-bg: #eceae4;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --win: #4cc46e;
+    --draw: #e8a33a;
+    --loss: var(--accent);
+    --win-tint: rgba(76, 196, 110, 0.14);
+    --draw-tint: rgba(232, 163, 58, 0.14);
+    --loss-tint: rgba(255, 106, 69, 0.14);
+    --mono-bg: #262623;
+  }
+}
+
+/* The result beat: 520 ms, once, when the result card mounts. */
+@keyframes beat {
+  0% { transform: scale(0.96); opacity: 0; }
+  60% { transform: scale(1.015); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}

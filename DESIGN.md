@@ -1,4 +1,4 @@
-# TENURE — design bible v0.7
+# TENURE — design bible v0.8
 
 Working title. A football management game about surviving a career. Depth of Football Chairman Pro 2; texture of Championship Manager 01/02.
 FEATURES.md lists what that means system by system, and what is deliberately out. It is the target; this document is the rules.
@@ -233,9 +233,15 @@ Validation target: for each decision type, across the AI population, the bold op
 
 ## Interface
 
-- **One column, one button.** Every screen is a phone column: the season and week, the club and its standing line at the top, a scrolling body, one Continue button whose second line says what it will do, and five tabs — Home, Squad, Tactics, Fixtures, Career. The design canvas ("Tenure", System · light / dark) is the reference; its tokens live in one stylesheet.
-- **Decision cards show likely, downside and confidence** for each option, in words; the default is marked and is what Continue applies.
-- Home carries the week: the fixture card with the odds and the opposition report, the questions of the week as cards, the inbox; out of work, the agent's application, the month's choice and the vacancies. The match is one screen that plays on to the next pause; full time is its own screen.
+The design canvas ("Tenure") is the reference. `design/v2/` holds its export — the tokens, the component specifications, the copy rules, the eight-press script and the artboards — and `apps/web/src/styles.css` carries the tokens. These rules win over anything in the current app.
+
+- **Continue goes straight to the result.** On a fixture, Continue plays the match at once: the fixture card becomes a three-second ticker of minutes and goals, then the result lands in its place — the letter, the score in its colour, the scorers, one line, the ratings behind a tap. Watching is the secondary action, a quiet Watch on the fixture card. A watched match pauses at goals, red cards, injuries that need a change and half time; Play on runs to the next pause; Continue inside it skips to the result.
+- **Home is a feed, not an inbox.** The next fixture and any decision are pinned at the top. Below, in a region that scrolls, posts newest first: results as score cards, the chairman, the press, the agent, the league, a player, the staff — one or two lines each, the week's stamp, and the fans' reaction as a count with a direction. Sources are monograms, never crests or faces. The top of the feed is the state of your world.
+- **Text is rationed.** No post over 140 characters. No paragraphs. Numbers and marks before words. Enough to understand, never the whole explanation. After three defeats the chairman posts "Three defeats. We notice." — not a letter. The templates in `text/*.json` are held to this budget.
+- **Contained.** Every tab's primary state fits 390 × 844 with no page scroll; only the feed and lists scroll, inside their region. The table shows your club and its neighbours, the full table a tap away. Fixtures show the next and the last, the season a tap away. Tactics shows the eleven as a shape, not a list.
+- **Fun, not work.** Colour carries meaning: green for a win, amber for a draw, the accent for a loss and for what is live — the running minute, a goal, pressure — and for what is yours. Form is five marks. Results land with a beat. Streaks and milestones are called out in the feed. Nothing looks like a form or a spreadsheet. Restraint holds: typographic, tabular figures, one accent plus the two result colours, no illustration, dark and light.
+
+Unchanged: one primary button on every screen, ink, its second line saying what it will do; a forced decision replaces it; decision cards show likely, downside and confidence per option with the default marked; five tabs — Home, Squad, Tactics, Fixtures, Career; the 390-point baseline, targets of 44 points or more, tabular figures.
 
 ## Club (phase 5)
 
@@ -272,7 +278,7 @@ These are starting targets from memory, to verify against the LMA's end-of-seaso
 4. Transfers: the windows, the director of football, requests, decisions as bets retrofitted to every existing decision, players who follow you, and the flip to strength derived from the squad.
 5. Club levels, youth, money.
 6. Media, awards, histories; the obituary's three names and the makers' list.
-7. Claude Design, then the designed web app replaces the unstyled one; JSON saves, shareable career page.
+7. Claude Design, then the designed web app replaces the unstyled one (done, v1); the redesign — the feed, the ticker, the watched match, the contained tabs (`design/v2/`) — replaces it; JSON saves, shareable career page.
 8. Meta and world: Hall of Fame across careers, the obituary from the event log, shared leaderboard, international management.
 
 ## Tunables

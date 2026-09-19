@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Text budget · before and after</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&amp;display=swap">
+<style>
+body{margin:0;background:#F5F4F0;color:#141413;font-family:"Schibsted Grotesk", -apple-system, "Helvetica Neue", Arial, sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box}
+a{color:#141413;text-decoration:none}a:hover{color:#5B5955}
+button{font-family:inherit;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1;cursor:pointer}
+input{font-family:inherit}
+::-webkit-scrollbar{display:none}
+
+</style>
+</helmet>
+<div style="width: 1366px; height: 640px; background: #F5F4F0; color: #141413; padding: 40px 48px; display: flex; flex-direction: column; gap: 18px; overflow: hidden;">
+<div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 40px;">
+<div style="display: flex; flex-direction: column; gap: 4px;"><div style="font-size: 34px; font-weight: 800; letter-spacing: -0.03em;">Text budget</div><div style="font-size: 14px; line-height: 19px; color: #5B5955; max-width: 620px;">Every visible character each screen holds in its primary state, counted from the artboards: labels, numbers, names, the button and the tabs. Scrolled content counts on both sides.</div></div>
+<div style="display: flex; gap: 32px;"><div style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 24px; line-height: 28px; font-weight: 700; letter-spacing: -0.02em;">7,100 → 5,079</span><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6E6B66; line-height: 14px;">Total · −28%</div></div><div style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 24px; line-height: 28px; font-weight: 700; letter-spacing: -0.02em;">39 → 34</span><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6E6B66; line-height: 14px;">Chars per item · inbox → post</div></div><div style="display: flex; flex-direction: column; gap: 2px;"><span style="font-size: 24px; line-height: 28px; font-weight: 700; letter-spacing: -0.02em;">51</span><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6E6B66; line-height: 14px;">Longest post · cap 140</div></div></div>
+</div>
+<div style="display: flex; flex-direction: column;"><div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 80px minmax(0, 1fr) 80px 90px; gap: 16px; padding: 0 0 6px; border-bottom: 1px solid #E2E0DA;"><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6E6B66; line-height: 14px;">Screen</div><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6E6B66; line-height: 14px;">Before · v1 as shipped</div><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6E6B66; line-height: 14px; text-align: right;">Chars</div><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6E6B66; line-height: 14px;">After · v2</div><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6E6B66; line-height: 14px; text-align: right;">Chars</div><div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #6E6B66; line-height: 14px; text-align: right;">Change</div></div><div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 80px minmax(0, 1fr) 80px 90px; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid #E2E0DA;">
+<span style="font-size: 15px; font-weight: 600;">Home<span style="display: block; font-size: 12px; line-height: 15px; font-weight: 400; color: #6E6B66; padding-top: 2px;">Rises: the feed holds seven posts where the inbox held three, and the decision card now carries its bets.</span></span>
+<span><div style="height: 8px; width: 50%; background: #6E6B66; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 600; color: #5B5955; text-align: right;">645</span>
+<span><div style="height: 8px; width: 70%; background: #141413; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 700; text-align: right;">902</span>
+<span style="font-size: 15px; font-weight: 700; color: {{accent}}; text-align: right;">+40%</span>
+</div><div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 80px minmax(0, 1fr) 80px 90px; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid #E2E0DA;">
+<span style="font-size: 15px; font-weight: 600;">Match · result</span>
+<span><div style="height: 8px; width: 71%; background: #6E6B66; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 600; color: #5B5955; text-align: right;">910</span>
+<span><div style="height: 8px; width: 48%; background: #141413; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 700; text-align: right;">614</span>
+<span style="font-size: 15px; font-weight: 700; color: #167A38; text-align: right;">−33%</span>
+</div><div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 80px minmax(0, 1fr) 80px 90px; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid #E2E0DA;">
+<span style="font-size: 15px; font-weight: 600;">Match · watched</span>
+<span><div style="height: 8px; width: 79%; background: #6E6B66; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 600; color: #5B5955; text-align: right;">1,020</span>
+<span><div style="height: 8px; width: 59%; background: #141413; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 700; text-align: right;">753</span>
+<span style="font-size: 15px; font-weight: 700; color: #167A38; text-align: right;">−26%</span>
+</div><div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 80px minmax(0, 1fr) 80px 90px; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid #E2E0DA;">
+<span style="font-size: 15px; font-weight: 600;">Squad</span>
+<span><div style="height: 8px; width: 100%; background: #6E6B66; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 600; color: #5B5955; text-align: right;">1,284</span>
+<span><div style="height: 8px; width: 48%; background: #141413; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 700; text-align: right;">616</span>
+<span style="font-size: 15px; font-weight: 700; color: #167A38; text-align: right;">−52%</span>
+</div><div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 80px minmax(0, 1fr) 80px 90px; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid #E2E0DA;">
+<span style="font-size: 15px; font-weight: 600;">Tactics</span>
+<span><div style="height: 8px; width: 61%; background: #6E6B66; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 600; color: #5B5955; text-align: right;">778</span>
+<span><div style="height: 8px; width: 48%; background: #141413; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 700; text-align: right;">620</span>
+<span style="font-size: 15px; font-weight: 700; color: #167A38; text-align: right;">−20%</span>
+</div><div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 80px minmax(0, 1fr) 80px 90px; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid #E2E0DA;">
+<span style="font-size: 15px; font-weight: 600;">Fixtures</span>
+<span><div style="height: 8px; width: 52%; background: #6E6B66; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 600; color: #5B5955; text-align: right;">669</span>
+<span><div style="height: 8px; width: 38%; background: #141413; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 700; text-align: right;">488</span>
+<span style="font-size: 15px; font-weight: 700; color: #167A38; text-align: right;">−27%</span>
+</div><div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 80px minmax(0, 1fr) 80px 90px; gap: 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid #E2E0DA;">
+<span style="font-size: 15px; font-weight: 600;">Table</span>
+<span><div style="height: 8px; width: 81%; background: #6E6B66; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 600; color: #5B5955; text-align: right;">1,035</span>
+<span><div style="height: 8px; width: 54%; background: #141413; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 700; text-align: right;">689</span>
+<span style="font-size: 15px; font-weight: 700; color: #167A38; text-align: right;">−33%</span>
+</div><div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) 80px minmax(0, 1fr) 80px 90px; gap: 16px; align-items: center; padding: 10px 0; border-bottom: none;">
+<span style="font-size: 15px; font-weight: 600;">Career</span>
+<span><div style="height: 8px; width: 59%; background: #6E6B66; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 600; color: #5B5955; text-align: right;">759</span>
+<span><div style="height: 8px; width: 31%; background: #141413; border-radius: 2px;"></div></span><span style="font-size: 15px; font-weight: 700; text-align: right;">397</span>
+<span style="font-size: 15px; font-weight: 700; color: #167A38; text-align: right;">−48%</span>
+</div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#C8391A","options":["#C8391A","#1D5FC2","#B8720A","#0F7A72"],"section":"Colour"},"$preview":{"width":1366,"height":640}}'>
+class Component extends DCLogic {
+renderVals() {
+return { accent: this.props.accent ?? '#C8391A' };
+}
+}
+</script>
+</body>
+</html>
