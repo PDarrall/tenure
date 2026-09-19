@@ -146,7 +146,7 @@ describe('the web controller', () => {
 })
 
 describe('the match view', () => {
-  it('stops before the human fixture, ticks the division in step, takes a substitution and a mentality change, and commits on Continue', { timeout: 60_000 }, async () => {
+  it('stops before the human fixture, plays the division in step to the next pause, takes a substitution and a mentality change, and commits on Continue', { timeout: 60_000 }, async () => {
     const mod = await import('../src/controller.js')
     let s = mod.newSession(3, 'Paul', 'coach')
     s = untilOffer(s)
@@ -162,20 +162,29 @@ describe('the match view', () => {
     expect(m.played).toBe(0)
     const side = mod.humanSide(s)
     expect(m[side].isHuman).toBe(true)
-    for (let i = 0; i < 20; i++) mod.tickWatched(s)
-    expect(m.played).toBe(20)
-    for (const other of w.matches) expect(other.played).toBe(20)
+    // To key events: the first press stops at the first pause, the rest of the division level with it.
+    expect(mod.matchPlay(s)).toBe('fullTime')
+    const events = mod.playToNextPause(s)
+    expect(events.some((e) => e.pause)).toBe(true)
+    expect(m.played).toBeGreaterThan(0)
+    expect(m.over).toBe(false)
+    for (const other of w.matches) expect(other.played).toBe(m.played)
+    const played = m.played
     mod.mentalityWatched(s, 'attack')
     expect(m[side].mentality).toBe('attack')
     const off = m[side].players.find((p) => p.on && p.slot?.position === 'F')!
     const on = m[side].players.find((p) => !p.started && !p.on)!
     expect(mod.substituteWatched(s, off.id, on.id)).toBe(true)
     expect(m[side].subsUsed).toBe(1)
-    // A save mid-match keeps the minute.
+    // A save mid-match keeps the minute, and the toggle travels with it.
+    s = mod.withMatchPlay(s, 'keyEvents')
     const saved = mod.parseSave(mod.serialize(s.world))
-    expect(saved.human!.watched!.matches[0]!.played).toBe(20)
-    mod.skipWatched(s)
+    expect(saved.human!.watched!.matches[0]!.played).toBe(played)
+    expect(saved.human!.matchPlay).toBe('keyEvents')
+    // To full time: the whistle for every match in the week.
+    mod.playToFullTime(s)
     expect(m.over).toBe(true)
+    for (const other of w.matches) expect(other.over).toBe(true)
     const keys = [...w.prepared.map((p) => p.fixture), ...w.others]
     const slotFixtures = keys.map((k) => s.world.fixtures.find((f) => f.competition === k.competition && f.round === k.round && f.homeId === k.homeId && f.awayId === k.awayId)!)
     expect(slotFixtures.some((f) => f.played)).toBe(false)

@@ -47,15 +47,17 @@ export function App() {
   const [saveNote, setSaveNote] = useState<string | null>(null)
   const [save, setSave] = useState<{ state: SaveState; world: World | null }>(() => savedWorld())
 
-  // Autosave whenever the world changes: a new, restored or imported world (object identity) or a played week (turn).
+  // Autosave whenever the world changes: a new, restored or imported world (object identity), a played week (turn),
+  // or the match screen's toggle, a preference saved as soon as it is set.
   const world = screen.kind === 'game' ? screen.session.world : null
   const turn = screen.kind === 'game' ? screen.session.turn : -1
+  const matchPlay = world?.human?.matchPlay
   useEffect(() => {
     if (!world) return
     const ok = storeSave(serialize(world))
     setSaveNote(ok ? null : 'Autosave failed on this device; export a file to keep your career.')
     setSave(ok ? { state: 'ok', world } : savedWorld())
-  }, [world, turn])
+  }, [world, turn, matchPlay])
 
   const open = (session: Session) => {
     setScreen((prev) => ({ kind: 'game', session, careerKey: (prev.kind === 'game' ? prev.careerKey : 0) + 1 }))

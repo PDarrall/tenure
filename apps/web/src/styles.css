@@ -269,6 +269,20 @@ p {
   font-weight: 800;
   letter-spacing: -0.02em;
 }
+/* The ticker (DESIGN.md "Interface", Result first): the running minute in the accent, a line filling to the whistle. */
+.minute.live {
+  color: var(--accent);
+}
+.ticker-line {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--hair);
+  overflow: hidden;
+}
+.ticker-line > div {
+  height: 100%;
+  background: var(--accent);
+}
 .stack {
   display: flex;
   flex-direction: column;

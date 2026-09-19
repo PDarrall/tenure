@@ -4,10 +4,10 @@ import { applyEverywhere, clubOf, continueTurn, getAJob, inMatch, playMatchQuick
 /**
  * A season in the browser, on an iPad viewport (DESIGN.md "Match", phase 3d):
  * turn the day-one offer down, get a job through the market, play every
- * fixture through the match view (one at full speed, timed; the rest skipped
- * to full time), make a substitution and a mentality change, play a cup tie,
- * renew a contract, see an under-24 debut and grow, and visit every tab.
- * Every tap target on Home is at least 32px.
+ * fixture from the match screen (the first to key events, with a substitution
+ * and a mentality change while paused; the rest to full time in one press),
+ * play a cup tie, renew a contract, see an under-24 debut and grow, and visit
+ * every tab. Every tap target on Home is at least 32px.
  */
 
 const SEED = 3
@@ -84,7 +84,7 @@ test('a season on an iPad: the match view, subs, mentality, a cup tie, a contrac
   await page.getByTestId('tab-home').click()
 
   let cupTies = 0
-  let timedSeconds: number | null = null
+  let keyEventPresses: number | null = null
   let subbed = false
   let mentalityChanged = false
   let renewed = false
@@ -103,31 +103,41 @@ test('a season on an iPad: the match view, subs, mentality, a cup tie, a contrac
     if (s === 'match') {
       const eyebrow = await page.locator('main[aria-label="Match"] .head .label').first().innerText()
       if (eyebrow.toLowerCase().includes('cup')) cupTies++
-      if (timedSeconds === null) {
-        // One match at full speed: Continue to each pause, timed from kick-off to the whistle.
-        const t0 = Date.now()
-        for (let i = 0; i < 600; i++) {
+      if (keyEventPresses === null) {
+        // The first match to key events: Continue at each pause; change mentality once and substitute once while paused; count the presses.
+        await page.getByTestId('play-keyEvents').click()
+        await expect(page.getByTestId('continue')).toHaveText(/Kick off · to next event/)
+        let presses = 0
+        for (let i = 0; i < 40; i++) {
           if ((await page.getByTestId('continue-after-match').count()) > 0) break
-          if ((await page.getByTestId('play-on').count()) > 0) {
-            // Paused at a goal, a card, an injury or half time: change mentality once, substitute once, play on.
-            if (!mentalityChanged && (await page.getByTestId('mentality-attack').count()) > 0 && i > 0) {
+          if ((await page.getByTestId('choice-default').count()) > 0) {
+            // An injury needing a change replaces Continue until a substitute is chosen.
+            await page.getByTestId('choice-default').click()
+            subbed = true
+            continue
+          }
+          const next = await page.getByTestId('continue').getAttribute('data-next')
+          if (next === 'next-event' && i > 0) {
+            if (!mentalityChanged && (await page.getByTestId('mentality-attack').count()) > 0) {
               await page.getByTestId('mentality-attack').click()
               mentalityChanged = true
             }
-            if (!subbed && i > 0 && (await page.getByTestId('make-a-change').count()) > 0) {
+            if (!subbed && (await page.getByTestId('make-a-change').count()) > 0) {
               await page.getByTestId('make-a-change').click()
               await page.getByTestId('sub-off').last().click()
               await page.getByTestId('sub-best').click()
               subbed = true
             }
-            await page.getByTestId('play-on').click()
           }
-          await page.waitForTimeout(400)
+          await page.getByTestId('continue').click()
+          presses++
         }
-        timedSeconds = (Date.now() - t0) / 1000
-        await expect(page.getByTestId('continue-after-match')).toBeVisible()
+        keyEventPresses = presses
       } else {
-        await page.getByTestId('to-full-time').click()
+        // Every other match to full time: the toggle back if the first match left it on key events, then one press and the ticker.
+        if ((await page.getByTestId('play-fullTime').getAttribute('aria-pressed')) !== 'true') await page.getByTestId('play-fullTime').click()
+        await expect(page.getByTestId('continue')).toHaveText(/Kick off · to full time/)
+        await page.getByTestId('continue').click()
       }
       await expect(page.getByTestId('continue-after-match')).toBeVisible()
       // The commentary names players; the ratings and, for the league, the table at full time are there.
@@ -157,11 +167,11 @@ test('a season on an iPad: the match view, subs, mentality, a cup tie, a contrac
   expect(subbed).toBe(true)
   expect(mentalityChanged).toBe(true)
   expect(renewed).toBe(true)
-  // A full match at full speed takes about a minute of wall time (DESIGN.md "Match").
-  console.log(`full match at full speed: ${timedSeconds?.toFixed(0)} s of wall time`)
-  expect(timedSeconds).not.toBeNull()
-  expect(timedSeconds!).toBeGreaterThan(40)
-  expect(timedSeconds!).toBeLessThan(150)
+  // To key events: kick-off, each pause, then Result (DESIGN.md "Validation targets": four to six presses in the common case).
+  console.log(`first match to key events: ${keyEventPresses} presses`)
+  expect(keyEventPresses).not.toBeNull()
+  expect(keyEventPresses!).toBeGreaterThanOrEqual(3)
+  expect(keyEventPresses!).toBeLessThanOrEqual(14)
 
   // The youngster made his debut and grew: checked at the club he was noted at, by his exact name.
   if ((await state(page)) === 'match') await playMatchQuickly(page)

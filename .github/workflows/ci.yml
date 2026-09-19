@@ -21,8 +21,8 @@ jobs:
       - run: pnpm web:build
 
   smoke:
-    # A season in the browser on an iPad viewport: the match view, a substitution, a mentality
-    # change, a cup tie, a contract renewal, a debut with growth; a full match at full speed is timed.
+    # A season in the browser on an iPad viewport: the match screen to key events and to full time,
+    # a substitution, a mentality change, a cup tie, a contract renewal, a debut with growth.
     name: Season smoke (Playwright)
     runs-on: ubuntu-latest
     steps:
