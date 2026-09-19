@@ -43,17 +43,17 @@ single branch, so they live here instead.
   weeks; tier 1 plays 38 rounds with two blank weeks, tiers 2–5 play 46
   rounds with six double weeks, and cup ties land on top, so a club can
   play two or three matches in a week. (DESIGN.md v0.2 § Turn structure
-  makes each of those matches its own turn; see Match layer below.)
+  makes each of those matches its own turn; see Match layer below.) (Settled by DESIGN.md v0.10 § World: a 52-week year, 41 of season and 11 of summer, with every fixture scheduled by a template so no club plays more than twice in a week; the Cup, the League Cup and three European competitions in real formats.)
 - Three up, three down at every tier boundary, no play-offs. Nothing is
   relegated out of tier 5.
 - Cups are single-leg knockouts with random draws and byes in the first
   round; level ties go to a shoot-out weighted by strength. Every club
-  enters the national cup in round one.
+  enters the national cup in round one. (Settled by DESIGN.md v0.10 § World: tiered entry, single ties in the Cup, two-leg semi-finals in the League Cup, groups then two-leg knockouts in Europe.)
 - The European competition is a 32-club knockout: five home clubs (top
   four of tier 1 plus the cup winner, or fifth place) and 27 foreign
   clubs picked by strength. Foreign leagues are settled once a season by
   ranking strength, manager ability and noise; a season abroad counts as
-  34 games. (Settled by DESIGN.md v0.6 § World: there are no foreign leagues, jobs or careers abroad; the European competition's opponents are generated for each tie.)
+  34 games. (Settled by DESIGN.md v0.6 § World: there are no foreign leagues, jobs or careers abroad; the European competition's opponents are generated for each tie. DESIGN.md v0.10 § World replaces the one 32-club knockout with three competitions of groups of four then two-leg knockouts.)
 - Goals are Poisson from an expected-goals figure driven by the strength
   gap, form, morale and tactical ability; expected points come from the
   same distribution, so credit is judged against the model's own odds.
