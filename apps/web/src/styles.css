@@ -407,6 +407,9 @@ p {
   justify-content: space-between;
   gap: 12px;
   width: 100%;
+  /* In the column, size to the content: .choice's grow 1 / basis 0 is for the side-by-side row and would pin every option at its min-height. */
+  flex-grow: 0;
+  flex-basis: auto;
   min-height: 50px;
   padding: 8px 16px;
   border-radius: 12px;
