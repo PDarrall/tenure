@@ -15,7 +15,8 @@ import { human, pendingDecisions } from '../src/play/decisions.js'
 import { startSpell } from '../src/tenure/spell.js'
 import { squadOf } from '../src/players/select.js'
 import { applyInputs } from '../src/play/inputs.js'
-import { checkPromises, makeRequest, requestLikelihood, requestOptions, returnLoans, searchPlayers, shortlistRows, wordsFor } from '../src/play/requests.js'
+import { checkPromises, lockUntil, makeRequest, requestCard, requestLikelihood, requestOptions, returnLoans, searchPlayers, shortlistRows, wordsFor } from '../src/play/requests.js'
+import { effectiveCapacity } from '../src/club/facilities.js'
 import type { World } from '../src/types.js'
 
 function seated(seed: number, sw: number) {
@@ -45,11 +46,23 @@ describe('the likelihoods', () => {
   it('states every ask with a chance and words, and marks the ones that are not on', () => {
     const { world } = seated(31, 3)
     const rows = requestOptions(world)
-    expect(rows.map((r) => r.ask)).toEqual(['budget', 'wages', 'backing', 'profile', 'named', 'sell', 'loan', 'contract', 'captaincy', 'playingTime'])
+    expect(rows.map((r) => r.ask)).toEqual(['budget', 'wages', 'stadium', 'coaching', 'academy', 'medical', 'scouting', 'backing', 'newContract', 'profile', 'named', 'sell', 'loan', 'talks', 'contract', 'captaincy', 'playingTime'])
     for (const r of rows) {
       expect(r.likelihood.p).toBeGreaterThanOrEqual(0)
       expect(['sure thing', 'likely', 'gamble']).toContain(r.likelihood.words)
+      // Every row states its cost and its effect from the text bank, inside the post budget.
+      expect(r.cost).not.toMatch(/^\[/)
+      expect(r.effect).not.toMatch(/^\[/)
+      expect(r.cost.length).toBeLessThanOrEqual(140)
+      expect(r.effect.length).toBeLessThanOrEqual(140)
     }
+    // A request is a decision card: the ask, bold, against holding, the cautious default.
+    const card = requestCard(world, { to: 'board', ask: 'stadium' })!
+    expect(card.options.map((o) => o.key)).toEqual(['ask', 'hold'])
+    expect(card.defaultKey).toBe('hold')
+    expect(card.options[0]!.bold).toBe(true)
+    expect(card.options[0]!.confidence).toBe(card.likelihood.words)
+    expect(card.options[1]!.isDefault).toBe(true)
     // Between windows the director cannot sell, loan or go for a name.
     expect(rows.find((r) => r.ask === 'sell')!.likelihood.available).toBe(false)
     expect(rows.find((r) => r.ask === 'sell')!.likelihood.why).toBe('closed')
@@ -69,26 +82,107 @@ describe('the likelihoods', () => {
 })
 
 describe('the board', () => {
-  it('granted: the pot grows and the target moves a place; refused: credit falls, and the third refusal is a board row', () => {
+  it('granted: the pot grows and the target moves a place; one ask a month; refused: credit falls, the ask is locked for three months, and the third refusal is a board row', () => {
     const { world, club, spell } = seated(33, 3)
     const pot = club.transferPot
     const expectation = spell.expectation
     makeRequest(world, fixed(0), { to: 'board', ask: 'budget' })
     expect(club.transferPot).toBeGreaterThan(pot)
     expect(spell.expectation).toBe(Math.max(1, expectation - T.REQUEST_GRANT_PLACES))
+    // One a month: the next ask waits, and asking anyway is logged as unavailable.
+    expect(requestLikelihood(world, { to: 'board', ask: 'wages' })).toMatchObject({ available: false, why: 'monthly' })
     const wages = club.wageBudget
     makeRequest(world, fixed(0), { to: 'board', ask: 'wages' })
+    expect(club.wageBudget).toBe(wages)
+    expect(world.log.some((e) => e.type === 'request.unavailable' && e.payload['why'] === 'monthly')).toBe(true)
+    world.week += T.MONTH_WEEKS
+    makeRequest(world, fixed(0), { to: 'board', ask: 'wages' })
     expect(club.wageBudget).toBeGreaterThan(wages)
+    // Refused: credit down, the ask locked for three months, the third refusal a row.
+    world.week += T.MONTH_WEEKS
     const credit = spell.credit
     const rows = spell.season.boardRows
     makeRequest(world, fixed(0.999), { to: 'board', ask: 'backing' })
     expect(spell.credit).toBeLessThan(credit)
     expect(spell.season.refusals).toBe(1)
-    makeRequest(world, fixed(0.999), { to: 'board', ask: 'backing' })
-    makeRequest(world, fixed(0.999), { to: 'board', ask: 'backing' })
+    expect(lockUntil(world, 'backing')).toBe(world.week + T.REQUEST_LOCK_MONTHS * T.MONTH_WEEKS)
+    world.week += T.MONTH_WEEKS
+    expect(requestLikelihood(world, { to: 'board', ask: 'backing' })).toMatchObject({ available: false, why: 'locked' })
+    makeRequest(world, fixed(0.999), { to: 'board', ask: 'coaching' })
+    world.week += T.MONTH_WEEKS
+    makeRequest(world, fixed(0.999), { to: 'board', ask: 'medical' })
     expect(spell.season.refusals).toBe(3)
     expect(spell.season.boardRows).toBe(rows + 1)
     expect(world.log.filter((e) => e.type === 'request.answered' && e.payload['third'] === true).length).toBe(1)
+    // The lock lifts.
+    world.week += T.REQUEST_LOCK_MONTHS * T.MONTH_WEEKS
+    expect(requestLikelihood(world, { to: 'board', ask: 'backing' }).available).toBe(true)
+  })
+
+  it('reads wealth, the table against the target and solvency', () => {
+    const { world, club, spell } = seated(36, 3)
+    club.cash = 0
+    const base = requestLikelihood(world, { to: 'board', ask: 'budget' }).p
+    club.wealth = Math.min(100, club.wealth + 40)
+    expect(requestLikelihood(world, { to: 'board', ask: 'budget' }).p).toBeGreaterThan(base)
+    club.wealth = Math.max(0, club.wealth - 80)
+    expect(requestLikelihood(world, { to: 'board', ask: 'budget' }).p).toBeLessThan(base)
+    club.wealth += 40
+    spell.expectation += 6
+    expect(requestLikelihood(world, { to: 'board', ask: 'budget' }).p).toBeGreaterThan(base)
+    spell.expectation -= 6
+    club.cash = -10
+    expect(requestLikelihood(world, { to: 'board', ask: 'budget' }).p).toBeLessThan(base)
+  })
+
+  it('the stadium: likelier when the ground is full; granted, the works cost the pot, cut the seats this season and open next', () => {
+    const { world, club } = seated(37, 3)
+    club.cash = 0
+    club.form = ['W', 'W', 'W', 'W', 'W']
+    const full = requestLikelihood(world, { to: 'board', ask: 'stadium' }).p
+    club.form = ['L', 'L', 'L', 'L', 'L']
+    const empty = requestLikelihood(world, { to: 'board', ask: 'stadium' }).p
+    expect(full).toBeGreaterThan(empty)
+    const before = club.stadium.capacity
+    const pot = club.transferPot
+    makeRequest(world, fixed(0), { to: 'board', ask: 'stadium' })
+    expect(club.transferPot).toBeLessThan(pot)
+    expect(effectiveCapacity(world, club)).toBeLessThan(before)
+    expect(club.stadium.expansion!.to).toBeGreaterThan(before)
+    expect(club.stadium.expansion!.wealthSeasonsLeft).toBe(T.STADIUM_WEALTH_SEASONS)
+    world.week += T.MONTH_WEEKS
+    expect(requestLikelihood(world, { to: 'board', ask: 'stadium' })).toMatchObject({ available: false, why: 'works' })
+    const answer = world.log.find((e) => e.type === 'request.answered' && e.payload['ask'] === 'stadium')!
+    expect(answer.payload['to']).toBe(before === club.stadium.expansion!.from ? club.stadium.expansion!.to : 0)
+  })
+
+  it('a level up costs the pot and is read where it acts; the top level is off; a new contract lengthens the deal and lifts the salary, and a longer one is a harder ask', () => {
+    const { world, club, spell } = seated(38, 3)
+    const coaching = club.levels.coaching
+    const pot = club.transferPot
+    makeRequest(world, fixed(0), { to: 'board', ask: 'coaching' })
+    expect(club.levels.coaching).toBe(Math.min(T.LEVEL_MAX, coaching + 1))
+    expect(club.transferPot).toBeLessThan(pot)
+    expect(world.log.some((e) => e.type === 'club.level' && e.payload['level'] === 'coaching')).toBe(true)
+    world.week += T.MONTH_WEEKS
+    club.levels.medical = T.LEVEL_MAX
+    expect(requestLikelihood(world, { to: 'board', ask: 'medical' })).toMatchObject({ available: false, why: 'max' })
+    const judgement = club.director.judgement
+    club.levels.scouting = 2
+    makeRequest(world, fixed(0), { to: 'board', ask: 'scouting' })
+    expect(club.levels.scouting).toBe(3)
+    expect(club.director.judgement).toBeGreaterThanOrEqual(judgement)
+    world.week += T.MONTH_WEEKS
+    const short = requestLikelihood(world, { to: 'board', ask: 'newContract', years: 1 }).p
+    const long = requestLikelihood(world, { to: 'board', ask: 'newContract', years: 3 }).p
+    expect(short).toBeGreaterThan(long)
+    const end = spell.contract.endWeek
+    const salary = spell.contract.salary
+    makeRequest(world, fixed(0), { to: 'board', ask: 'newContract', years: 3 })
+    expect(spell.contract.endWeek).toBeGreaterThan(end)
+    expect(spell.contract.yearsAtSigning).toBe(3)
+    expect(spell.contract.salary).toBeGreaterThan(salary)
+    expect(world.log.some((e) => e.type === 'contract.renewed' && e.payload['years'] === 3)).toBe(true)
   })
 })
 
@@ -97,6 +191,10 @@ describe('the director', () => {
     const { world, club, me } = seated(34, T.JANUARY_WINDOW_WEEKS[0])
     makeRequest(world, fixed(0), { to: 'director', ask: 'profile', profile: { position: 'F', maxAge: 25 } })
     expect(world.human!.targetProfile).toEqual({ position: 'F', maxAge: 25 })
+    // Contract talks: the director sits down with him and the demand arrives as a decision.
+    const talker = squadOf(world, club)[3]!
+    makeRequest(world, fixed(0), { to: 'director', ask: 'talks', playerId: talker.id })
+    expect(pendingDecisions(world).some((d) => d.kind === 'playerContract' && d.payload['playerId'] === talker.id)).toBe(true)
     // A named player from another club within the pot becomes a bid at the close.
     const rows = searchPlayers(world, { position: 'M', maxRating: club.squad.strength + 5 })
     const target = rows.find((r) => r.fee > 0 && r.fee <= club.transferPot)!

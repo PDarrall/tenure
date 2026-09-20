@@ -11,6 +11,7 @@ import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import { clamp, round1 } from '../world/gen.js'
 import { playerById } from '../lookup.js'
+import { injuryWeeksAt, levelsOf } from '../club/facilities.js'
 import { slotsOf } from '../players/formations.js'
 import { assisterWeight, effectiveRating, scorerWeight, type Rateable } from '../players/select.js'
 import { hasTrait } from '../players/traits.js'
@@ -195,6 +196,10 @@ export function oneShotFacts(world: World, rng: Rng, side: SideInput): SideFacts
 /** Write the facts into the players: stats, condition, cards and bans, injuries, growth, tags and bonds, morale. */
 export function applyFacts(world: World, side: SideInput, facts: SideFacts, squadIds: readonly PlayerId[]): void {
   const played = new Set<PlayerId>()
+  // The club's levels (DESIGN.md "Club"): coaching speeds growth, medical shortens injuries; a generated side sits at neutral.
+  const levels = levelsOf(world, side.clubId)
+  const coaching = levels ? levels.coaching : T.LEVEL_NEUTRAL
+  const medical = levels ? levels.medical : T.LEVEL_NEUTRAL
   const manager = side.managerId === null ? undefined : world.managers[side.managerId - 1]
   const inPost = manager && manager.id === side.managerId ? manager : undefined
   const drain = T.CONDITION_DRAIN_PER_90 * (side.style === 'pressing' ? T.STYLE_EFFECTS.pressing.drain : 1)
@@ -213,7 +218,7 @@ export function applyFacts(world: World, side: SideInput, facts: SideFacts, squa
       if (inPost) tagPlayer(world, p, inPost, { id: side.clubId, ...(side.tier === null ? {} : { tier: side.tier }) }, 'debut')
     }
     if (f.started) bondForStart(p, side.managerId)
-    growWithMinutes(p, f.minutes, side.development, side.managerId)
+    growWithMinutes(p, f.minutes, side.development, side.managerId, coaching)
     p.season.goals += f.goals
     p.season.assists += f.assists
     p.season.ratingSum += f.rating
@@ -234,8 +239,8 @@ export function applyFacts(world: World, side: SideInput, facts: SideFacts, squa
       }
     }
     if (f.injuryWeeks > 0) {
-      p.injuryWeeks = f.injuryWeeks
-      emit(world, 'player.injured', { playerId: p.id, clubId: side.clubId, name: p.name, weeks: f.injuryWeeks, season: world.season })
+      p.injuryWeeks = injuryWeeksAt(f.injuryWeeks, medical)
+      emit(world, 'player.injured', { playerId: p.id, clubId: side.clubId, name: p.name, weeks: p.injuryWeeks, season: world.season })
     }
   }
   // Everyone else: a ban served is a match sat out.

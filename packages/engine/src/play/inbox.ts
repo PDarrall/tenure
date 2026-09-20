@@ -389,15 +389,25 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
       case 'request.answered': {
         if (!mine(e)) break
         const ask = String(p['ask'])
-        const vars: Record<string, string | number> = { name: String(p['name'] ?? ''), amount: (p['amount'] as number) ?? 0, pot: (p['pot'] as number) ?? 0, budget: (p['wageBudget'] as number) ?? 0, expectation: ordinal((p['expectation'] as number) ?? 0), refusals: (p['refusals'] as number) ?? 0, profile: String(p['profile'] ?? ''), fee: (p['fee'] as number) ?? 0, club: String(p['buyer'] ?? ''), starts: (p['starts'] as number) ?? 0, weeks: (p['weeks'] as number) ?? 0 }
+        const vars: Record<string, string | number> = { name: String(p['name'] ?? ''), amount: (p['amount'] as number) ?? 0, pot: (p['pot'] as number) ?? 0, budget: (p['wageBudget'] as number) ?? 0, expectation: ordinal((p['expectation'] as number) ?? 0), refusals: (p['refusals'] as number) ?? 0, profile: String(p['profile'] ?? ''), fee: (p['fee'] as number) ?? 0, club: String(p['buyer'] ?? ''), starts: (p['starts'] as number) ?? 0, weeks: (p['weeks'] as number) ?? 0, from: (p['from'] as number) ?? 0, to: (p['to'] as number) ?? 0, years: (p['years'] as number) ?? 0, salary: (p['salary'] as number) ?? 0 }
         const granted = p['granted'] === true
-        const key = ask === 'profile' ? 'profile_set' : ask === 'named' ? 'named_card' : ask === 'sell' ? (granted ? 'sell_found' : 'sell_none') : ask === 'loan' ? (granted ? 'loan_found' : 'loan_none') : `${ask}_${granted ? 'granted' : 'refused'}`
-        push(e, ask === 'budget' || ask === 'wages' || ask === 'backing' ? 'board' : ask === 'profile' || ask === 'named' || ask === 'sell' || ask === 'loan' ? 'staff' : 'players', renderText('requests', key, vars, e.week))
+        const key = ask === 'profile' ? 'profile_set' : ask === 'named' ? 'named_card' : ask === 'sell' ? (granted ? 'sell_found' : 'sell_none') : ask === 'loan' ? (granted ? 'loan_found' : 'loan_none') : ask === 'talks' ? 'talks_granted' : `${ask}_${granted ? 'granted' : 'refused'}`
+        // The board's answers are posts; a refusal is news (DESIGN.md "Requests").
+        const from: InboxFrom = p['to'] === 'board' ? (granted ? 'board' : 'news') : p['to'] === 'director' ? 'staff' : 'players'
+        push(e, from, renderText('requests', key, vars, e.week))
         if (p['third'] === true) push(e, 'board', renderText('requests', 'third_refusal', {}, e.week))
         break
       }
       case 'request.unavailable':
-        if (mine(e)) push(e, 'staff', renderText('requests', 'named_unavailable', { name: String(p['name'] ?? 'him'), why: renderText('requests', String(p['why']), {}, e.week) }, e.week))
+        if (!mine(e)) break
+        if (p['to'] === 'board') push(e, 'board', renderText('requests', 'board_unavailable', { why: renderText('requests', String(p['why']), {}, e.week) }, e.week))
+        else push(e, 'staff', renderText('requests', 'named_unavailable', { name: String(p['name'] ?? 'him'), why: renderText('requests', String(p['why']), {}, e.week) }, e.week))
+        break
+      case 'stadium.expanded':
+        if (mine(e)) push(e, 'board', renderText('requests', 'stadium_expanded', { from: p['from'] as number, to: p['to'] as number }, e.week))
+        break
+      case 'club.attendance':
+        if (mine(e)) push(e, 'board', renderText('requests', 'attendance', { attendance: p['attendance'] as number, capacity: p['capacity'] as number }, e.week))
         break
       case 'player.loanReturned':
         if (mine(e)) push(e, 'staff', renderText('requests', 'loan_returned', { name: String(p['name']), club: clubNameOf(world, p['fromClubId'] as number) }, e.week))

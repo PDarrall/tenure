@@ -1,6 +1,7 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
+import { attendanceOf, settleStadiums } from '../club/facilities.js'
 import type { Club, ClubId, CupRound, CupState, Event, Fixture, Formation, Manager, Result, SeasonRecord, Tier, World } from '../types.js'
 import { homeClub, managerAt } from '../lookup.js'
 import { matchTemplateKey } from '../text/render.js'
@@ -604,6 +605,11 @@ export function endSeason(world: World, rng: Rng, extrasFor: ExtrasFor = noExtra
     }
   }
   emit(world, 'managers.aged', { season: world.season, count: aged })
+  // The works finish and wealth follows (DESIGN.md "Requests", Expand the stadium); the crowd is reported.
+  settleStadiums(world)
+  for (const club of world.clubs) {
+    emit(world, 'club.attendance', { clubId: club.id, managerId: club.managerId, attendance: attendanceOf(world, club), capacity: club.stadium.capacity, season: world.season })
+  }
   for (const club of world.clubs) summerSquad(world, rng, club)
   summerFreeAgents(world, rng)
 

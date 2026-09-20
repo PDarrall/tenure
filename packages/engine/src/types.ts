@@ -301,6 +301,30 @@ export interface Club {
   xiAtWindowOpen?: PlayerId[]
   /** Bids the director has placed this window (AI clubs trade to a quota). */
   windowBids?: number
+  /** The four levels (DESIGN.md "Club"), 1–5, set by wealth and raised by a granted request. */
+  levels: ClubLevels
+  /** The stadium: capacity caps attendance; only a granted request expands it. */
+  stadium: Stadium
+}
+
+export type LevelName = 'coaching' | 'scouting' | 'medical' | 'academy'
+
+export type ClubLevels = Record<LevelName, number>
+
+/** Works granted this season: capacity is cut until the season ends, then rises; wealth rises at each of the next season ends. */
+export interface StadiumExpansion {
+  season: number
+  from: number
+  to: number
+  wealthSeasonsLeft: number
+}
+
+export interface Stadium {
+  /** Thousands. */
+  capacity: number
+  expansion: StadiumExpansion | null
+  /** Seats past works added, thousands: their income comes onto the summer pot. */
+  added: number
 }
 
 /** One per club. His judgement scales how far his estimates sit from the truth. */
@@ -368,7 +392,31 @@ export interface TargetProfile {
 }
 
 /** A request (DESIGN.md "Requests"): to the board, the director or a player; each a bet with a stated likelihood. */
-export type RequestAsk = 'budget' | 'wages' | 'backing' | 'profile' | 'named' | 'sell' | 'loan' | 'contract' | 'captaincy' | 'playingTime'
+export type RequestAsk =
+  | 'budget'
+  | 'wages'
+  | 'stadium'
+  | 'coaching'
+  | 'academy'
+  | 'medical'
+  | 'scouting'
+  | 'backing'
+  | 'newContract'
+  | 'profile'
+  | 'named'
+  | 'sell'
+  | 'loan'
+  | 'talks'
+  | 'contract'
+  | 'captaincy'
+  | 'playingTime'
+
+/** A board ask refused: not to be repeated at this club until the week named (DESIGN.md "Requests"). */
+export interface RequestLock {
+  ask: RequestAsk
+  clubId: ClubId
+  untilWeek: number
+}
 
 /** A signing agreed in principle outside a window: the director's card as it stood, confirmed as a bid when the window opens. */
 export interface AgreedTarget {
@@ -393,6 +441,8 @@ export interface Request {
   ask: RequestAsk
   playerId?: PlayerId
   profile?: TargetProfile
+  /** A new contract: the length asked for. */
+  years?: number
 }
 
 /** A promise of playing time: this many starts by this week, or it is a fallout. */
@@ -859,6 +909,10 @@ export interface HumanState {
   agreedTargets?: AgreedTarget[]
   /** Promises of playing time still to be kept. */
   promises?: PlayingPromise[]
+  /** The week of the last request to the board: one a month (DESIGN.md "Requests"). */
+  boardAskedWeek?: number
+  /** Board asks refused and locked. */
+  requestLocks?: RequestLock[]
 }
 
 /** Enough of a fixture to find it again in world.fixtures. */

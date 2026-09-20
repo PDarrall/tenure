@@ -72,11 +72,11 @@ export function monthlyResignation(world: World, rng: Rng, spell: Spell): boolea
 }
 
 /** Sign a renewal for `years` at the tier × reputation salary. */
-export function renewContract(world: World, spell: Spell, years: number): void {
+export function renewContract(world: World, spell: Spell, years: number, salary?: number): void {
   const manager = managerById(world, spell.managerId)
   spell.contract = {
     endWeek: contractEndWeek(world, years),
-    salary: salaryFor(world, spell.post, manager.reputation),
+    salary: salary ?? salaryFor(world, spell.post, manager.reputation),
     yearsAtSigning: years,
     promise: spell.contract.promise,
   }

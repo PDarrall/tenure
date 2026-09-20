@@ -24,6 +24,7 @@ import { addCredit } from '../tenure/credit.js'
 import { bumpReputation } from '../tenure/exits.js'
 import { averageRating } from '../match/aftermath.js'
 import { levelOf, normalBudget, moveOn, refreshStrength, topUpSquad, trimSquad, windowTurnover, type WindowSummary } from '../season/squad.js'
+import { ensureFacilities, levelFromWealth, scoutingJudgementBonus, stadiumIncome } from '../club/facilities.js'
 
 // ---------------------------------------------------------------------------
 // Windows
@@ -90,8 +91,8 @@ export function isCardClose(sw: number): WindowName | null {
 // The director himself
 // ---------------------------------------------------------------------------
 
-export function judgementFor(rng: Rng | null, wealth: number): number {
-  const base = T.DIRECTOR_JUDGEMENT_BASE + T.DIRECTOR_JUDGEMENT_PER_WEALTH * wealth
+export function judgementFor(rng: Rng | null, wealth: number, scouting: number = levelFromWealth(wealth)): number {
+  const base = T.DIRECTOR_JUDGEMENT_BASE + T.DIRECTOR_JUDGEMENT_PER_WEALTH * wealth + scoutingJudgementBonus(scouting)
   const noise = rng ? rng.normal(0, T.DIRECTOR_JUDGEMENT_SD) : 0
   return Math.round(clamp(base + noise, T.DIRECTOR_JUDGEMENT_RANGE[0], T.DIRECTOR_JUDGEMENT_RANGE[1]))
 }
@@ -112,6 +113,7 @@ export function ensureDirectors(world: World): void {
   }
   if (!world.bids) world.bids = []
   if (world.nextBidId === undefined) world.nextBidId = 1
+  ensureFacilities(world)
 }
 
 /** How far the estimate sits from the truth, by judgement. */
@@ -132,7 +134,8 @@ export function wageBill(world: World, club: Club): number {
 /** Reset the pot for the summer (the board's budget × the promise) or top it up for January. */
 export function refreshPot(world: World, club: Club, window: WindowName, multiplier: number): void {
   const normal = normalBudget(club)
-  club.transferPot = round1(window === 'summer' ? normal * multiplier : club.transferPot + normal * T.WINTER_BUDGET_SHARE)
+  // The summer pot: the board's budget, plus what an expanded stadium brings in (DESIGN.md "Requests", Expand the stadium).
+  club.transferPot = round1(window === 'summer' ? normal * multiplier + stadiumIncome(club) : club.transferPot + normal * T.WINTER_BUDGET_SHARE)
   club.xiAtWindowOpen = [...autoPick(world, club, clubFormation(world, club)).xi]
   club.windowBids = 0
   emit(world, 'window.pot', { clubId: club.id, window, pot: club.transferPot, wageBudget: club.wageBudget, wageBill: wageBill(world, club), season: world.season })

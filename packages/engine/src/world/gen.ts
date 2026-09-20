@@ -3,6 +3,7 @@ import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import type { Club, OwnerType, Tier, World } from '../types.js'
 import { makeDirector } from '../market/director.js'
+import { levelsFor, stadiumFor } from '../club/facilities.js'
 import { clubName, TownNamer } from './names.js'
 import { createManagers } from '../managers/gen.js'
 import { seatIncumbents } from '../tenure/spell.js'
@@ -70,6 +71,8 @@ function makeClub(rng: Rng, id: number, tier: Tier, town: string): Club {
     pendingYouthGain: 0,
     director: makeDirector(rng, wealth),
     transferPot: round1(T.TRANSFER_BUDGET_PER_WEALTH_SQ * wealth * wealth),
+    levels: levelsFor(wealth),
+    stadium: stadiumFor(tier, prestige),
   }
 }
 

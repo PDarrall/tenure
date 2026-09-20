@@ -82,5 +82,188 @@
   ],
   "gone": [
     "he is not available"
+  ],
+  "stadium_granted": [
+    "Works approved: {from}k to {to}k seats from next season, fewer meanwhile. £{amount}m off the pot; the target is {expectation}."
+  ],
+  "stadium_refused": [
+    "The board will not build. That is refusal {refusals} this season."
+  ],
+  "coaching_granted": [
+    "Coaching goes to level {to}: the young ones will come on faster. £{amount}m off the pot; the target is {expectation}."
+  ],
+  "coaching_refused": [
+    "The board will not pay for coaching. That is refusal {refusals} this season."
+  ],
+  "academy_granted": [
+    "The academy goes to level {to}: better kids next summer. £{amount}m off the pot; the target is {expectation}."
+  ],
+  "academy_refused": [
+    "The board will not pay for the academy. That is refusal {refusals} this season."
+  ],
+  "medical_granted": [
+    "Medical goes to level {to}: shorter injuries. £{amount}m off the pot; the target is {expectation}."
+  ],
+  "medical_refused": [
+    "The board will not pay for the medical staff. That is refusal {refusals} this season."
+  ],
+  "scouting_granted": [
+    "Scouting goes to level {to}: sharper reports, a sharper director. £{amount}m off the pot; the target is {expectation}."
+  ],
+  "scouting_refused": [
+    "The board will not pay for scouting. That is refusal {refusals} this season."
+  ],
+  "newContract_granted": [
+    "A new deal: {years} years at £{salary}m a season. They will expect it to show: the target is {expectation}."
+  ],
+  "newContract_refused": [
+    "The board will not talk about your contract. That is refusal {refusals} this season."
+  ],
+  "talks_granted": [
+    "The director has opened talks with {name}. His demand is on the desk."
+  ],
+  "board_unavailable": [
+    "Not now: {why}."
+  ],
+  "monthly": [
+    "the board hear one request a month"
+  ],
+  "locked": [
+    "they said no; ask again in three months"
+  ],
+  "max": [
+    "it is already at the top level"
+  ],
+  "works": [
+    "the builders are still in"
+  ],
+  "stadium_expanded": [
+    "The new stand is open: {to}k seats, up from {from}k. Wealth rises from here."
+  ],
+  "attendance": [
+    "Average gate {attendance}k of {capacity}k this season."
+  ],
+  "cost_budget": [
+    "nothing now; the target a place harder"
+  ],
+  "effect_budget": [
+    "£{amount}m on the pot this window"
+  ],
+  "cost_wages": [
+    "the target a place harder"
+  ],
+  "effect_wages": [
+    "£{amount}m a season more for wages"
+  ],
+  "cost_stadium": [
+    "£{amount}m off the pot; {cut}k seats fewer this season"
+  ],
+  "effect_stadium": [
+    "{to}k seats from next season; wealth up for three summers"
+  ],
+  "cost_coaching": [
+    "£{amount}m off the pot; the target a place harder"
+  ],
+  "effect_coaching": [
+    "level {to}: the young ones come on faster"
+  ],
+  "cost_academy": [
+    "£{amount}m off the pot; the target a place harder"
+  ],
+  "effect_academy": [
+    "level {to}: better kids next summer"
+  ],
+  "cost_medical": [
+    "£{amount}m off the pot; the target a place harder"
+  ],
+  "effect_medical": [
+    "level {to}: shorter injuries"
+  ],
+  "cost_scouting": [
+    "£{amount}m off the pot; the target a place harder"
+  ],
+  "effect_scouting": [
+    "level {to}: sharper reports, a sharper director"
+  ],
+  "cost_backing": [
+    "the target a place harder"
+  ],
+  "effect_backing": [
+    "credit +{credit}; the dispute ends"
+  ],
+  "cost_newContract": [
+    "the target a place harder"
+  ],
+  "effect_newContract": [
+    "{years} years at £{salary}m: more patience, a bigger payout"
+  ],
+  "cost_profile": [
+    "nothing"
+  ],
+  "effect_profile": [
+    "next week's cards follow it"
+  ],
+  "cost_named": [
+    "his fee and wage from the pot"
+  ],
+  "effect_named": [
+    "a bid goes in now"
+  ],
+  "cost_sell": [
+    "a player gone"
+  ],
+  "effect_sell": [
+    "his fee on the pot"
+  ],
+  "cost_loan": [
+    "a player gone till the summer"
+  ],
+  "effect_loan": [
+    "minutes elsewhere; his wage saved"
+  ],
+  "cost_talks": [
+    "nothing"
+  ],
+  "effect_talks": [
+    "his demand on the desk"
+  ],
+  "cost_contract": [
+    "morale if he says no"
+  ],
+  "effect_contract": [
+    "his demand on the desk"
+  ],
+  "cost_captaincy": [
+    "morale if he says no"
+  ],
+  "effect_captaincy": [
+    "the armband; morale up"
+  ],
+  "cost_playingTime": [
+    "a fallout if you break it"
+  ],
+  "effect_playingTime": [
+    "{starts} starts in {weeks} weeks; morale up"
+  ],
+  "hold_label": [
+    "Not now"
+  ],
+  "hold_detail": [
+    "nothing changes"
+  ],
+  "hold_likely": [
+    "Nothing moves."
+  ],
+  "hold_downside": [
+    "The chance passes."
+  ],
+  "downside_board": [
+    "A no costs credit and locks the ask for three months."
+  ],
+  "downside_director": [
+    "He may find nobody."
+  ],
+  "downside_player": [
+    "A no costs his morale."
   ]
 }

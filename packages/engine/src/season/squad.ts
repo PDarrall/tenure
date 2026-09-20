@@ -1,6 +1,7 @@
 import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
+import { academyPotentialBonus, academyRatingBonus } from '../club/facilities.js'
 import { clamp, gravityTarget, round1 } from '../world/gen.js'
 import { managerAt } from '../lookup.js'
 import type { Club, Formation, FormationSlot, Manager, Player, Position, Result, Tier, World } from '../types.js'
@@ -114,10 +115,10 @@ export function promoteAcademy(world: World, rng: Rng, club: Club, youth: number
       position: slot.position,
       side: slot.side,
       age: rng.int(T.ACADEMY_AGE_RANGE[0], T.ACADEMY_AGE_RANGE[1]),
-      rating: levelOf(club) - T.ACADEMY_RATING_GAP + rng.normal(0, T.STARTER_RATING_SD),
+      rating: levelOf(club) - T.ACADEMY_RATING_GAP + academyRatingBonus(club.levels.academy) + rng.normal(0, T.STARTER_RATING_SD),
       academy: true,
     })
-    p.potential = Math.min(100, p.potential + T.ACADEMY_POTENTIAL_BONUS)
+    p.potential = Math.min(100, p.potential + T.ACADEMY_POTENTIAL_BONUS + academyPotentialBonus(club.levels.academy))
     club.playerIds.push(p.id)
     emit(world, 'player.promoted', { playerId: p.id, clubId: club.id, managerId: manager ? manager.id : null, name: p.name, rating: p.rating, season: world.season })
     if (manager) tagPlayer(world, p, manager, club, 'promoted')

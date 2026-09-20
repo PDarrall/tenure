@@ -88,7 +88,7 @@ export const T = {
 
   /** Strength of a generated opponent by competition and stage (mean, sd), drawn afresh before each stage so the later rounds are harder whoever survives. */
   EUROPE_OPPONENT_STRENGTH: {
-    championsCup: { group: { mean: 93, sd: 4 }, quarter: { mean: 95, sd: 3 }, semi: { mean: 97, sd: 3 }, final: { mean: 98, sd: 2 } },
+    championsCup: { group: { mean: 94, sd: 4 }, quarter: { mean: 96, sd: 3 }, semi: { mean: 98, sd: 3 }, final: { mean: 99, sd: 2 } },
     europaCup: { group: { mean: 86, sd: 4 }, quarter: { mean: 89, sd: 3 }, semi: { mean: 91, sd: 3 }, final: { mean: 93, sd: 2 } },
     conferenceCup: { group: { mean: 80, sd: 4 }, quarter: { mean: 84, sd: 3 }, semi: { mean: 87, sd: 3 }, final: { mean: 89, sd: 2 } },
   } as Readonly<Record<'championsCup' | 'europaCup' | 'conferenceCup', Readonly<Record<'group' | 'quarter' | 'semi' | 'final', { mean: number; sd: number }>>>>,
@@ -1259,6 +1259,61 @@ export const T = {
   REQUEST_WORDS: [0.7, 0.45] as readonly [number, number],
   /** Rows a search returns at most. */
   SEARCH_LIMIT: 40,
+  /** The board also reads wealth (per 50 points, clamped ±1), the table against the target (per this many places, clamped ±1) and solvency (a flat penalty when the club is not). */
+  REQUEST_BOARD_WEALTH_SWING: 0.12,
+  REQUEST_BOARD_EXPECTATION_SWING: 0.15,
+  REQUEST_BOARD_EXPECTATION_SCALE: 5,
+  REQUEST_BOARD_INSOLVENT_PENALTY: 0.25,
+  /** Cadence (DESIGN.md "Requests"): one board request a month (MONTH_WEEKS), a refused ask locked for this many months. */
+  REQUEST_LOCK_MONTHS: 3,
+  /** A level up: each level already held lowers the chance; the works cost this share of the normal budget off the pot. */
+  REQUEST_LEVEL_PER_LEVEL: -0.08,
+  REQUEST_LEVEL_COST_SHARE: 0.2,
+  /** The stadium: likely when attendance runs at this share of capacity (the bonus) and the club is solvent; the works cost this share of the normal budget, off the pot first and cash after. */
+  STADIUM_NEAR_CAPACITY: 0.9,
+  STADIUM_NEAR_CAPACITY_BONUS_P: 0.25,
+  STADIUM_COST_SHARE: 0.6,
+  /** A new contract: each year asked beyond the first lowers the chance; the salary rises by this share on the tier's rate. */
+  REQUEST_NEW_CONTRACT_YEARS: [1, 2, 3] as readonly number[],
+  REQUEST_NEW_CONTRACT_PER_YEAR: -0.08,
+  REQUEST_NEW_CONTRACT_SALARY_RISE: 0.1,
+
+  // ---------------------------------------------------------------------------
+  // Club levels and the stadium (DESIGN.md "Club", "Requests"): four levels
+  // set by wealth that a granted request raises; a stadium whose capacity
+  // caps attendance and which only a granted request expands.
+  // Serves: the level and stadium requests have a cost now and an effect
+  // later; the population is unmoved because every effect is centred on
+  // level 3, the level of a club of middling wealth.
+  // ---------------------------------------------------------------------------
+
+  /** Levels run 1–5: one per this many points of wealth, from 1. Level 3 is the neutral point of every effect below. */
+  LEVEL_MAX: 5,
+  LEVEL_WEALTH_STEP: 20,
+  LEVEL_NEUTRAL: 3,
+  /** Coaching: growth with minutes × (1 + this × (level − 3)). */
+  COACHING_DEV_PER_LEVEL: 0.08,
+  /** Medical: an injury's weeks × (1 − this × (level − 3)), never under a week. */
+  MEDICAL_INJURY_PER_LEVEL: 0.1,
+  /** Academy: the summer intake's rating and potential move by this per level from 3. */
+  ACADEMY_RATING_PER_LEVEL: 1.5,
+  ACADEMY_POTENTIAL_PER_LEVEL: 2,
+  /** Scouting: the director's judgement moves by this per level from 3 (DESIGN.md "Club": sharper reports and a sharper director). */
+  DIRECTOR_JUDGEMENT_PER_SCOUTING_LEVEL: 4,
+  /** Capacity in thousands at prestige 50 by tier, ± this share across prestige 0–100, to the nearest step. */
+  STADIUM_CAPACITY_BY_TIER: [45, 25, 12, 7, 4] as readonly number[],
+  STADIUM_CAPACITY_PRESTIGE_SLOPE: 0.6,
+  STADIUM_CAPACITY_STEP: 0.5,
+  /** Attendance: demand is the club's implied capacity × (base + swing × form score, −1..1), capped by the stadium. */
+  ATTENDANCE_DEMAND_BASE: 0.85,
+  ATTENDANCE_FORM_SWING: 0.15,
+  /** The works: capacity down by this share for the rest of the season, then up by this share; wealth up by this much at each of this many season ends. */
+  STADIUM_WORKS_CUT: 0.15,
+  STADIUM_EXPANSION_SHARE: 0.25,
+  STADIUM_WEALTH_PER_SEASON: 2,
+  STADIUM_WEALTH_SEASONS: 3,
+  /** Income from the new seats: £m onto the summer pot per thousand added. */
+  STADIUM_INCOME_PER_K: 0.1,
 
   // ---------------------------------------------------------------------------
   // The score (DESIGN.md "The score"). Serves: Legacy calibration — a 30-year

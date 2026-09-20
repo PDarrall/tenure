@@ -7,6 +7,7 @@
  */
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
+import { coachingFactor } from '../club/facilities.js'
 import { clamp, round1 } from '../world/gen.js'
 import { playerById } from '../lookup.js'
 import type { Club, MadeBy, MadeCircumstance, Manager, ManagerId, Player, Tier, World } from '../types.js'
@@ -31,18 +32,18 @@ export function tagWeight(tag: MadeBy): number {
   return T.TAG_WEIGHTS[tag.circumstance]
 }
 
-/** Growth speed: the manager's development ability scales it (the club's coaching level joins in phase 5). */
-export function developmentFactor(development: number): number {
-  return T.DEV_FACTOR_BASE + (T.DEV_FACTOR_SLOPE * development) / 100
+/** Growth speed: the manager's development ability scales it, and the club's coaching level (DESIGN.md "Club") on top. */
+export function developmentFactor(development: number, coaching: number = T.LEVEL_NEUTRAL): number {
+  return (T.DEV_FACTOR_BASE + (T.DEV_FACTOR_SLOPE * development) / 100) * coachingFactor(coaching)
 }
 
 /**
  * Minutes make players: an under-24 moves toward potential by a step per
  * full season of starts. Returns the gain; bench minutes are zero.
  */
-export function growWithMinutes(player: Player, minutes: number, development: number, managerId: ManagerId | null): number {
+export function growWithMinutes(player: Player, minutes: number, development: number, managerId: ManagerId | null, coaching: number = T.LEVEL_NEUTRAL): number {
   if (player.age >= T.YOUTH_AGE || player.rating >= player.potential || minutes <= 0) return 0
-  const step = (T.GROWTH_PER_SEASON / T.EXPECTED_STARTS) * (minutes / T.MATCH_MINUTES) * developmentFactor(development)
+  const step = (T.GROWTH_PER_SEASON / T.EXPECTED_STARTS) * (minutes / T.MATCH_MINUTES) * developmentFactor(development, coaching)
   const gain = Math.min(step, player.potential - player.rating)
   player.rating = Math.round((player.rating + gain) * 1000) / 1000
   player.season.growth = Math.round((player.season.growth + gain) * 1000) / 1000
