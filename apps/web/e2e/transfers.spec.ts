@@ -179,8 +179,10 @@ test('a summer window: one signing approved, one declined, one "ask for another"
     refused = s.requests.some((r) => r.ask === 'budget' && !r.granted)
   }
   expect(refused).toBe(true)
-  // A refusal is news in the feed; a grant is the board's.
-  await expect(page.locator('.inbox-item', { hasText: /will not add to the pot|found £/ }).first()).toBeVisible()
+  // A refusal is news in the feed; a grant is the board's. The answer came at the week's first step, so it may sit a turn back.
+  const post = page.locator('.inbox-item', { hasText: /will not add to the pot|found £/ })
+  for (let i = 0; i < 3 && (await post.count()) === 0; i++) await page.getByRole('button', { name: 'Earlier' }).click()
+  await expect(post.first()).toBeVisible()
 })
 
 test('deadline day, nothing moves between windows but a free agent, a sale in the next window, the reveal, and a default taken through Continue', async ({ page }) => {
@@ -192,10 +194,11 @@ test('deadline day, nothing moves between windows but a free agent, a sale in th
   let s = await until(page, (x) => x.window !== null && x.weeksToDeadline === 0, 200)
   expect(s.weeksToDeadline).toBe(0)
   await expect(page.getByTestId('window-banner')).toContainText('deadline day')
-  // Approve whatever is on the desk on deadline day; it is answered at the day's close.
+  // Approve whatever is on the desk on deadline day; it is answered at the day's close, which is its own step.
   const cards = page.getByTestId('decision-signing')
   if ((await cards.count()) > 0) await cards.first().getByTestId('signing-approve').click()
-  await turn(page)
+  const deadlineWeek = s.seasonWeek
+  for (let i = 0; i < 3 && (await snap(page)).seasonWeek === deadlineWeek; i++) await turn(page)
   s = await snap(page)
   expect(s.window).toBeNull()
   await expect(page.locator('.inbox-item', { hasText: /Deadline day/ }).first()).toBeVisible()

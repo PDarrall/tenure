@@ -756,10 +756,10 @@ export const T = {
   } as Readonly<Record<'patient' | 'normal' | 'impatient', number>>,
   /** Erratic owners: uniform in this range, re-rolled monthly. */
   SACK_THRESHOLD_ERRATIC: [10, 45] as readonly [number, number],
-  /** Weekly roll while below threshold: base × (1 − perYear × years remaining), floored. DESIGN started at 10%; 4% let eight weeks pass more often; 3.2% (with the floor at 2.4%) keeps the per-season hazard where it was once the year grew from 46 weeks to 52. Serves: unjust ≈ 20–30%, median career 6–8. */
-  SACK_ROLL_BASE: 0.032,
+  /** Weekly roll while below threshold: base × (1 − perYear × years remaining), floored. DESIGN started at 10%; 4% let eight weeks pass more often; 3.2% (floor 2.4%) kept the per-season hazard where it was once the year grew from 46 weeks to 52; 2.9% (floor 2.2%) because the real cup formats bring more exits to lower-tier sides (−6 each) and careers had shortened by half a season. Serves: unjust ≈ 20–30%, median career 6–8. */
+  SACK_ROLL_BASE: 0.029,
   SACK_ROLL_PER_YEAR: 0.2,
-  SACK_ROLL_FLOOR: 0.024,
+  SACK_ROLL_FLOOR: 0.022,
   /** Credit at or below this: sacked at once, and counted as deserved. DESIGN started at 5; 9 since the fast path (phase 3c), whose draw-heavier results had stretched the median first spell to the top of its band. */
   CREDIT_INSTANT_SACK: 9,
   /** A sacking is "deserved" after this many consecutive weeks below threshold. */
