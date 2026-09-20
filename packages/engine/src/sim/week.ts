@@ -17,7 +17,7 @@ import * as market from '../market/hooks.js'
 import { playersWeekly } from '../match/aftermath.js'
 import { aiPlayerRequests, queuePlayerRequests, queueExpiringContracts } from '../players/contracts.js'
 import { agentWeekly } from '../market/agent.js'
-import { aiTradeRounds, closeWindow, deadlineOf, humanClub, isCardClose, isDeadlineWeek, refreshPot, resolveBids, settleSoldShines, windowAt, windowSummaries } from '../market/director.js'
+import { aiTradeRounds, closeWindow, deadlineOf, forgetAbroadCandidates, humanClub, isCardClose, isDeadlineWeek, refreshPot, resolveBids, settleSoldShines, windowAt, windowSummaries } from '../market/director.js'
 import { directorWeek } from '../play/transfers.js'
 import { confirmAgreedTargets } from '../market/arrival.js'
 import { checkPromises, returnLoans } from '../play/requests.js'
@@ -88,4 +88,7 @@ export function closeWeekHooks(world: World, rng: Rng, sw: number): void {
   tenure.weekly(world, rng)
   market.weekly(world, rng)
   if (world.human) agentWeekly(world)
+  // Last of all: once the deadline has gone, nobody from abroad is left
+  // waiting on a bid, whatever else the week did after the window shut.
+  if (!windowAt(sw) || isDeadlineWeek(sw)) forgetAbroadCandidates(world)
 }

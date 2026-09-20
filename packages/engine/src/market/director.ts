@@ -229,7 +229,8 @@ export type MarketIndex = Record<Position, Player[]>
 export function marketIndex(world: World): MarketIndex {
   const index: MarketIndex = { GK: [], D: [], M: [], F: [] }
   for (const p of world.players) {
-    if (!p || p.retired || p.clubId < 0 || p.abroad || p.loan) continue
+    // A generated European side's players are made for the tie and go with it: they are nobody's to buy.
+    if (!p || p.retired || p.clubId < 0 || p.clubId >= T.EUROPEAN_OPPONENT_ID_BASE || p.abroad || p.loan) continue
     index[p.position].push(p)
   }
   for (const position of ['GK', 'D', 'M', 'F'] as const) index[position].sort((a, b) => b.rating - a.rating || a.id - b.id)
@@ -633,9 +634,6 @@ export function settleSoldShines(world: World): void {
  * summary goes in the log.
  */
 export function closeWindow(world: World, rng: Rng, window: WindowName): void {
-  for (const p of world.players) {
-    if (p && !p.retired && p.abroad && p.clubId === T.ABROAD_CLUB_ID) forgetPlayer(world, p)
-  }
   for (const club of world.clubs) {
     trimSquad(world, rng, club)
     topUpSquad(world, rng, club)
@@ -658,7 +656,23 @@ export function closeWindow(world: World, rng: Rng, window: WindowName): void {
       emit(world, 'window.deadline', { clubId: club.id, managerId: club.managerId, window, signings, sales, spend: round1(spend), pot: club.transferPot, season: world.season })
     }
   }
+  // Last, so nobody generated while the squads settled is left waiting.
+  forgetAbroadCandidates(world)
   emit(world, 'window.closed', { window, season: world.season })
+}
+
+/**
+ * Outside a window there are no candidates from abroad waiting: the ones
+ * nobody signed are forgotten, and one who did sign is a home player now,
+ * not a candidate. Run at the close and again on any week with no window, so
+ * the invariant does not depend on what happened inside the week.
+ */
+export function forgetAbroadCandidates(world: World): void {
+  for (const p of world.players) {
+    if (!p || p.retired || !p.abroad) continue
+    if (p.clubId === T.ABROAD_CLUB_ID) forgetPlayer(world, p)
+    else p.abroad = false
+  }
 }
 
 // ---------------------------------------------------------------------------

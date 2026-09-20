@@ -5,7 +5,7 @@ import { academyPotentialBonus, academyRatingBonus } from '../club/facilities.js
 import { clamp, gravityTarget, round1 } from '../world/gen.js'
 import { managerAt } from '../lookup.js'
 import type { Club, Formation, FormationSlot, Manager, Player, Position, Result, Tier, World } from '../types.js'
-import { forgetPlayer, makePlayer, pickFreeAgent, positionMix, releasePlayer, signFreeAgent, squadSizeFor, valueFor, freeAgents } from '../players/gen.js'
+import { depthGap, forgetPlayer, makePlayer, pickFreeAgent, positionMix, releasePlayer, signFreeAgent, squadSizeFor, valueFor, freeAgents } from '../players/gen.js'
 import { bestXiMean, clubFormation, squadOf, autoPick } from '../players/select.js'
 import { slotsOf } from '../players/formations.js'
 import { rollContract, wageDemand as contractWageDemand } from '../players/contracts.js'
@@ -274,11 +274,13 @@ export function topUpSquad(world: World, rng: Rng, club: Club): void {
       if (manager) tagPlayer(world, fromPool, manager, club, 'signed')
       continue
     }
+    // A club topping up is filling the back of the squad, so he comes in behind the men already there.
+    const place = Math.max(1, squadOf(world, club).filter((q) => q.position === slot.position).length - slotsOf(formation).filter((x) => x.position === slot.position).length + 1)
     const p = makePlayer(world, rng, club.id, club.tier, {
       position: slot.position,
       side: slot.side,
       age: rng.int(T.PLAYER_AGE_RANGE[0], T.PLAYER_AGE_RANGE[1]),
-      rating: levelOf(club) - T.BACKUP_RATING_GAP + rng.normal(0, T.BACKUP_RATING_SD),
+      rating: levelOf(club) - depthGap(levelOf(club), place, club.tier) + rng.normal(0, T.BACKUP_RATING_SD),
     })
     club.playerIds.push(p.id)
   }

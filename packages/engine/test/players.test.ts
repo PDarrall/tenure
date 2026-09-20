@@ -41,10 +41,10 @@ describe('formations', () => {
 describe('squads', () => {
   const world = createWorld(1)
 
-  it('gives every club the tier size, two keepers and a spread of positions; European opponents wait for their tie', () => {
+  it('gives every club a squad of 25, three keepers and the design shape; European opponents wait for their tie', () => {
     for (const club of world.clubs) {
       const squad = squadOf(world, club)
-      expect(squad).toHaveLength(T.SQUAD_SIZE_BY_TIER[club.tier - 1] as number)
+      expect(squad).toHaveLength(T.SQUAD_SIZE)
       const mix = positionMix(squad.length)
       for (const pos of ['GK', 'D', 'M', 'F'] as const) expect(squad.filter((p) => p.position === pos)).toHaveLength(mix[pos])
       for (const p of squad) {
@@ -219,13 +219,59 @@ describe('traits', () => {
   })
 })
 
+describe('squad depth', () => {
+  const world = createWorld(11)
+
+  it('shapes a squad of 25 as DESIGN names it: 3 GK, 8 D, 9 M, 5 F', () => {
+    const mix = positionMix(T.SQUAD_SIZE)
+    expect(mix).toEqual({ GK: 3, D: 8, M: 9, F: 5 })
+  })
+
+  it('falls away below the XI, and further down at lower tiers', () => {
+    // DESIGN.md "Players": depth falls away below the XI, and further down at
+    // lower tiers — a tier-5 squad is a strong XI and little else. Read as the
+    // reserves' mean against the best XI's, in the club's own terms.
+    const shortfall = (tier: number): number => {
+      const clubs = world.clubs.filter((c) => c.tier === tier)
+      let total = 0
+      for (const club of clubs) {
+        const squad = squadOf(world, club).sort((a, b) => b.rating - a.rating)
+        const xi = squad.slice(0, 11)
+        const rest = squad.slice(11)
+        const xiMean = xi.reduce((n, p) => n + p.rating, 0) / xi.length
+        const restMean = rest.reduce((n, p) => n + p.rating, 0) / rest.length
+        total += (xiMean - restMean) / xiMean
+      }
+      return total / clubs.length
+    }
+    const byTier = [1, 2, 3, 4, 5].map(shortfall)
+    for (const v of byTier) expect(v).toBeGreaterThan(0)
+    // Every tier falls away more steeply than the one above it.
+    for (let i = 1; i < byTier.length; i++) expect(byTier[i] as number).toBeGreaterThan(byTier[i - 1] as number)
+    expect(byTier[4] as number).toBeGreaterThan((byTier[0] as number) * 1.3)
+  })
+
+  it('still leaves the best XI on the club strength at every tier', () => {
+    // Genesis puts a handful of tier-5 clubs on a strength of 1, and a rating
+    // cannot go below 1, so the anchor has nowhere to shift them: those are
+    // read once strength is derived from the squad (the test below).
+    const anchored = world.clubs.filter((c) => c.squad.strength > 5)
+    expect(anchored.length).toBeGreaterThan(world.clubs.length - 25)
+    for (const club of anchored) {
+      const manager = club.managerId === null ? null : world.managers[club.managerId - 1]!
+      const formation = manager ? manager.preferredFormation : club.formation
+      expect(Math.abs(bestXiMean(world, club, formation) - club.squad.strength), club.name).toBeLessThanOrEqual(0.06)
+    }
+  })
+})
+
 describe('players over seasons', () => {
   it('keeps every squad at size through windows and summers, strength is the best XI, and forgets nobody who matters', { timeout: 60_000 }, () => {
     const world = createWorld(6)
     runSeasons(world, 2)
     for (const club of world.clubs) {
       const squad = squadOf(world, club)
-      expect(squad).toHaveLength(T.SQUAD_SIZE_BY_TIER[club.tier - 1] as number)
+      expect(squad).toHaveLength(T.SQUAD_SIZE)
       const manager = club.managerId === null ? null : world.managers[club.managerId - 1]!
       const formation = manager ? manager.preferredFormation : club.formation
       // Strength is derived from the squad (the flip): the best XI's mean in the club's formation, to a tenth.

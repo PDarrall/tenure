@@ -62,8 +62,8 @@ export const T = {
   /** First-XI mean age at genesis, uniform. DESIGN: peak 25–29. */
   SQUAD_AGE_INITIAL_RANGE: [24, 30] as readonly [number, number],
 
-  /** Squad size at genesis, uniform. */
-  SQUAD_SIZE_RANGE: [22, 28] as readonly [number, number],
+  /** Squad size at genesis, before the real players are generated over it. */
+  SQUAD_SIZE_RANGE: [25, 25] as readonly [number, number],
 
   /** Morale at genesis (0–100). */
   MORALE_INITIAL: 50,
@@ -333,11 +333,11 @@ export const T = {
   // target through the anchoring rule; the best XI averages club strength.
   // ---------------------------------------------------------------------------
 
-  /** Squad size by tier, index 0 = tier 1. DESIGN: 22 in tiers 1–2, 20 in 3–4, 18 in 5. */
-  SQUAD_SIZE_BY_TIER: [22, 22, 20, 20, 18] as readonly number[],
-  EUROPEAN_OPPONENT_SQUAD_SIZE: 22,
-  /** Keepers in every squad; the outfield splits by these shares. DESIGN: for a 22, about 2 GK, 7 D, 8 M, 4–5 F. */
-  SQUAD_KEEPERS: 2,
+  /** Squad size, every tier. DESIGN.md "Players": a squad of 25 at every tier, plus academy players. */
+  SQUAD_SIZE: 25,
+  EUROPEAN_OPPONENT_SQUAD_SIZE: 25,
+  /** Keepers in every squad; the outfield splits by these shares. DESIGN: of 25, about 3 GK, 8 D, 9 M, 5 F. */
+  SQUAD_KEEPERS: 3,
   SQUAD_OUTFIELD_MIX: { D: 0.35, M: 0.4 } as const,
   /** Side draw for outfield players: left, centre, right, either. */
   SIDE_WEIGHTS: [0.2, 0.5, 0.2, 0.1] as readonly number[],
@@ -345,7 +345,16 @@ export const T = {
   PLAYER_AGE_RANGE: [18, 33] as readonly [number, number],
   /** Starters are drawn around club strength, backups below it. */
   STARTER_RATING_SD: 4,
-  BACKUP_RATING_GAP: 7,
+  /**
+   * Depth below the XI (DESIGN.md "Players"): each further place back is
+   * worse than the last, as a share of the club's own level, and the fall is
+   * steeper the lower the tier — a tier-5 squad is a strong XI and little
+   * else. Serves: the depth profile per tier, and the best XI still averaging
+   * club strength after the anchor.
+   */
+  BACKUP_GAP_SHARE: 0.1,
+  BACKUP_STEP_SHARE: 0.035,
+  BACKUP_TIER_SLOPE: 0.15,
   BACKUP_RATING_SD: 4,
   /** Potential = rating + years to 24 × this + noise. Hidden. */
   POTENTIAL_GAIN_PER_YEAR: 2,
