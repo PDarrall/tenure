@@ -283,9 +283,14 @@ function SigningCard({ decision, chosen, onChoose }: { decision: Decision; chose
   const value = chosen ?? decision.defaultKey
   const labelOf = (key: string | undefined) => decision.options.find((o) => o.key === key)?.label ?? key ?? ''
   const reason = p['reason'] === 'request' ? 'what you asked for' : p['reason'] === 'bargain' ? 'a bargain' : 'the weakest slot'
-  const when = p['signNow'] === true ? ' · a free agent, sign now' : p['agreed'] === true ? ' · for the window' : ''
+  // No budget is not no market (DESIGN.md "Transfers"): a loan and a swap read as their own kind, by the term and the wage, not a fee.
+  const kind = String(p['kind'] ?? 'buy')
+  const term = p['loanHalf'] === true ? 'to January' : 'for the season'
+  const when = kind === 'loan' ? ` · on loan, ${term}` : kind === 'exchange' ? ' · a swap, no fee' : kind === 'free' ? ' · a free agent' : p['signNow'] === true ? ' · a free agent, sign now' : p['agreed'] === true ? ' · for the window' : ''
+  const cost = kind === 'loan' ? `£${String(p['wage'])}k a week` : kind === 'exchange' ? (Number(p['cash']) > 0 ? `£${String(p['cash'])}m` : 'A swap') : Number(p['fee']) > 0 ? `£${String(p['fee'])}m` : 'Free'
+  const costLabel = kind === 'loan' ? `Our share of his wage, ${term}` : kind === 'exchange' ? `${String(p['from'])} take one of ours` : `£${String(p['wage'])}k a week`
   return (
-    <Card label={`Director · optional · ${reason}${when}`} testId="decision-signing">
+    <Card label={`Director · optional · ${reason}${when}`} testId="decision-signing" data-kind={kind}>
       <div className="h" data-testid="signing-name">{String(p['name'])}</div>
       <div className="sub">
         {String(p['position'])} · {String(p['age'])} · from {String(p['from'])} · {(p['traits'] as string[]).length ? (p['traits'] as string[]).join(', ') : 'no traits to speak of'}
@@ -299,9 +304,9 @@ function SigningCard({ decision, chosen, onChoose }: { decision: Decision; chose
           <span className="h bold">{String(p['plo'])}–{String(p['phi'])}</span>
           <div className="label">Potential</div>
         </div>
-        <div>
-          <span className="h bold">{Number(p['fee']) > 0 ? `£${String(p['fee'])}m` : 'Free'}</span>
-          <div className="label">£{String(p['wage'])}k a week</div>
+        <div data-testid="signing-cost">
+          <span className="h bold">{cost}</span>
+          <div className="label">{costLabel}</div>
         </div>
       </div>
       <div className="sub">

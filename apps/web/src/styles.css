@@ -1084,6 +1084,13 @@ label.label {
   line-height: 20px;
   font-weight: 600;
 }
+.score-head .side .sc .more {
+  font-size: inherit;
+  color: var(--accent);
+  padding: 0;
+  white-space: nowrap;
+}
+
 .score-head .side .sc {
   font-size: 12px;
   line-height: 15px;

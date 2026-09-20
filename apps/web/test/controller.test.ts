@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { applicationInFlight, openVacancies, pendingDecisions, qualifies, tunables } from '@tenure/engine'
+import { foldScorers, SCORERS_SHOWN } from '../src/screens/common.js'
 import {
   blockingUnanswered,
   canAdvance,
@@ -208,5 +209,28 @@ describe('the match view', () => {
     s = mod.nextTurn(s)
     expect(s.world.human!.selection.captain).toBe(2)
     expect(s.world.human!.selection.autoPick).toBe(false)
+  })
+})
+
+describe('the result card scorers', () => {
+  const names = ["Adams 12'", "Boyd 23'", "Carr 41'", "Dean 55'", "Ellis 70'", "Frost 88'"]
+
+  it('shows four and folds the rest', () => {
+    const { shown, more } = foldScorers(names, false)
+    expect(shown).toHaveLength(SCORERS_SHOWN)
+    expect(more).toBe(names.length - SCORERS_SHOWN)
+    expect(shown[0]).toBe("Adams 12'")
+  })
+
+  it('shows them all once opened', () => {
+    const { shown, more } = foldScorers(names, true)
+    expect(shown).toEqual(names)
+    expect(more).toBe(0)
+  })
+
+  it('does not fold a list that fits, and copes with none', () => {
+    const short = names.slice(0, SCORERS_SHOWN)
+    expect(foldScorers(short, false)).toEqual({ shown: short, more: 0 })
+    expect(foldScorers([], false)).toEqual({ shown: [], more: 0 })
   })
 })
