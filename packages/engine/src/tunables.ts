@@ -88,7 +88,7 @@ export const T = {
 
   /** Strength of a generated opponent by competition and stage (mean, sd), drawn afresh before each stage so the later rounds are harder whoever survives. */
   EUROPE_OPPONENT_STRENGTH: {
-    championsCup: { group: { mean: 94, sd: 4 }, quarter: { mean: 96, sd: 3 }, semi: { mean: 98, sd: 3 }, final: { mean: 99, sd: 2 } },
+    championsCup: { group: { mean: 95, sd: 4 }, quarter: { mean: 97, sd: 3 }, semi: { mean: 99, sd: 3 }, final: { mean: 100, sd: 2 } },
     europaCup: { group: { mean: 86, sd: 4 }, quarter: { mean: 89, sd: 3 }, semi: { mean: 91, sd: 3 }, final: { mean: 93, sd: 2 } },
     conferenceCup: { group: { mean: 80, sd: 4 }, quarter: { mean: 84, sd: 3 }, semi: { mean: 87, sd: 3 }, final: { mean: 89, sd: 2 } },
   } as Readonly<Record<'championsCup' | 'europaCup' | 'conferenceCup', Readonly<Record<'group' | 'quarter' | 'semi' | 'final', { mean: number; sd: number }>>>>,
