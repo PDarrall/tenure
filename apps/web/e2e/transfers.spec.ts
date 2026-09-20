@@ -66,7 +66,7 @@ async function seated(page: Page): Promise<void> {
   })
 }
 
-/** One turn from Home; through the match view when one comes. Returns false when the career is over. */
+/** One week from Home: through the pre-match stop and the match view when one comes. Returns false when the career is over. */
 async function turn(page: Page): Promise<boolean> {
   const s = await state(page)
   if (s === 'over') return false
@@ -76,6 +76,11 @@ async function turn(page: Page): Promise<boolean> {
   }
   await continueTurn(page)
   if ((await state(page)) === 'match') await playMatchQuickly(page)
+  else if ((await page.getByTestId('continue').count()) > 0 && (await page.getByTestId('continue').getAttribute('data-next')) === 'kick-off') {
+    // The turn stopped before kick-off: the side is picked; kick off and play.
+    await continueTurn(page)
+    if ((await state(page)) === 'match') await playMatchQuickly(page)
+  }
   return true
 }
 
@@ -100,11 +105,11 @@ test('a summer window: one signing approved, one declined, one "ask for another"
   await startCareer(page, SEED, 'Dealer')
   await page.getByTestId('accept-offer').click()
   await seated(page)
-  // Into the first match, then on to January: the window banner and the director's cards.
-  let s = await until(page, (x) => x.window === 'january' && x.pending.some((d) => d.kind === 'signing'), 120)
-  expect(s.window).toBe('january')
+  // A window with the director's cards on the desk: the summer's, which the career starts inside, or January's.
+  let s = await until(page, (x) => x.window !== null && x.pending.some((d) => d.kind === 'signing'), 120)
+  expect(s.window).not.toBeNull()
   await expect(page.getByTestId('window-banner')).toBeVisible()
-  await expect(page.getByTestId('window-banner')).toContainText('January window')
+  await expect(page.getByTestId('window-banner')).toContainText(/January window|Summer window/)
 
   // Every card is a bet: likely, downside, confidence, the default marked.
   const cards = page.getByTestId('decision-signing')
@@ -147,7 +152,7 @@ test('a summer window: one signing approved, one declined, one "ask for another"
   expect(s.requests.some((r) => r.ask === 'budget')).toBe(true)
 
   // Next week's cards follow the profile: forwards.
-  if (s.window === 'january' && (s.weeksToDeadline ?? 0) > 0) {
+  if (s.window !== null && (s.weeksToDeadline ?? 0) > 0) {
     const forwards = page.getByTestId('decision-signing')
     if ((await forwards.count()) > 0) await expect(forwards.first().locator('.sub').first()).toContainText(/^F ·/)
   }
@@ -155,7 +160,11 @@ test('a summer window: one signing approved, one declined, one "ask for another"
   // Keep asking the board for money until a refusal lands (each ask is a roll; the board hear one a month), a few asks at most.
   let refused = s.requests.some((r) => r.ask === 'budget' && !r.granted)
   for (let i = 0; i < 24 && !refused; i++) {
-    if (s.clubId === null) break
+    if (s.clubId === null) {
+      expect(await getAJob(page), 'another job').toBe(true)
+      s = await snap(page)
+      continue
+    }
     await page.getByTestId('tab-career').click()
     await page.getByTestId('open-requests').click()
     const row = page.getByTestId('req-budget')

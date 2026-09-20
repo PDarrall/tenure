@@ -53,7 +53,7 @@ async function seated(page: Page): Promise<void> {
   })
 }
 
-/** One turn from Home; through the match view when one comes. */
+/** One week from Home: through the pre-match stop and the match view when one comes. */
 async function turn(page: Page): Promise<void> {
   if ((await state(page)) === 'match') {
     await playMatchQuickly(page)
@@ -61,6 +61,10 @@ async function turn(page: Page): Promise<void> {
   }
   await continueTurn(page)
   if (await inMatch(page)) await playMatchQuickly(page)
+  else if ((await page.getByTestId('continue').count()) > 0 && (await page.getByTestId('continue').getAttribute('data-next')) === 'kick-off') {
+    await continueTurn(page)
+    if (await inMatch(page)) await playMatchQuickly(page)
+  }
 }
 
 test('take a job mid-season: the director posts his assessment and his first cards the week you arrive', async ({ page }) => {
@@ -80,7 +84,7 @@ test('take a job mid-season: the director posts his assessment and his first car
   if ((await state(page)) === 'employed') {
     const cards = page.getByTestId('decision-signing')
     expect(await cards.count()).toBe(s.signingCards.length)
-    if (s.window === null) await expect(cards.first().locator('.label')).toContainText(/sign now|for the window/)
+    if (s.window === null) await expect(cards.first().locator('.label').first()).toContainText(/sign now|for the window/)
     // Approve the first card: outside a window a free agent signs now, a target is agreed for the window.
     await cards.first().getByTestId('signing-approve').click()
     await turn(page)
