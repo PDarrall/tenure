@@ -44,6 +44,7 @@ Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · �
 - The director's assessment and first recommendations on arrival at a club — ✓
 - A shortlist and search, used to name targets for the director — ✓
 - Transfer and wage budgets from the board — ✓ (the pot by tier and wealth, the wage budget, requests for more, a level upgrade as a request)
+- Loans, free agents and exchanges when there is no budget — 4
 - Agents, clauses, instalments, haggling rounds, sell-on fees — ✗
 
 ## Decisions
