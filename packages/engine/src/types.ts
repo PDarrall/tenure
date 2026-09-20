@@ -176,7 +176,57 @@ export type Competition =
   | 'league'
   | 'nationalCup'
   | 'leagueCup'
-  | 'european'
+  | 'championsCup'
+  | 'europaCup'
+  | 'conferenceCup'
+
+export type CupCompetition = Exclude<Competition, 'league'>
+export type EuropeanCompetition = 'championsCup' | 'europaCup' | 'conferenceCup'
+
+/** A round of a cup as the tunables lay it out: its week and slot, who enters, a second leg, a neutral ground. */
+export interface CupRoundSpec {
+  week: number
+  /** 0 the weekend, 1 the midweek. */
+  slot: 0 | 1
+  /** Tiers entering at this round; 'europe' is the tier-1 clubs in Europe (the League Cup's third round). */
+  entrants: readonly (Tier | 'europe')[]
+  secondLeg?: { week: number; slot: 0 | 1 }
+  neutral?: boolean
+}
+
+/** A round as the competition holds it: the spec, its number, its name, and whether it is a group matchday. */
+export interface CupRound extends CupRoundSpec {
+  round: number
+  label: string
+  group?: boolean
+}
+
+export interface GroupRow {
+  clubId: ClubId
+  played: number
+  won: number
+  drawn: number
+  lost: number
+  goalsFor: number
+  goalsAgainst: number
+  points: number
+}
+
+export interface CupGroup {
+  index: number
+  clubIds: ClubId[]
+  rows: GroupRow[]
+}
+
+/** A two-legged tie in play: the first leg's score waits for the second. */
+export interface CupTie {
+  id: number
+  round: number
+  /** Home in the first leg. */
+  homeId: ClubId
+  awayId: ClubId
+  firstLeg: { homeGoals: number; awayGoals: number } | null
+}
 
 export interface Owner {
   type: OwnerType
@@ -251,6 +301,30 @@ export interface Club {
   xiAtWindowOpen?: PlayerId[]
   /** Bids the director has placed this window (AI clubs trade to a quota). */
   windowBids?: number
+  /** The four levels (DESIGN.md "Club"), 1–5, set by wealth and raised by a granted request. */
+  levels: ClubLevels
+  /** The stadium: capacity caps attendance; only a granted request expands it. */
+  stadium: Stadium
+}
+
+export type LevelName = 'coaching' | 'scouting' | 'medical' | 'academy'
+
+export type ClubLevels = Record<LevelName, number>
+
+/** Works granted this season: capacity is cut until the season ends, then rises; wealth rises at each of the next season ends. */
+export interface StadiumExpansion {
+  season: number
+  from: number
+  to: number
+  wealthSeasonsLeft: number
+}
+
+export interface Stadium {
+  /** Thousands. */
+  capacity: number
+  expansion: StadiumExpansion | null
+  /** Seats past works added, thousands: their income comes onto the summer pot. */
+  added: number
 }
 
 /** One per club. His judgement scales how far his estimates sit from the truth. */
@@ -318,13 +392,57 @@ export interface TargetProfile {
 }
 
 /** A request (DESIGN.md "Requests"): to the board, the director or a player; each a bet with a stated likelihood. */
-export type RequestAsk = 'budget' | 'wages' | 'backing' | 'profile' | 'named' | 'sell' | 'loan' | 'contract' | 'captaincy' | 'playingTime'
+export type RequestAsk =
+  | 'budget'
+  | 'wages'
+  | 'stadium'
+  | 'coaching'
+  | 'academy'
+  | 'medical'
+  | 'scouting'
+  | 'backing'
+  | 'newContract'
+  | 'profile'
+  | 'named'
+  | 'sell'
+  | 'loan'
+  | 'talks'
+  | 'contract'
+  | 'captaincy'
+  | 'playingTime'
+
+/** A board ask refused: not to be repeated at this club until the week named (DESIGN.md "Requests"). */
+export interface RequestLock {
+  ask: RequestAsk
+  clubId: ClubId
+  untilWeek: number
+}
+
+/** A signing agreed in principle outside a window: the director's card as it stood, confirmed as a bid when the window opens. */
+export interface AgreedTarget {
+  playerId: PlayerId
+  fromClubId: number
+  name: string
+  position: Position
+  fee: number
+  wage: number
+  estimate: number
+  potentialEstimate: number
+  halfWidth: number
+  reason: SigningReason
+  confidence: Confidence
+  gain: number
+  need: FormationSlot
+  week: number
+}
 
 export interface Request {
   to: 'board' | 'director' | 'player'
   ask: RequestAsk
   playerId?: PlayerId
   profile?: TargetProfile
+  /** A new contract: the length asked for. */
+  years?: number
 }
 
 /** A promise of playing time: this many starts by this week, or it is a fallout. */
@@ -343,10 +461,11 @@ export interface Loan {
   season: number
 }
 
-/** A foreign side generated for one European tie (DESIGN.md "World"): a name, a strength drawn by round, a squad while the tie is on. */
+/** A foreign side generated for a European competition (DESIGN.md "World"): a name, a strength drawn by competition and stage, a squad while a tie against a home club is on. */
 export interface EuropeanOpponent {
   id: ClubId
   name: string
+  competition: EuropeanCompetition
   strength: number
   /** Generated when the tie is prepared, dropped once it is settled. */
   playerIds: PlayerId[]
@@ -375,8 +494,10 @@ export interface World {
   /** This season's league tables, one row per club. */
   tables: TableRow[]
   cups: CupState[]
-  /** Home clubs entering the European competition this season. */
-  europeanEntrants: ClubId[]
+  /** Home clubs in each European competition this season (DESIGN.md "World": by finish and cup wins, places passing down). */
+  europeanPlaces: Record<EuropeanCompetition, ClubId[]>
+  /** Weeks in the year this world was made for: a save from another calendar cannot be continued. */
+  calendar: number
   spells: Spell[]
   nextSpellId: SpellId
   vacancies: Vacancy[]
@@ -513,6 +634,8 @@ export interface Manager {
 export interface Fixture {
   /** Season week (0-based) the match is played in. */
   week: number
+  /** 0 the weekend, 1 the midweek (DESIGN.md "World": no club plays more than twice in a week). */
+  slot: 0 | 1
   competition: Competition
   /** Cup round, 1-based; league round for the league. */
   round: number
@@ -523,6 +646,15 @@ export interface Fixture {
   played: boolean
   homeGoals?: number
   awayGoals?: number
+  /** A neutral ground: no home lean (the Cup's semi-finals and final, every final). */
+  neutral?: boolean
+  /** Leg of a two-legged tie. */
+  leg?: 1 | 2
+  tieId?: number
+  /** The first leg's score carried into the second, from this fixture's home side's view. */
+  aggregate?: { home: number; away: number }
+  /** Group index for a European group matchday. */
+  group?: number
 }
 
 export interface TableRow {
@@ -538,15 +670,21 @@ export interface TableRow {
 }
 
 export interface CupState {
-  competition: 'nationalCup' | 'leagueCup' | 'european'
-  /** Season weeks of each round; last is the final. */
-  roundWeeks: number[]
-  /** Clubs still in. Generated opponents' ids appear in the European competition. */
+  competition: CupCompetition
+  /** Every round in order, the final last; group matchdays first in Europe. */
+  rounds: CupRound[]
+  /** Clubs in the competition and not out: the whole field during a group stage. Generated opponents' ids appear in Europe. */
   remaining: ClubId[]
-  /** Rounds already drawn and played. */
+  /** Clubs entering at each round, by round index. */
+  entrants: ClubId[][]
+  /** Rounds played to the end (a two-legged round counts once its second leg is played). */
   roundsPlayed: number
   winnerId: ClubId | null
   finalistIds: ClubId[]
+  groups: CupGroup[]
+  /** Two-legged ties in play. */
+  ties: CupTie[]
+  nextTieId: number
 }
 
 export interface ClubSeasonTally {
@@ -767,8 +905,14 @@ export interface HumanState {
   shortlist?: PlayerId[]
   /** Candidates declined this window, so the director does not bring the same name back. */
   declinedPlayers?: PlayerId[]
+  /** Targets agreed in principle outside a window (DESIGN.md "Transfers", On arrival): bids the day the window opens unless cancelled. */
+  agreedTargets?: AgreedTarget[]
   /** Promises of playing time still to be kept. */
   promises?: PlayingPromise[]
+  /** The week of the last request to the board: one a month (DESIGN.md "Requests"). */
+  boardAskedWeek?: number
+  /** Board asks refused and locked. */
+  requestLocks?: RequestLock[]
 }
 
 /** Enough of a fixture to find it again in world.fixtures. */
@@ -790,7 +934,9 @@ export type MatchPlay = 'fullTime' | 'keyEvents'
 
 export interface WatchedWeek {
   seasonWeek: number
-  slot: { kind: 'league' } | { kind: 'cup'; competition: 'nationalCup' | 'leagueCup' | 'european' }
+  slot: { kind: 'league' } | { kind: 'cup'; competition: CupCompetition }
+  /** Which slot of the week: 0 the weekend, 1 the midweek. */
+  slotIndex: 0 | 1
   /** The fixtures played in the minute engine, the human's first. */
   prepared: PreparedFixture[]
   matches: MatchState[]
@@ -812,6 +958,8 @@ export interface HumanInputs {
   requests?: Request[]
   shortlistAdd?: PlayerId[]
   shortlistRemove?: PlayerId[]
+  /** Agreed targets the manager calls off before the window opens. */
+  cancelAgreed?: PlayerId[]
   activity?: UnemployedActivity
   resign?: boolean
   retire?: boolean

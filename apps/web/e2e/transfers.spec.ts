@@ -39,11 +39,12 @@ async function snap(page: Page): Promise<Snapshot> {
     const me = w.managers[w.human.managerId - 1]
     const clubId = me.status.kind === 'employed' && me.status.post.kind === 'home' ? me.status.post.clubId : null
     const club = clubId === null ? null : w.clubs[clubId - 1]
-    const sw = w.week % 46
-    const jan = sw >= 18 && sw <= 21
-    const summer = sw >= 40 && sw <= 45
+    // The 52-week calendar (DESIGN.md "World"): January is weeks 22–25; the summer runs from the last match week into the third week of the new season.
+    const sw = w.week % 52
+    const jan = sw >= 21 && sw <= 24
+    const summer = sw >= 40 || sw <= 2
     const openWindow = jan ? 'january' : summer ? 'summer' : null
-    const deadline = jan ? 21 : summer ? 45 : null
+    const deadline = jan ? 24 : summer ? (sw >= 40 ? 52 + 2 : 2) : null
     const log = w.log as { week: number; type: string; payload: Record<string, unknown> }[]
     const signings = log.filter((e) => e.type === 'transfer.completed' && e.payload['clubId'] === clubId).map((e) => ({ playerId: e.payload['playerId'] as number, name: String(e.payload['name']), week: e.week, free: e.payload['free'] === true, follow: e.payload['follow'] === true }))
     const sales = log.filter((e) => e.type === 'player.sold' && e.payload['clubId'] === clubId).length
@@ -65,7 +66,7 @@ async function seated(page: Page): Promise<void> {
   })
 }
 
-/** One turn from Home; through the match view when one comes. Returns false when the career is over. */
+/** One week from Home: through the pre-match stop and the match view when one comes. Returns false when the career is over. */
 async function turn(page: Page): Promise<boolean> {
   const s = await state(page)
   if (s === 'over') return false
@@ -75,6 +76,11 @@ async function turn(page: Page): Promise<boolean> {
   }
   await continueTurn(page)
   if ((await state(page)) === 'match') await playMatchQuickly(page)
+  else if ((await page.getByTestId('continue').count()) > 0 && (await page.getByTestId('continue').getAttribute('data-next')) === 'kick-off') {
+    // The turn stopped before kick-off: the side is picked; kick off and play.
+    await continueTurn(page)
+    if ((await state(page)) === 'match') await playMatchQuickly(page)
+  }
   return true
 }
 
@@ -99,11 +105,11 @@ test('a summer window: one signing approved, one declined, one "ask for another"
   await startCareer(page, SEED, 'Dealer')
   await page.getByTestId('accept-offer').click()
   await seated(page)
-  // Into the first match, then on to January: the window banner and the director's cards.
-  let s = await until(page, (x) => x.window === 'january' && x.pending.some((d) => d.kind === 'signing'), 120)
-  expect(s.window).toBe('january')
+  // A window with the director's cards on the desk: the summer's, which the career starts inside, or January's.
+  let s = await until(page, (x) => x.window !== null && x.pending.some((d) => d.kind === 'signing'), 120)
+  expect(s.window).not.toBeNull()
   await expect(page.getByTestId('window-banner')).toBeVisible()
-  await expect(page.getByTestId('window-banner')).toContainText('January window')
+  await expect(page.getByTestId('window-banner')).toContainText(/January window|Summer window/)
 
   // Every card is a bet: likely, downside, confidence, the default marked.
   const cards = page.getByTestId('decision-signing')
@@ -123,12 +129,20 @@ test('a summer window: one signing approved, one declined, one "ask for another"
   if (n > 2) await cards.nth(2).getByTestId('signing-another').click()
   const approvedName = (await cards.nth(0).getByTestId('signing-name').innerText()).trim()
 
-  // A striker under 25 from the director, and more budget from the board.
+  // Requests live on their own screen off Career, never on Home (DESIGN.md "Requests"): a striker from the director, more budget from the board.
+  await expect(page.getByTestId('requests-card')).toHaveCount(0)
+  await page.getByTestId('tab-career').click()
+  await page.getByTestId('open-requests').click()
+  await page.getByTestId('req-profile').click()
   await page.getByTestId('profile-F').click()
-  await page.getByTestId('request-profile').click()
-  await expect(page.getByTestId('cancel-profile')).toBeVisible()
-  await page.getByTestId('request-budget').click()
-  await expect(page.getByTestId('cancel-budget')).toBeVisible()
+  await page.getByTestId('request-ask').click()
+  await expect(page.getByTestId('request-state')).toHaveText(/Asked when you continue/)
+  await page.getByTestId('requests-back').click()
+  await expect(page.getByTestId('req-profile')).toContainText('Asked when you continue')
+  await page.getByTestId('req-budget').click()
+  await page.getByTestId('request-ask').click()
+  await page.getByTestId('requests-back').click()
+  await page.getByTestId('tab-home').click()
   await turn(page)
   s = await snap(page)
   // The bid went in and was answered at the close; the asks were answered.
@@ -138,22 +152,37 @@ test('a summer window: one signing approved, one declined, one "ask for another"
   expect(s.requests.some((r) => r.ask === 'budget')).toBe(true)
 
   // Next week's cards follow the profile: forwards.
-  if (s.window === 'january' && (s.weeksToDeadline ?? 0) > 0) {
+  if (s.window !== null && (s.weeksToDeadline ?? 0) > 0) {
     const forwards = page.getByTestId('decision-signing')
     if ((await forwards.count()) > 0) await expect(forwards.first().locator('.sub').first()).toContainText(/^F ·/)
   }
 
-  // Keep asking the board for money until a refusal lands (each ask is a roll), a few asks at most.
+  // Keep asking the board for money until a refusal lands (each ask is a roll; the board hear one a month), a few asks at most.
   let refused = s.requests.some((r) => r.ask === 'budget' && !r.granted)
-  for (let i = 0; i < 6 && !refused; i++) {
-    if ((await page.getByTestId('request-budget').count()) === 0) break
-    await page.getByTestId('request-budget').click()
+  for (let i = 0; i < 24 && !refused; i++) {
+    if (s.clubId === null) {
+      expect(await getAJob(page), 'another job').toBe(true)
+      s = await snap(page)
+      continue
+    }
+    await page.getByTestId('tab-career').click()
+    await page.getByTestId('open-requests').click()
+    const row = page.getByTestId('req-budget')
+    if ((await row.getAttribute('data-available')) === 'true') {
+      await row.click()
+      await page.getByTestId('request-ask').click()
+      await page.getByTestId('requests-back').click()
+    }
+    await page.getByTestId('tab-home').click()
     await turn(page)
     s = await snap(page)
     refused = s.requests.some((r) => r.ask === 'budget' && !r.granted)
   }
   expect(refused).toBe(true)
-  await expect(page.locator('.inbox-item', { hasText: /will not add to the pot|found £/ }).first()).toBeVisible()
+  // A refusal is news in the feed; a grant is the board's. The answer came at the week's first step, so it may sit a turn back.
+  const post = page.locator('.inbox-item', { hasText: /will not add to the pot|found £/ })
+  for (let i = 0; i < 3 && (await post.count()) === 0; i++) await page.getByRole('button', { name: 'Earlier' }).click()
+  await expect(post.first()).toBeVisible()
 })
 
 test('deadline day, nothing moves between windows but a free agent, a sale in the next window, the reveal, and a default taken through Continue', async ({ page }) => {
@@ -165,10 +194,11 @@ test('deadline day, nothing moves between windows but a free agent, a sale in th
   let s = await until(page, (x) => x.window !== null && x.weeksToDeadline === 0, 200)
   expect(s.weeksToDeadline).toBe(0)
   await expect(page.getByTestId('window-banner')).toContainText('deadline day')
-  // Approve whatever is on the desk on deadline day; it is answered at the day's close.
+  // Approve whatever is on the desk on deadline day; it is answered at the day's close, which is its own step.
   const cards = page.getByTestId('decision-signing')
   if ((await cards.count()) > 0) await cards.first().getByTestId('signing-approve').click()
-  await turn(page)
+  const deadlineWeek = s.seasonWeek
+  for (let i = 0; i < 3 && (await snap(page)).seasonWeek === deadlineWeek; i++) await turn(page)
   s = await snap(page)
   expect(s.window).toBeNull()
   await expect(page.locator('.inbox-item', { hasText: /Deadline day/ }).first()).toBeVisible()

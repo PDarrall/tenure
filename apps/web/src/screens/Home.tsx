@@ -2,7 +2,6 @@ import { useState } from 'react'
 import {
   applicationInFlight,
   boardMood,
-  requestOptions,
   wageBill,
   windowState,
   clubNameOf,
@@ -20,14 +19,11 @@ import {
   tunables,
   type Decision,
   type MatchSide,
-  type Position,
-  type Request,
-  type RequestOffer,
   type UnemployedActivity,
   type Vacancy,
   type World,
 } from '@tenure/engine'
-import { blockingUnanswered, humanMatch, humanSide, isApplying, markFor, requested, watched, withActivity, withAnswer, withApply, withRequest, withWithdraw, withoutRequest, type Session } from '../controller.js'
+import { blockingUnanswered, cancellingAgreed, humanMatch, humanSide, isApplying, markFor, watched, withActivity, withAnswer, withApply, withCancelAgreed, withKeepAgreed, withWithdraw, type Session } from '../controller.js'
 import { bandLine, continueNext, humanClub, player, positionLabel, seasonLine, standingLine, weekLabel } from './common.js'
 import { BetOptions, Card, Chevron, Choices, Continue, Foot, Head, SectionLabel, Seg } from './ui.js'
 import { OfferCard, defaultPick, offerOption, type OfferPick } from './FirstOffer.js'
@@ -87,7 +83,7 @@ export function Home({ session, onChange, onContinue, onKickOff, saveNote, turns
               <DecisionCard key={d.id} decision={d} chosen={answers[d.id]} onChoose={(key) => onChange(withAnswer(session, d.id, key))} />
             ),
           )}
-          {club && <RequestsCard session={session} onChange={onChange} />}
+          {club && <AgreedCard session={session} onChange={onChange} />}
           {session.inputs.resign && <div className="note">You resign when you continue.</div>}
           {session.inputs.retire && <div className="note">You retire when you continue: the career ends and the score is banked.</div>}
           {saveNote && <div className="note">{saveNote}</div>}
@@ -287,8 +283,9 @@ function SigningCard({ decision, chosen, onChoose }: { decision: Decision; chose
   const value = chosen ?? decision.defaultKey
   const labelOf = (key: string | undefined) => decision.options.find((o) => o.key === key)?.label ?? key ?? ''
   const reason = p['reason'] === 'request' ? 'what you asked for' : p['reason'] === 'bargain' ? 'a bargain' : 'the weakest slot'
+  const when = p['signNow'] === true ? ' · a free agent, sign now' : p['agreed'] === true ? ' · for the window' : ''
   return (
-    <Card label={`Director · optional · ${reason}`} testId="decision-signing">
+    <Card label={`Director · optional · ${reason}${when}`} testId="decision-signing">
       <div className="h" data-testid="signing-name">{String(p['name'])}</div>
       <div className="sub">
         {String(p['position'])} · {String(p['age'])} · from {String(p['from'])} · {(p['traits'] as string[]).length ? (p['traits'] as string[]).join(', ') : 'no traits to speak of'}
@@ -316,68 +313,36 @@ function SigningCard({ decision, chosen, onChoose }: { decision: Decision; chose
   )
 }
 
-/** What can be asked (DESIGN.md "Requests"): the board's three, the director's profile; the rest from a player's page or the shortlist. */
-function RequestsCard({ session, onChange }: { session: Session; onChange: (s: Session) => void }) {
+/** Targets agreed in principle outside a window (DESIGN.md "Transfers", On arrival): bids the day it opens unless called off here. */
+function AgreedCard({ session, onChange }: { session: Session; onChange: (s: Session) => void }) {
   const world = session.world
-  const [profile, setProfile] = useState<{ position: Position | 'any'; maxAge: number | null }>({ position: 'any', maxAge: null })
-  const rows = requestOptions(world)
-  if (rows.length === 0) return null
-  const queued = session.inputs.requests ?? []
-  const ask = (row: RequestOffer) => {
-    if (row.ask === 'profile') {
-      const req: Request = { to: 'director', ask: 'profile', profile: { ...(profile.position === 'any' ? {} : { position: profile.position }), ...(profile.maxAge === null ? {} : { maxAge: profile.maxAge }) } }
-      onChange(withRequest(session, req))
-      return
-    }
-    onChange(withRequest(session, { to: row.to, ask: row.ask }))
-  }
-  const cancel = (row: RequestOffer) => onChange(withoutRequest(session, { to: row.to, ask: row.ask }))
-  const direct = rows.filter((r) => !r.needsPlayer)
-  const byPlayer = rows.filter((r) => r.needsPlayer)
+  const targets = world.human?.agreedTargets ?? []
+  if (targets.length === 0) return null
+  const w = windowState(world)
   return (
-    <Card label="Requests · each a bet" testId="requests-card">
-      <div className="h">Ask</div>
-      {direct.map((row) => {
-        const on = requested(session, { to: row.to, ask: row.ask })
+    <Card label={`Director · agreed for the window${w.open ? '' : ' · bids when it opens'}`} testId="agreed-card">
+      {targets.map((t) => {
+        const off = cancellingAgreed(session, t.playerId)
         return (
-          <div className="ask-row" key={row.ask} data-testid={`ask-${row.ask}`} data-likely={row.likelihood.words}>
+          <div className="ask-row" key={t.playerId} data-testid="agreed-row">
             <div className="stack g2 grow">
-              <span className="row-name">
-                {row.label} <span className="ink3">· {fromLabel(row.to)}</span>
-              </span>
+              <span className="row-name">{t.name}</span>
               <span className="caption">
-                {row.detail} · <span className="strong">{row.likelihood.words}</span>
+                {t.position} · {t.fromClubId > 0 ? clubNameOf(world, t.fromClubId) : 'the pool'} · £{t.fee}m, £{t.wage}k a week{off ? ' · called off when you continue' : ''}
               </span>
-              {row.ask === 'profile' && !on && (
-                <div className="field-row" style={{ marginTop: 4 }}>
-                  <Seg small options={[{ key: 'any', label: 'Any' }, { key: 'GK', label: 'GK' }, { key: 'D', label: 'D' }, { key: 'M', label: 'M' }, { key: 'F', label: 'F' }]} value={profile.position} onChange={(k) => setProfile({ ...profile, position: k as Position | 'any' })} testId={(k) => `profile-${k}`} />
-                  <select aria-label="Age at most" value={profile.maxAge ?? ''} onChange={(e) => setProfile({ ...profile, maxAge: e.target.value === '' ? null : Number(e.target.value) })}>
-                    <option value="">any age</option>
-                    {[21, 24, 27, 30].map((a) => (
-                      <option key={a} value={a}>
-                        under {a + 1}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
             </div>
-            {on ? (
-              <button type="button" className="btn small" onClick={() => cancel(row)} data-testid={`cancel-${row.ask}`}>
-                Asked · cancel
+            {off ? (
+              <button type="button" className="btn small" onClick={() => onChange(withKeepAgreed(session, t.playerId))} data-testid="keep-agreed">
+                Keep
               </button>
             ) : (
-              <button type="button" className="btn small" onClick={() => ask(row)} data-testid={`request-${row.ask}`} disabled={!row.likelihood.available}>
-                Ask
+              <button type="button" className="btn small" onClick={() => onChange(withCancelAgreed(session, t.playerId))} data-testid="cancel-agreed">
+                Call off
               </button>
             )}
           </div>
         )
       })}
-      <div className="caption">
-        {byPlayer.map((r) => `${r.label} (${r.likelihood.available ? r.likelihood.words : 'the window is shut'})`).join(' · ')}: from a player's page, or the shortlist under Squad.
-      </div>
-      {queued.filter((r) => r.playerId !== undefined).length > 0 && <div className="note">You will also ask: {queued.filter((r) => r.playerId !== undefined).map((r) => `${r.ask} for ${world.players[(r.playerId as number) - 1]?.name ?? 'a player'}`).join(', ')}.</div>}
     </Card>
   )
 }

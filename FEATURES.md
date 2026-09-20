@@ -33,15 +33,17 @@ Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · �
 - Substitutions and mentality changes while paused — ✓
 - Latest scores from the division; live table at full time — ✓
 - Match stats (shots, on target, possession, corners, fouls, cards); pre-match odds — ✓
-- Fixtures and results by competition; league table; cups; European competition — ✓
+- Fixtures and results by competition; league table — ✓
+- The Cup, the League Cup and three European competitions in real formats; a 52-week calendar — ✓
 
 ## Transfers
 - Two windows, summer and January; free agents any time — ✓
 - A director of football who recommends signings and sales; the manager decides — ✓
 - Every signing a bet: the director's estimate against the truth, revealed over five matches — ✓
-- Requests to the board, the director and players, each with a stated likelihood — ✓
+- Requests to the board, the director and players on their own screen — stadium, budgets, levels, backing, a contract — each with a stated likelihood, cost and long-term effect — ✓
+- The director's assessment and first recommendations on arrival at a club — ✓
 - A shortlist and search, used to name targets for the director — ✓
-- Transfer and wage budgets from the board — ◐ (the pot by tier and wealth, the wage budget, requests for more ✓; a level upgrade 5)
+- Transfer and wage budgets from the board — ✓ (the pot by tier and wealth, the wage budget, requests for more, a level upgrade as a request)
 - Agents, clauses, instalments, haggling rounds, sell-on fees — ✗
 
 ## Decisions
@@ -49,10 +51,11 @@ Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · �
 - Gambles recorded in the event log and on the career page — ✓
 
 ## Club
-- Four levels — coaching, scouting, medical, academy — the manager can ask the board to raise — 5
+- Four levels — coaching, scouting, medical, academy — the manager can ask the board to raise — ✓ (set by wealth; coaching speeds growth, medical shortens injuries, academy lifts the intake, scouting sharpens the director)
 - Youth intake each summer — 5
-- Money reported by the board: balance, income, wages, attendance — 5
-- Stadium building, ticket prices, sponsorship deals, kit design — ✗ (the board's business, or the chairman's game)
+- Money reported by the board: balance, income, wages, attendance — ◐ (the pot, the wage bill and the summer gate against capacity ✓; balance and income lines 5)
+- Stadium expansion as a request the board decides — ✓
+- Ticket prices, sponsorship deals, kit design — ✗ (the board's business, or the chairman's game)
 
 ## Board and career
 - Board expectation, credit, patience, shocks, sackings — ✓ (deeper than either game)

@@ -10,15 +10,16 @@ import type { World } from '../types.js'
 import { emit } from '../events.js'
 import { isMonthly } from '../season/calendar.js'
 import { endSeason } from '../season/season.js'
-import { refreshStrengths } from '../season/squad.js'
+import { refreshStrength, refreshStrengths, topUpSquad, trimSquad } from '../season/squad.js'
 import { managerById, spellOf } from '../lookup.js'
 import * as tenure from '../tenure/hooks.js'
 import * as market from '../market/hooks.js'
 import { playersWeekly } from '../match/aftermath.js'
 import { aiPlayerRequests, queuePlayerRequests, queueExpiringContracts } from '../players/contracts.js'
 import { agentWeekly } from '../market/agent.js'
-import { aiTradeRounds, closeWindow, humanClub, isCardClose, isDeadlineWeek, refreshPot, resolveBids, settleSoldShines, windowAt, windowSummaries } from '../market/director.js'
+import { aiTradeRounds, closeWindow, deadlineOf, humanClub, isCardClose, isDeadlineWeek, refreshPot, resolveBids, settleSoldShines, windowAt, windowSummaries } from '../market/director.js'
 import { directorWeek } from '../play/transfers.js'
+import { confirmAgreedTargets } from '../market/arrival.js'
 import { checkPromises, returnLoans } from '../play/requests.js'
 
 export function extrasFor(world: World) {
@@ -51,12 +52,15 @@ export function closeWeekHooks(world: World, rng: Rng, sw: number): void {
   }
   // The windows (DESIGN.md "Transfers"): bids answer at the close; every director trades; the human's director brings next week's cards; deadline day shuts it.
   const window = windowAt(sw)
-  if (window) resolveBids(world, rng)
-  const opening = windowAt(sw + 1)
-  if (opening && !windowAt(sw)) {
+  // Bids resolve every week: in a window all of them, outside one only free agents (the rest wait for the open).
+  resolveBids(world, rng)
+  const opening = windowAt((sw + 1) % T.SEASON_WEEKS)
+  if (opening && !window) {
     for (const club of world.clubs) refreshPot(world, club, opening, tenure.budgetMultiplierFor(world, club.id))
+    // Targets agreed in principle become bids the day the window opens (DESIGN.md "Transfers", On arrival).
+    confirmAgreedTargets(world)
     const mine = humanClub(world)
-    if (mine) emit(world, 'window.opened', { clubId: mine.club.id, managerId: mine.manager.id, window: opening, deadline: opening === 'january' ? T.JANUARY_WINDOW_WEEKS[1] : T.SUMMER_WINDOW_WEEKS[1], pot: mine.club.transferPot, wages: mine.club.wageBudget, season: world.season })
+    if (mine) emit(world, 'window.opened', { clubId: mine.club.id, managerId: mine.manager.id, window: opening, deadline: deadlineOf(opening), pot: mine.club.transferPot, wages: mine.club.wageBudget, season: world.season })
   }
   const cards = isCardClose(sw)
   if (cards) {
@@ -65,11 +69,22 @@ export function closeWeekHooks(world: World, rng: Rng, sw: number): void {
   }
   if (window && isDeadlineWeek(sw)) {
     closeWindow(world, rng, window)
-    if (window === 'summer') tenure.afterSummerWindow(world, windowSummaries(world))
-    else tenure.afterWinterWindow(world, windowSummaries(world))
+    if (window === 'january') tenure.afterWinterWindow(world, windowSummaries(world))
   }
   // Strength follows the squad: refreshed as players grow, move and age.
   refreshStrengths(world)
+  // The last week of the summer: ownership and the ceiling from the summer's turnover so far (the window runs three
+  // weeks into the season, but the tenure model reads it at the boundary), then the boards set the new season's targets.
+  if (sw === T.SEASON_WEEKS - 1) {
+    // Registration: no club starts a season short or over its size while the window runs on (the deadline tops up again).
+    for (const club of world.clubs) {
+      trimSquad(world, rng, club)
+      topUpSquad(world, rng, club)
+      refreshStrength(world, club)
+    }
+    tenure.afterSummerWindow(world, windowSummaries(world))
+    tenure.newSeason(world)
+  }
   tenure.weekly(world, rng)
   market.weekly(world, rng)
   if (world.human) agentWeekly(world)

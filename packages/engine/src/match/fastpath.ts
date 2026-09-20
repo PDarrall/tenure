@@ -58,8 +58,8 @@ function lookup(grid: number[][], edges: number[], x: number, y: number): number
 }
 
 /** Expected goals for each side after calibration: the model's reading corrected by the table. */
-export function calibratedGoals(home: SideView, away: SideView, t: FastPathTable = FAST_PATH_TABLE): { home: number; away: number; lean: number } {
-  const a = analyticGoals(home, away)
+export function calibratedGoals(home: SideView, away: SideView, t: FastPathTable = FAST_PATH_TABLE, neutral = false): { home: number; away: number; lean: number } {
+  const a = analyticGoals(home, away, neutral)
   if (t.edges.length < 2) return { home: bound(a.home), away: bound(a.away), lean: a.lean }
   const x = Math.log(Math.max(0.01, a.home))
   const y = Math.log(Math.max(0.01, a.away))
@@ -121,8 +121,8 @@ export interface FastOdds {
 }
 
 /** Pre-match odds from the fast path: the calibrated lambdas and the scoreline distribution. */
-export function fastOdds(home: SideView, away: SideView, t: FastPathTable = FAST_PATH_TABLE): FastOdds {
-  const g = calibratedGoals(home, away, t)
+export function fastOdds(home: SideView, away: SideView, t: FastPathTable = FAST_PATH_TABLE, neutral = false): FastOdds {
+  const g = calibratedGoals(home, away, t, neutral)
   const pmf = jointPmf(g.home, g.away, t.rho)
   let pHome = 0
   let pDraw = 0

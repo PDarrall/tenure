@@ -1,4 +1,4 @@
-# TENURE — design bible v0.9
+# TENURE — design bible v0.10
 
 Working title. A football management game about surviving a career. Depth of Football Chairman Pro 2; texture of Championship Manager 01/02.
 FEATURES.md lists what that means system by system, and what is deliberately out. It is the target; this document is the rules.
@@ -23,7 +23,7 @@ Tune the weights so that a 30-year mid-table career, a 12-year trophy-laden care
 Nothing is ever deducted. Unemployment scores zero — that is the real cost of being sacked.
 Age caps a career at a little under 40 seasons (see Age), so "longest" has a ceiling and Legacy stays comparable across careers.
 
-Trophy points (starting values): European title 120 · tier-1 title 100 · national cup 50 · league cup 25 ·
+Trophy points (starting values): Champions Cup 120 · Europa Cup 70 · Conference Cup 40 · tier-1 title 100 · the Cup 50 · the League Cup 25 · tier-2 title 40 · tier-3/4/5 titles 25/15/10 · promotion without the title 20/12/8/5 by tier.
 tier-2 title 40 · tier-3/4/5 titles 25/15/10 · promotion without the title 20/12/8/5 by tier.
 
 ## World
@@ -31,10 +31,14 @@ tier-2 title 40 · tier-3/4/5 titles 25/15/10 · promotion without the title 20/
 Fictional, generated, English-style pyramid. A 30-year world is fictional after year three anyway.
 
 - Tier 1: 20 clubs. Tiers 2–4: 24 clubs each. Tier 5 ("non-league"): abstracted pool of 24.
-- No foreign leagues. There are no jobs, careers or clubs abroad. The one European competition (top four of tier 1 plus the cup winner) is played against foreign opponents generated for each tie, squad included, with strength drawn by round from a tunable distribution so the trophy is hard.
-- Cups: one national cup (all tiers), one league cup (tiers 1–2), the European competition above.
+- No foreign leagues. There are no jobs, careers or clubs abroad. European opponents are generated for each competition and round, squad included, with strength drawn by competition and round from a tunable distribution so the trophies are hard.
+- Cups, real formats under the game's own names (the real ones are trademarks):
+  - **The Cup** (FA Cup format): every club. Tiers 4–5 enter in round one, tier 3 in round two, tiers 1–2 in round three; single ties, no replays; weekends; semi-finals and the final at a neutral ground. The winner goes to the second European competition.
+  - **The League Cup** (EFL Cup format): tiers 1–4. Tiers 2–4 enter in round one, tier 1 in round two, tier-1 clubs in Europe in round three; midweeks; two-leg semi-finals; a final. The winner goes to the third European competition.
+  - **Europe**, three competitions, midweeks: the **Champions Cup** for the top four of tier 1, the **Europa Cup** for fifth and the Cup winner, the **Conference Cup** for sixth and the League Cup winner (a place passes down the table when a club has already qualified). Each is groups of four, six matches, then two-leg knockouts and a one-off final. Prize money and prestige follow the round reached.
+- The calendar is 52 weeks. Weeks 1–41 are the season, August to May: league at weekends, the League Cup and Europe midweek, the Cup on its weekends. Weeks 42–52 are the summer: the window, awards, expiries, the new season's fixtures. Every fixture is scheduled inside those weeks with no club playing more than twice in a week, and that is tested.
 
-Club: name, city, tier, prestige (0–100, slow-moving), wealth (0–100), owner {type: patient | normal | impatient | erratic, ambition}, fan patience, squad {strength 0–100, age profile, size}, wage budget, honours, rivals[].
+Club: name, city, tier, prestige (0–100, slow-moving), wealth (0–100), owner {type: patient | normal | impatient | erratic, ambition}, fan patience, squad, wage budget, stadium capacity, honours, rivals[].
 
 Squad strength drifts toward a level set by wealth ("gravity"). Manager decisions push it above or below.
 
@@ -146,8 +150,8 @@ The next fixture is always on screen: competition, opponent, venue, date, the op
 
 ## Turn structure
 
-One match per turn. Continue plays the next fixture; everything due before it — board, agent, press, transfers, cup draw, injuries and suspensions — arrives first as inbox items and decisions. Weeks with no fixture (international breaks, cup rounds you are out of, the summer) pass as single steps with their own inbox. A season is the league games plus cup ties plus around ten non-match steps.
-Target pace: a match in about a minute at full speed; a season in under an hour; a career in a long weekend.
+One match per turn. Continue plays the next fixture; everything due before it — board, agent, press, transfers, cup draw, injuries and suspensions — arrives first as feed posts and decisions. Weeks with no fixture pass as single steps with their own posts; a week with nothing in it passes as one line. The year is 52 weeks (see World): 41 of season, 11 of summer, and the summer's steps are where the window, the awards and the expiries happen.
+Target pace: a match in one press, or about a minute if watched; a season in half an hour; a career in a weekend.
 
 ## Players
 
@@ -210,18 +214,31 @@ The tenure model reads results exactly as before. What the player controls: whic
 
 ## Transfers (phase 4)
 
-Two windows: summer, from the last match of one season to the first of the next; January, the calendar month. Nothing moves outside them except free agents, who can sign at any time.
+Two windows: summer, from the last match of one season to the end of the third week of the next; January, the calendar month. Nothing moves outside them except free agents, who can sign at any time.
 
 The director of football runs the market; the manager decides. Every club has a director of football with a judgement rating set by the club's scouting level and wealth. In a window he brings up to three recommendations a week, each a card: the player — name, age, position, rating and potential as ranges narrowed by the club's scouting level, traits — the fee and wage, the reason (the squad's need, the manager's request, or a bargain), his confidence in three words (sure thing, likely, gamble), and the budget after. The manager approves, declines, or asks for a different profile. An approved bid negotiates itself with one roll on the selling club and one on the player, and the answer arrives next turn. Sales work the same way: the director proposes a sale when a bid arrives, when the wage bill is over budget, or when a player is unsettled; the manager approves or refuses — and refusing a big bid for an unsettled player has its own downside.
 
-Every signing is a bet. His true rating and potential differ from the director's estimate by an amount scaled by the director's judgement, and they reveal over his first five matches. A hit lifts credit and reputation; a flop costs credit — the board question your signings — and wages for the length of the contract. A player sold who shines elsewhere costs reputation. The pot stays: transfer and wage budgets from the board by tier and wealth; the director keeps inside them; anything beyond is a request.
+**On arrival.** The director's first cards come the week you take a job, not at the next window: his assessment of the squad — the two positions that need cover, the players he would sell — and his first recommendations. In a window they are bids. Outside one they are free agents you can sign now, plus targets he lines up for the window, agreed in principle and confirmed when it opens.
 
-Requests. The manager can ask at any time, and each ask is a bet with a stated likelihood:
-- The board: more transfer budget, more wage budget, a level upgrade (phase 5), backing in a dispute. Granted raises expectation; refused costs credit; a third refusal in a season adds progress toward "difficult".
-- The director: a target profile ("a striker under 24 by the deadline"), a named player from any club — a shortlist exists for this, searchable by position, age and rating — sell X, loan out Y. His answer depends on budget, the player's willingness and his own judgement, and shapes next week's recommendations.
-- Players: a new contract, the captaincy, a promise of playing time. A promise unkept is a fallout.
+Every signing is a bet. His true rating and potential differ from the director's estimate by an amount scaled by the director's judgement, and they reveal over his first five matches. A hit lifts credit and reputation; a flop costs credit — the board question your signings — and wages for the length of the contract. A player sold who shines elsewhere costs reputation. The pot stays: transfer and wage budgets from the board by tier and wealth; the director keeps inside them; anything beyond is a request (see Requests).
 
 AI clubs run the same director model, and their trading moves squads toward the level their wealth sets, which is what lets club strength be derived from the squad from this phase on. The population targets must hold through the flip, and that is tested.
+
+## Requests
+
+Requests live on their own screen, reached from Career, never on Home. Each is a bet with a stated likelihood, a short-term cost and a long-term effect on the card, in the decision-card format. One request to the board a month; a refusal cannot be repeated for three months. Granted requests raise expectation; refusals cost credit; a third refusal in a season adds progress toward "difficult".
+
+To the board:
+- **Transfer budget** — cash now; expectation up.
+- **Wage budget** — room for a signing or a renewal; expectation up.
+- **Expand the stadium** — a cash hit and a season of reduced capacity, then more attendance and income every season after; wealth rises over three seasons. Likely when attendances run near capacity and the club is solvent.
+- **Coaching** — the coaching level up one: faster development. **Academy** — better youth intake. **Medical** — shorter injuries. **Scouting** — better reports and a sharper director.
+- **Back me** — public backing in a dispute with a player or the press: credit up if granted, the dispute ends; a refusal is itself news.
+- **A new contract** — length and salary; a longer deal buys patience and payout, and lifts expectation.
+
+To the director: a target profile, a named player from the shortlist, sell a player, loan a player out, open contract talks with a player.
+
+To players: a new contract, the captaincy, a promise of playing time. A promise unkept is a fallout.
 
 ## Decisions are bets
 
@@ -240,12 +257,13 @@ The design canvas ("Tenure") is the reference. `design/v2/` holds its export —
 - **Text is rationed.** No post over 140 characters. No paragraphs. Numbers and marks before words. Enough to understand, never the whole explanation. After three defeats the chairman posts "Three defeats. We notice." — not a letter. The templates in `text/*.json` are held to this budget.
 - **Contained.** Every tab's primary state fits 390 × 844 with no page scroll; only the feed and lists scroll, inside their region. The table shows your club and its neighbours, the full table a tap away. Fixtures show the next and the last, the season a tap away. Tactics shows the eleven as a shape, not a list.
 - **Fun, not work.** Colour carries meaning: green for a win, amber for a draw, the accent for a loss and for what is live — the running minute, a goal, pressure — and for what is yours. Form is five marks. Results land with a beat. Streaks and milestones are called out in the feed. Nothing looks like a form or a spreadsheet. Restraint holds: typographic, tabular figures, one accent plus the two result colours, no illustration, dark and light.
+- **Five tabs, one tap each:** Home, Squad, Tactics, Fixtures (fixtures and results by competition, the table, the cups), Career (the four score lines, history, Requests, the job market when out of work). Requests never appear on Home; only their answers do.
 
-Unchanged: one primary button on every screen, ink, its second line saying what it will do; a forced decision replaces it; decision cards show likely, downside and confidence per option with the default marked; five tabs — Home, Squad, Tactics, Fixtures, Career; the 390-point baseline, targets of 44 points or more, tabular figures.
+Unchanged: one primary button on every screen, ink, its second line saying what it will do; a forced decision replaces it; decision cards show likely, downside and confidence per option with the default marked; the 390-point baseline, targets of 44 points or more, tabular figures.
 
 ## Club (phase 5)
 
-Four levels, 1 to 5: coaching (development speed), scouting (search reach, potential accuracy and the director of football's judgement), medical (injury length), academy (youth intake quality). Wealth sets them; once a season the manager can ask the board to raise one, which is a credit gamble — a refusal costs credit, and a raise granted lifts expectation. Youth players arrive each summer from the academy level. Money is the board's business, reported in the inbox: balance, income by tier, attendance and prestige, wages, transfers; attendance grows with success. No stadium building or ticket prices. Insolvency is a shock, as specified in the tenure model.
+Four levels, 1 to 5: coaching (development speed), scouting (search reach, potential accuracy and the director of football's judgement), medical (injury length), academy (youth intake quality). Wealth sets them; the manager can ask the board to raise one (see Requests). Youth players arrive each summer from the academy level. Money is the board's business, reported in the feed: balance, income by tier, attendance against capacity and prestige, wages, transfers; attendance grows with success and is capped by the stadium, which only a granted request (see Requests) expands. No ticket prices. Insolvency is a shock, as specified in the tenure model.
 
 ## Media, awards and history (phase 6)
 
@@ -265,6 +283,7 @@ The model is right when the AI population looks like the real one. Simulate 500 
 - Players and tactics: the best XI per club averages club strength (until phase 4); every trait is read by a rule; match ratings average ≈ 6.9 with a spread of about 0.6; no formation or style beats the mean points per game by more than 10%.
 - Your players: across the AI population, the best maker's Legacy lands within 20% of the best trophy-winner's; buying finished players yields under 10% of players-made points; follow-you moves average about one per two job changes and never exceed two per move; a player under 24 who starts a season gains at least three times the rating of one who sits it out.
 - Decisions: for each decision type, bold options' mean effect within 10% of cautious options', with at least 1.5× the variance. Signings: about 40% beat the director's estimate, about 25% fall short, scaled by his judgement (a starting point, not a real-world figure).
+- Calendar and cups: 52 weeks a year, every fixture scheduled, no club plays more than twice in a week; a tier-5 club reaches the Cup's third round about once in twenty seasons; the Champions Cup is won by a home club about one year in five (starting points).
 - Interface: a season is playable with Continue alone; a match is one press in To full time and four to six in To key events; no tab's primary state scrolls at 390 × 844; no post exceeds 140 characters.
 - After phase 4: the population targets still hold with strength derived from squads. After phase 5: fewer than 2% of clubs are insolvent in any season.
 

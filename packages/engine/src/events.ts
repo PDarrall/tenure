@@ -11,6 +11,7 @@ const NEWS = new Set([
   'relegation',
   'trophy',
   'cup.final',
+  'europe.group',
   'manager.hired',
   'manager.sacked',
   'manager.mutual',

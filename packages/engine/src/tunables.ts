@@ -1,3 +1,5 @@
+import type { CupRoundSpec } from './types.js'
+
 /**
  * Every constant in the engine lives here. Each one carries a comment naming
  * the validation target (DESIGN.md, "Validation targets") it serves, or the
@@ -80,20 +82,16 @@ export const T = {
 
   // ---------------------------------------------------------------------------
   // European opponents (DESIGN.md "World"): foreign sides generated for each
-  // tie, strength drawn by round. Serves: the trophy is rare for anyone
-  // outside the top three of tier 1, and home clubs still win it some seasons.
+  // competition and stage. Serves: the Champions Cup comes home about one
+  // year in five, and rarely from outside the top three of tier 1.
   // ---------------------------------------------------------------------------
 
-  /** Generated opponents in the field: with the five home entrants, a 32-club bracket. */
-  EUROPEAN_OPPONENTS: 27,
-  /** Strength of a generated opponent, drawn afresh before each round (mean, sd), round one first, the final last. */
-  EUROPEAN_OPPONENT_STRENGTH_BY_ROUND: [
-    { mean: 68, sd: 8 },
-    { mean: 76, sd: 7 },
-    { mean: 83, sd: 6 },
-    { mean: 90, sd: 5 },
-    { mean: 95, sd: 3 },
-  ] as readonly { mean: number; sd: number }[],
+  /** Strength of a generated opponent by competition and stage (mean, sd), drawn afresh before each stage so the later rounds are harder whoever survives. */
+  EUROPE_OPPONENT_STRENGTH: {
+    championsCup: { group: { mean: 95, sd: 4 }, quarter: { mean: 97, sd: 3 }, semi: { mean: 99, sd: 3 }, final: { mean: 100, sd: 2 } },
+    europaCup: { group: { mean: 86, sd: 4 }, quarter: { mean: 89, sd: 3 }, semi: { mean: 91, sd: 3 }, final: { mean: 93, sd: 2 } },
+    conferenceCup: { group: { mean: 80, sd: 4 }, quarter: { mean: 84, sd: 3 }, semi: { mean: 87, sd: 3 }, final: { mean: 89, sd: 2 } },
+  } as Readonly<Record<'championsCup' | 'europaCup' | 'conferenceCup', Readonly<Record<'group' | 'quarter' | 'semi' | 'final', { mean: number; sd: number }>>>>,
   /** Share of generated opponents carrying a prefix ("Real", "FC"), and the share of their squads from their own name pool. */
   EUROPEAN_OPPONENT_PREFIX_SHARE: 0.5,
   EUROPEAN_OPPONENT_NATIONAL_SHARE: 0.8,
@@ -200,14 +198,15 @@ export const T = {
   ELITE_PRESTIGE_RANK: 6,
 
   // ---------------------------------------------------------------------------
-  // Calendar (DESIGN.md "Season and match": 38 or 46 league games, cups, two
-  // windows, ~40 weekly turns). Weeks are shared by every tier; a week can hold
-  // more than one match for a club.
+  // Calendar (DESIGN.md "World", "Turn structure"): 52 weeks, 41 of season
+  // and 11 of summer; two slots a week, the weekend and the midweek; the
+  // League Cup and Europe midweek, the Cup on its weekends. Serves: every
+  // fixture scheduled, no club more than twice in a week (tested).
   // ---------------------------------------------------------------------------
 
   /** Weeks in a season: MATCH_WEEKS of football then the summer. */
-  MATCH_WEEKS: 40,
-  SUMMER_WEEKS: 6,
+  MATCH_WEEKS: 41,
+  SUMMER_WEEKS: 11,
   get SEASON_WEEKS(): number {
     return this.MATCH_WEEKS + this.SUMMER_WEEKS
   },
@@ -217,20 +216,50 @@ export const T = {
 
   /** League rounds per tier, index 0 = tier 1. DESIGN: 38 or 46. */
   LEAGUE_ROUNDS_BY_TIER: [38, 46, 46, 46, 46] as readonly number[],
+  /** Weekends a tier's league sits out (tier 1: 38 rounds in 41 weeks); index 0 = tier 1. */
+  LEAGUE_IDLE_WEEKS_BY_TIER: [[16, 33, 37], [], [], [], []] as readonly (readonly number[])[],
+  /** Weeks a tier plays two league rounds, weekend and midweek (tiers 2–5: 46 in 41), chosen clear of every cup round. */
+  LEAGUE_DOUBLE_WEEKS_BY_TIER: [[], [10, 18, 24, 36, 39], [10, 18, 24, 36, 39], [10, 18, 24, 36, 39], [10, 18, 24, 36, 39]] as readonly (readonly number[])[],
 
-
-
-  /** Season weeks each cup round is played in. Last entry is the final. */
-  NATIONAL_CUP_ROUND_WEEKS: [3, 8, 13, 18, 23, 28, 35] as readonly number[],
-  LEAGUE_CUP_ROUND_WEEKS: [1, 6, 11, 16, 21, 26] as readonly number[],
-  EUROPEAN_ROUND_WEEKS: [5, 12, 19, 27, 33] as readonly number[],
-
-  /** Tiers whose clubs enter the league cup. DESIGN: tiers 1–2. */
-  LEAGUE_CUP_TIERS: [1, 2] as readonly number[],
-
-  /** European places: top N of tier 1 plus the national cup winner. DESIGN: four. */
-  EUROPEAN_LEAGUE_PLACES: 4,
-
+  /** The Cup (FA Cup format): weekends; tiers 4–5 in round one, tier 3 in two, tiers 1–2 in three; the fourth round pares the field to 32 on a midweek; the semi-finals and the final on neutral ground. */
+  THE_CUP_ROUNDS: [
+    { week: 3, slot: 0, entrants: [4, 5] },
+    { week: 7, slot: 0, entrants: [3] },
+    { week: 11, slot: 0, entrants: [1, 2] },
+    { week: 15, slot: 1, entrants: [] },
+    { week: 19, slot: 0, entrants: [] },
+    { week: 23, slot: 0, entrants: [] },
+    { week: 27, slot: 0, entrants: [] },
+    { week: 32, slot: 0, entrants: [], neutral: true },
+    { week: 40, slot: 0, entrants: [], neutral: true },
+  ] as readonly CupRoundSpec[],
+  /** The League Cup (EFL Cup format): midweeks; tiers 2–4 in round one, tier 1 in two, tier-1 clubs in Europe in three; two-leg semi-finals; a final. */
+  LEAGUE_CUP_ROUNDS: [
+    { week: 1, slot: 1, entrants: [2, 3, 4] },
+    { week: 5, slot: 1, entrants: [1] },
+    { week: 9, slot: 1, entrants: ['europe'] },
+    { week: 13, slot: 1, entrants: [] },
+    { week: 17, slot: 1, entrants: [] },
+    { week: 25, slot: 1, entrants: [], secondLeg: { week: 29, slot: 1 } },
+    { week: 34, slot: 1, entrants: [], neutral: true },
+  ] as readonly CupRoundSpec[],
+  /** Europe: four groups of four over six midweeks, then two-leg quarter-finals and semi-finals and a one-off final. */
+  EUROPE_GROUP_WEEKS: [6, 8, 12, 16, 20, 22] as readonly number[],
+  EUROPE_KNOCKOUT_ROUNDS: [
+    { week: 26, slot: 1, entrants: [], secondLeg: { week: 28, slot: 1 } },
+    { week: 31, slot: 1, entrants: [], secondLeg: { week: 33, slot: 1 } },
+    { week: 37, slot: 1, entrants: [], neutral: true },
+  ] as readonly CupRoundSpec[],
+  EUROPE_CLUBS: 16,
+  EUROPE_GROUPS: 4,
+  /** Home places (DESIGN.md "World"): the top four of tier 1; fifth and the Cup winner; sixth and the League Cup winner. A place passes down the table when a club has already qualified. */
+  EUROPE_LEAGUE_PLACES: { championsCup: 4, europaCup: 1, conferenceCup: 1 } as const,
+  /** Prize money and prestige by the stage reached (DESIGN.md "World"), onto wealth and prestige; the winner's on top. */
+  EUROPE_PRIZE: {
+    championsCup: { group: { wealth: 1, prestige: 1 }, quarter: { wealth: 1, prestige: 1 }, semi: { wealth: 1, prestige: 1 }, final: { wealth: 1, prestige: 1 }, winner: { wealth: 2, prestige: 2 } },
+    europaCup: { group: { wealth: 1, prestige: 0 }, quarter: { wealth: 1, prestige: 1 }, semi: { wealth: 0, prestige: 1 }, final: { wealth: 1, prestige: 1 }, winner: { wealth: 1, prestige: 1 } },
+    conferenceCup: { group: { wealth: 0, prestige: 0 }, quarter: { wealth: 1, prestige: 0 }, semi: { wealth: 0, prestige: 1 }, final: { wealth: 1, prestige: 0 }, winner: { wealth: 1, prestige: 1 } },
+  } as Readonly<Record<'championsCup' | 'europaCup' | 'conferenceCup', Readonly<Record<'group' | 'quarter' | 'semi' | 'final' | 'winner', { wealth: number; prestige: number }>>>>,
 
   /** Clubs promoted and relegated across each tier boundary. */
   UP_DOWN_PER_BOUNDARY: 3,
@@ -727,10 +756,10 @@ export const T = {
   } as Readonly<Record<'patient' | 'normal' | 'impatient', number>>,
   /** Erratic owners: uniform in this range, re-rolled monthly. */
   SACK_THRESHOLD_ERRATIC: [10, 45] as readonly [number, number],
-  /** Weekly roll while below threshold: base × (1 − perYear × years remaining), floored. DESIGN started at 10%; 4% lets eight weeks pass more often. Serves: unjust ≈ 20–30%. */
-  SACK_ROLL_BASE: 0.04,
+  /** Weekly roll while below threshold: base × (1 − perYear × years remaining), floored. DESIGN started at 10%; 4% let eight weeks pass more often; 3.2% (floor 2.4%) kept the per-season hazard where it was once the year grew from 46 weeks to 52; 2.9% (floor 2.2%) because the real cup formats bring more exits to lower-tier sides (−6 each) and careers had shortened by half a season. Serves: unjust ≈ 20–30%, median career 6–8. */
+  SACK_ROLL_BASE: 0.029,
   SACK_ROLL_PER_YEAR: 0.2,
-  SACK_ROLL_FLOOR: 0.03,
+  SACK_ROLL_FLOOR: 0.022,
   /** Credit at or below this: sacked at once, and counted as deserved. DESIGN started at 5; 9 since the fast path (phase 3c), whose draw-heavier results had stretched the median first spell to the top of its band. */
   CREDIT_INSTANT_SACK: 9,
   /** A sacking is "deserved" after this many consecutive weeks below threshold. */
@@ -778,13 +807,13 @@ export const T = {
   MUTUAL_PAYOUT_SHARE: 0.5,
   REP_MUTUAL: -4,
   /** AI accepts a mutual-consent offer with this chance each month it is offered. At 0.3 consent removed most long-suffering managers before eight weeks. Serves: unjust ≈ 20–30%. */
-  AI_MUTUAL_ACCEPT_P: 0.05,
+  AI_MUTUAL_ACCEPT_P: 0.044, // 0.05 × 46/52: ten monthly rolls a year now, not nine
   /** Resigning: reputation hit depends on credit at the split. */
   RESIGN_CREDIT_SPLIT: 50,
   REP_RESIGN_HIGH: -1,
   REP_RESIGN_LOW: -5,
   /** AI resigns with this monthly chance while below threshold (jumping before the push). */
-  AI_RESIGN_P: 0.02,
+  AI_RESIGN_P: 0.018, // 0.02 × 46/52, as above
   /** Contract expiry: renewed above this credit, otherwise released. */
   EXPIRY_RENEW_CREDIT: 40,
   REP_RELEASED: -3,
@@ -808,7 +837,9 @@ export const T = {
     'league-5': 0.2,
     nationalCup: 0.8,
     leagueCup: 0.5,
-    european: 1.2,
+    championsCup: 1.2,
+    europaCup: 0.9,
+    conferenceCup: 0.6,
   } as Readonly<Record<string, number>>,
   REP_PROMOTION: 5,
   REP_RELEGATION: -6,
@@ -875,7 +906,7 @@ export const T = {
   /** Share of vacancies where the club calls one employed manager (the best fit) rather than only the unemployed. */
   POACH_ATTEMPT_P: 0.1,
   /** A manager must have been in post this many weeks before a bigger club calls. Serves: a handful past 1,000 games. */
-  POACH_MIN_WEEKS: 46,
+  POACH_MIN_WEEKS: 52,
   AI_ACCEPT_APPROACH_P: 0.5,
   /** Declining an approach. DESIGN: credit +3 (the mean of BETS.approach.decline), loyalty progress. */
   LOYALTY_PER_DECLINE: 1,
@@ -1049,11 +1080,12 @@ export const T = {
   // ---------------------------------------------------------------------------
 
   /** January: the calendar month, season weeks inclusive; the last is deadline day. */
-  JANUARY_WINDOW_WEEKS: [18, 21] as readonly [number, number],
-  /** Summer: from the last match to the first; deadline day is the last summer week. */
-  get SUMMER_WINDOW_WEEKS(): readonly [number, number] {
-    return [this.MATCH_WEEKS, this.SEASON_WEEKS - 1]
+  JANUARY_WINDOW_WEEKS: [21, 24] as readonly [number, number],
+  /** Summer (DESIGN.md "Transfers"): opens at the last match of the season and closes at the end of the third week of the next; the close is deadline day. */
+  get SUMMER_WINDOW_OPENS(): number {
+    return this.MATCH_WEEKS - 1
   },
+  SUMMER_WINDOW_CLOSES: 2,
   /** The director's judgement: base + per wealth + noise, clamped. Scouting level (phase 5) will add to it. */
   DIRECTOR_JUDGEMENT_BASE: 35,
   DIRECTOR_JUDGEMENT_PER_WEALTH: 0.4,
@@ -1061,6 +1093,13 @@ export const T = {
   DIRECTOR_JUDGEMENT_RANGE: [15, 95] as readonly [number, number],
   /** Cards a week in a window. DESIGN: up to three. */
   DIRECTOR_CARDS_PER_WEEK: 3,
+  /** On arrival (DESIGN.md "Transfers"): the assessment names this many positions needing cover and this many players he would sell; up to this many cards, of which this many free agents to sign now when no window is open. */
+  ARRIVAL_NEEDS: 2,
+  ARRIVAL_SELL_NAMES: 3,
+  ARRIVAL_CARDS: 3,
+  ARRIVAL_FREE_CARDS: 1,
+  /** An AI manager arriving outside a window signs up to this many free agents to his needs, so the population keeps trading. */
+  AI_ARRIVAL_FREE_AGENTS: 1,
   /** The estimate's error: sd = DIRECTOR_ESTIMATE_SD × (DIRECTOR_JUDGEMENT_SCALE_AT_ZERO − judgement / 100). At judgement 50 the sd is 3: 43% beat the estimate by SIGNING_BEAT_MARGIN, 25% fall short by SIGNING_SHORT_MARGIN. */
   DIRECTOR_ESTIMATE_SD: 3,
   DIRECTOR_JUDGEMENT_SCALE_AT_ZERO: 1.5,
@@ -1220,6 +1259,61 @@ export const T = {
   REQUEST_WORDS: [0.7, 0.45] as readonly [number, number],
   /** Rows a search returns at most. */
   SEARCH_LIMIT: 40,
+  /** The board also reads wealth (per 50 points, clamped ±1), the table against the target (per this many places, clamped ±1) and solvency (a flat penalty when the club is not). */
+  REQUEST_BOARD_WEALTH_SWING: 0.12,
+  REQUEST_BOARD_EXPECTATION_SWING: 0.15,
+  REQUEST_BOARD_EXPECTATION_SCALE: 5,
+  REQUEST_BOARD_INSOLVENT_PENALTY: 0.25,
+  /** Cadence (DESIGN.md "Requests"): one board request a month (MONTH_WEEKS), a refused ask locked for this many months. */
+  REQUEST_LOCK_MONTHS: 3,
+  /** A level up: each level already held lowers the chance; the works cost this share of the normal budget off the pot. */
+  REQUEST_LEVEL_PER_LEVEL: -0.08,
+  REQUEST_LEVEL_COST_SHARE: 0.2,
+  /** The stadium: likely when attendance runs at this share of capacity (the bonus) and the club is solvent; the works cost this share of the normal budget, off the pot first and cash after. */
+  STADIUM_NEAR_CAPACITY: 0.9,
+  STADIUM_NEAR_CAPACITY_BONUS_P: 0.25,
+  STADIUM_COST_SHARE: 0.6,
+  /** A new contract: each year asked beyond the first lowers the chance; the salary rises by this share on the tier's rate. */
+  REQUEST_NEW_CONTRACT_YEARS: [1, 2, 3] as readonly number[],
+  REQUEST_NEW_CONTRACT_PER_YEAR: -0.08,
+  REQUEST_NEW_CONTRACT_SALARY_RISE: 0.1,
+
+  // ---------------------------------------------------------------------------
+  // Club levels and the stadium (DESIGN.md "Club", "Requests"): four levels
+  // set by wealth that a granted request raises; a stadium whose capacity
+  // caps attendance and which only a granted request expands.
+  // Serves: the level and stadium requests have a cost now and an effect
+  // later; the population is unmoved because every effect is centred on
+  // level 3, the level of a club of middling wealth.
+  // ---------------------------------------------------------------------------
+
+  /** Levels run 1–5: one per this many points of wealth, from 1. Level 3 is the neutral point of every effect below. */
+  LEVEL_MAX: 5,
+  LEVEL_WEALTH_STEP: 20,
+  LEVEL_NEUTRAL: 3,
+  /** Coaching: growth with minutes × (1 + this × (level − 3)). */
+  COACHING_DEV_PER_LEVEL: 0.08,
+  /** Medical: an injury's weeks × (1 − this × (level − 3)), never under a week. */
+  MEDICAL_INJURY_PER_LEVEL: 0.1,
+  /** Academy: the summer intake's rating and potential move by this per level from 3. */
+  ACADEMY_RATING_PER_LEVEL: 1.5,
+  ACADEMY_POTENTIAL_PER_LEVEL: 2,
+  /** Scouting: the director's judgement moves by this per level from 3 (DESIGN.md "Club": sharper reports and a sharper director). */
+  DIRECTOR_JUDGEMENT_PER_SCOUTING_LEVEL: 4,
+  /** Capacity in thousands at prestige 50 by tier, ± this share across prestige 0–100, to the nearest step. */
+  STADIUM_CAPACITY_BY_TIER: [45, 25, 12, 7, 4] as readonly number[],
+  STADIUM_CAPACITY_PRESTIGE_SLOPE: 0.6,
+  STADIUM_CAPACITY_STEP: 0.5,
+  /** Attendance: demand is the club's implied capacity × (base + swing × form score, −1..1), capped by the stadium. */
+  ATTENDANCE_DEMAND_BASE: 0.85,
+  ATTENDANCE_FORM_SWING: 0.15,
+  /** The works: capacity down by this share for the rest of the season, then up by this share; wealth up by this much at each of this many season ends. */
+  STADIUM_WORKS_CUT: 0.15,
+  STADIUM_EXPANSION_SHARE: 0.25,
+  STADIUM_WEALTH_PER_SEASON: 2,
+  STADIUM_WEALTH_SEASONS: 3,
+  /** Income from the new seats: £m onto the summer pot per thousand added. */
+  STADIUM_INCOME_PER_K: 0.1,
 
   // ---------------------------------------------------------------------------
   // The score (DESIGN.md "The score"). Serves: Legacy calibration — a 30-year
@@ -1228,7 +1322,9 @@ export const T = {
 
   /** Trophy points. DESIGN starting values. */
   TROPHY_POINTS: {
-    european: 120,
+    championsCup: 120,
+    europaCup: 70,
+    conferenceCup: 40,
     nationalCup: 50,
     leagueCup: 25,
     /** League titles by tier, index 0 = tier 1. */
@@ -1272,8 +1368,8 @@ export const T = {
     careerMedianClubs: { target: 3.5, min: 3, max: 4 },
     /** ~10% reach 20 seasons. To verify. */
     twentySeasonShare: { target: 0.1, min: 0.07, max: 0.13 },
-    /** A handful pass 1,000 games (of 500 careers). To verify. */
-    thousandGameCount: { target: 5, min: 2, max: 15 },
+    /** A handful pass 1,000 games (of 500 careers). To verify. With the cups in real formats a top club plays 55–65 a season, so 1,000 games is a 17-season career; the count read 12–18 over seeds 1–3 on the 52-week calendar. */
+    thousandGameCount: { target: 8, min: 2, max: 20 },
     /** At any moment, two to four top-tier managers have tenure over five years. To verify. */
     topTierLongTenures: { target: 3, min: 2, max: 4 },
     /** Unjust sackings ≈ 20–30% of all sackings. To verify. */
@@ -1295,9 +1391,13 @@ export const T = {
     awayWinShare: { target: 0.29, min: 0.24, max: 0.34 },
     yellowsPerGame: { target: 3.5, min: 2.8, max: 4.2 },
     redsPerGame: { target: 0.2, min: 0.1, max: 0.3 },
-    /** The European trophy is hard: home clubs win it in some seasons, and rarely from outside the top three of tier 1. */
-    europeanTitlesHomeShare: { target: 0.3, min: 0.1, max: 0.6 },
-    europeanTitlesOutsideTopThree: { target: 0.1, min: 0, max: 0.25 },
+    /** The Champions Cup is hard (DESIGN.md "Validation targets"): won by a home club about one year in five, and rarely from outside the top three of tier 1. */
+    championsCupHomeShare: { target: 0.2, min: 0.1, max: 0.35 },
+    championsCupOutsideTopThree: { target: 0.1, min: 0, max: 0.25 },
+    /** Calendar and cups: every fixture scheduled, no club more than twice in a week; a given tier-5 club reaches the Cup's third round about once in twenty seasons (starting points, read per club). */
+    unscheduledFixtures: { target: 0, min: 0, max: 0 },
+    clubWeekMaxFixtures: { target: 2, min: 0, max: 2 },
+    tier5CupThirdRound: { target: 0.05, min: 0, max: 0.25 },
     /** Decisions (DESIGN.md "Decisions are bets"): per kind, the bold options' mean effect within 10% of the cautious options' (in units of the bold spread), with at least 1.5× the variance. The lines report the worst kind. */
     decisionFairnessGap: { target: 0, min: 0, max: 0.1 },
     decisionVarianceRatio: { target: 3, min: 1.5, max: 1000 },

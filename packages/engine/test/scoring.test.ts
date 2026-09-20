@@ -7,7 +7,9 @@ import { T } from '../src/tunables.js'
 
 describe('trophy points', () => {
   it('matches the DESIGN table', () => {
-    expect(trophyPointsFor({ season: 1, competition: 'european' })).toBe(120)
+    expect(trophyPointsFor({ season: 1, competition: 'championsCup' })).toBe(120)
+    expect(trophyPointsFor({ season: 1, competition: 'europaCup' })).toBe(70)
+    expect(trophyPointsFor({ season: 1, competition: 'conferenceCup' })).toBe(40)
     expect(trophyPointsFor({ season: 1, competition: 'league', tier: 1 })).toBe(100)
     expect(trophyPointsFor({ season: 1, competition: 'nationalCup' })).toBe(50)
     expect(trophyPointsFor({ season: 1, competition: 'leagueCup' })).toBe(25)

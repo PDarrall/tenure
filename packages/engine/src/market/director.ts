@@ -24,6 +24,7 @@ import { addCredit } from '../tenure/credit.js'
 import { bumpReputation } from '../tenure/exits.js'
 import { averageRating } from '../match/aftermath.js'
 import { levelOf, normalBudget, moveOn, refreshStrength, topUpSquad, trimSquad, windowTurnover, type WindowSummary } from '../season/squad.js'
+import { ensureFacilities, levelFromWealth, scoutingJudgementBonus, stadiumIncome } from '../club/facilities.js'
 
 // ---------------------------------------------------------------------------
 // Windows
@@ -40,17 +41,23 @@ export interface WindowState {
   weeksToDeadline: number | null
 }
 
-/** Which window a season week falls in, if any. */
+/** Which window a season week falls in, if any. The summer runs across the season boundary: from the last match week to the deadline in the new season. */
 export function windowAt(sw: number): WindowName | null {
   const [js, je] = T.JANUARY_WINDOW_WEEKS
   if (sw >= js && sw <= je) return 'january'
-  const [ss, se] = T.SUMMER_WINDOW_WEEKS
-  if (sw >= ss && sw <= se) return 'summer'
+  if (sw >= T.SUMMER_WINDOW_OPENS || sw <= T.SUMMER_WINDOW_CLOSES) return 'summer'
   return null
 }
 
 export function deadlineOf(window: WindowName): number {
-  return window === 'january' ? T.JANUARY_WINDOW_WEEKS[1] : T.SUMMER_WINDOW_WEEKS[1]
+  return window === 'january' ? T.JANUARY_WINDOW_WEEKS[1] : T.SUMMER_WINDOW_CLOSES
+}
+
+/** Weeks from a season week to a window's deadline, the summer's counted across the boundary. */
+export function weeksToDeadline(window: WindowName, sw: number): number {
+  const deadline = deadlineOf(window)
+  if (window === 'summer' && sw >= T.SUMMER_WINDOW_OPENS) return T.SEASON_WEEKS - sw + deadline
+  return deadline - sw
 }
 
 export function isDeadlineWeek(sw: number): boolean {
@@ -63,8 +70,7 @@ export function windowState(world: World): WindowState {
   const sw = seasonWeek(world.week)
   const window = windowAt(sw)
   if (!window) return { open: false, window: null, deadlineWeek: null, weeksToDeadline: null }
-  const deadline = deadlineOf(window)
-  return { open: true, window, deadlineWeek: deadline, weeksToDeadline: deadline - sw }
+  return { open: true, window, deadlineWeek: deadlineOf(window), weeksToDeadline: weeksToDeadline(window, sw) }
 }
 
 /**
@@ -73,10 +79,11 @@ export function windowState(world: World): WindowState {
  * (the season closes at that week's close, and the squads change with it).
  */
 export function isCardClose(sw: number): WindowName | null {
-  const next = windowAt(sw + 1)
+  const nextSw = (sw + 1) % T.SEASON_WEEKS
+  const next = windowAt(nextSw)
   if (!next) return null
-  if (deadlineOf(next) === sw + 1) return null
-  if (next === 'summer' && sw + 1 === T.SUMMER_WINDOW_WEEKS[0]) return null
+  if (deadlineOf(next) === nextSw) return null
+  if (next === 'summer' && nextSw === T.MATCH_WEEKS) return null
   return next
 }
 
@@ -84,8 +91,8 @@ export function isCardClose(sw: number): WindowName | null {
 // The director himself
 // ---------------------------------------------------------------------------
 
-export function judgementFor(rng: Rng | null, wealth: number): number {
-  const base = T.DIRECTOR_JUDGEMENT_BASE + T.DIRECTOR_JUDGEMENT_PER_WEALTH * wealth
+export function judgementFor(rng: Rng | null, wealth: number, scouting: number = levelFromWealth(wealth)): number {
+  const base = T.DIRECTOR_JUDGEMENT_BASE + T.DIRECTOR_JUDGEMENT_PER_WEALTH * wealth + scoutingJudgementBonus(scouting)
   const noise = rng ? rng.normal(0, T.DIRECTOR_JUDGEMENT_SD) : 0
   return Math.round(clamp(base + noise, T.DIRECTOR_JUDGEMENT_RANGE[0], T.DIRECTOR_JUDGEMENT_RANGE[1]))
 }
@@ -106,6 +113,7 @@ export function ensureDirectors(world: World): void {
   }
   if (!world.bids) world.bids = []
   if (world.nextBidId === undefined) world.nextBidId = 1
+  ensureFacilities(world)
 }
 
 /** How far the estimate sits from the truth, by judgement. */
@@ -126,7 +134,8 @@ export function wageBill(world: World, club: Club): number {
 /** Reset the pot for the summer (the board's budget × the promise) or top it up for January. */
 export function refreshPot(world: World, club: Club, window: WindowName, multiplier: number): void {
   const normal = normalBudget(club)
-  club.transferPot = round1(window === 'summer' ? normal * multiplier : club.transferPot + normal * T.WINTER_BUDGET_SHARE)
+  // The summer pot: the board's budget, plus what an expanded stadium brings in (DESIGN.md "Requests", Expand the stadium).
+  club.transferPot = round1(window === 'summer' ? normal * multiplier + stadiumIncome(club) : club.transferPot + normal * T.WINTER_BUDGET_SHARE)
   club.xiAtWindowOpen = [...autoPick(world, club, clubFormation(world, club)).xi]
   club.windowBids = 0
   emit(world, 'window.pot', { clubId: club.id, window, pot: club.transferPot, wageBudget: club.wageBudget, wageBill: wageBill(world, club), season: world.season })
@@ -233,6 +242,8 @@ export interface ProposeOptions {
   /** Share of the cards from abroad. */
   abroadShare?: number
   index?: MarketIndex
+  /** Where to look: anywhere (the default), the free-agent pool only, or other clubs only (targets for a window). */
+  pool?: 'any' | 'free' | 'clubs'
 }
 
 /**
@@ -259,8 +270,11 @@ export function proposeSignings(world: World, rng: Rng, club: Club, count: numbe
     const floor = Math.max(need.rating + T.DIRECTOR_MIN_GAIN, aim - T.DIRECTOR_REACH_BELOW)
     const fromAbroad = i >= count - abroadCards
     let best: Candidate | null = null
+    const pool = options.pool ?? 'any'
     const consider = (p: Player, reason: SigningReason) => {
       if (used.has(p.id) || p.retired || p.clubId === club.id) return
+      if (pool === 'free' && p.clubId !== 0) return
+      if (pool === 'clubs' && p.clubId <= 0) return
       if (p.position !== need.slot.position) return
       if (p.rating < floor || p.rating > ceiling) return
       const fee = feeFor(p)
@@ -276,7 +290,7 @@ export function proposeSignings(world: World, rng: Rng, club: Club, count: numbe
       const score = (c: Candidate) => c.estimate - (c.fee / Math.max(1, club.transferPot)) * T.DIRECTOR_FEE_WEIGHT
       if (!best || score(candidate) > score(best)) best = candidate
     }
-    if (fromAbroad) {
+    if (fromAbroad && pool === 'any') {
       const target = clamp(Math.max(floor + T.DIRECTOR_ABROAD_GAIN, aim), floor, ceiling)
       consider(abroadCandidate(world, rng, club, need, target), 'need')
     } else {
@@ -348,14 +362,18 @@ export function playerAcceptP(world: World, p: Player, buyer: Club, wage: number
   return clamp(prob, T.BID_ACCEPT_RANGE[0], T.BID_ACCEPT_RANGE[1])
 }
 
-/** Every bid negotiates itself: one roll on the club, one on the player; the answer is logged. */
+/** Every bid negotiates itself: one roll on the club, one on the player; the answer is logged. Outside a window only bids for free agents resolve; the rest wait. */
 export function resolveBids(world: World, rng: Rng): void {
+  const window = windowAt(seasonWeek(world.week))
   const pending = world.bids
   world.bids = []
-  const window = windowAt(seasonWeek(world.week))
   for (const bid of pending) {
     const buyer = clubById(world, bid.clubId)
     const p = playerById(world, bid.playerId)
+    if (!window && p && !p.retired && p.clubId !== 0) {
+      world.bids.push(bid)
+      continue
+    }
     if (!p || p.retired || p.clubId === buyer.id) {
       emit(world, 'bid.failed', { bidId: bid.id, clubId: buyer.id, managerId: bid.managerId, playerId: bid.playerId, name: p ? p.name : '?', reason: 'gone', season: world.season })
       continue
@@ -684,10 +702,12 @@ export function windowSummaries(world: World): WindowSummary[] {
   return world.clubs.map((club) => ({ clubId: club.id, managerId: club.managerId, turnover: windowTurnover(world, club) }))
 }
 
-/** The global week the current window opened. */
+/** The global week the current window opened; the summer's may lie in the season before. */
 function openedWeek(world: World, window: WindowName): number {
-  const start = window === 'january' ? T.JANUARY_WINDOW_WEEKS[0] : T.SUMMER_WINDOW_WEEKS[0]
-  return world.week - (seasonWeek(world.week) - start)
+  const sw = seasonWeek(world.week)
+  if (window === 'january') return world.week - (sw - T.JANUARY_WINDOW_WEEKS[0])
+  if (sw >= T.SUMMER_WINDOW_OPENS) return world.week - (sw - T.SUMMER_WINDOW_OPENS)
+  return world.week - sw - (T.SEASON_WEEKS - T.SUMMER_WINDOW_OPENS)
 }
 
 /** The human's manager and club in a window, if employed at a home club. */

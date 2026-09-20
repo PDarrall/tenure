@@ -11,8 +11,12 @@ import type { Honour, Manager, Tier, World } from '../types.js'
 
 export function trophyPointsFor(honour: Honour): number {
   switch (honour.competition) {
-    case 'european':
-      return T.TROPHY_POINTS.european
+    case 'championsCup':
+      return T.TROPHY_POINTS.championsCup
+    case 'europaCup':
+      return T.TROPHY_POINTS.europaCup
+    case 'conferenceCup':
+      return T.TROPHY_POINTS.conferenceCup
     case 'nationalCup':
       return T.TROPHY_POINTS.nationalCup
     case 'leagueCup':

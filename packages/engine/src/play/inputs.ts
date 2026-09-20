@@ -16,6 +16,7 @@ import { playerById } from '../lookup.js'
 import { humanClubId } from '../sim/turn.js'
 import { noteWithdrawal } from '../market/agent.js'
 import { makeRequest } from './requests.js'
+import { cancelAgreed } from '../market/arrival.js'
 
 export function applyInputs(world: World, rng: Rng, inputs: HumanInputs): void {
   const state = humanState(world)
@@ -59,6 +60,7 @@ export function applyInputs(world: World, rng: Rng, inputs: HumanInputs): void {
     state.shortlist = [...current].sort((a, b) => a - b)
   }
   for (const req of inputs.requests ?? []) makeRequest(world, rng, req)
+  if (inputs.cancelAgreed && inputs.cancelAgreed.length > 0) cancelAgreed(world, inputs.cancelAgreed)
 
   if (inputs.activity && player.status.kind === 'unemployed') setActivity(world, player, inputs.activity)
 

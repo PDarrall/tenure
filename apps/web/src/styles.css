@@ -1315,3 +1315,93 @@ label.label {
   background: var(--ground);
   color: var(--ink);
 }
+
+/* Requests (DESIGN.md "Requests"): a tappable row per ask, and the way in from Career. */
+.req-row,
+.req-open {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--hair);
+  border-radius: 0;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.req-open {
+  border-top: 1px solid var(--hair);
+  margin-top: 4px;
+}
+.req-row:last-child {
+  border-bottom: none;
+}
+.req-open:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* The calendar (DESIGN.md "World"): a row a week, the current one in ink, the summer marked. */
+.cal-row {
+  display: flex;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--hair);
+  font-size: 13px;
+  line-height: 17px;
+  color: var(--ink2);
+}
+.cal-row:last-child {
+  border-bottom: none;
+}
+.cal-row .wk {
+  width: 92px;
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--ink3);
+}
+.cal-row.summer .wk {
+  color: var(--draw);
+}
+.cal-row.current {
+  color: var(--ink);
+}
+.cal-row.current .wk {
+  color: var(--accent);
+}
+
+/* Europe's group table: the table rows, six columns. */
+.group-head {
+  display: flex;
+  align-items: baseline;
+  padding: 6px 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink3);
+}
+.group-head > span,
+.group-row > span {
+  text-align: right;
+}
+.group-head > span.grow,
+.group-row > span.grow {
+  text-align: left;
+}
+.group-row {
+  display: flex;
+  align-items: baseline;
+  min-height: 30px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--hair);
+  font-size: 14px;
+  line-height: 18px;
+}
+.group-row:last-child {
+  border-bottom: none;
+}
+.group-row.me {
+  font-weight: 700;
+}
+.group-row .pts {
+  font-weight: 700;
+}

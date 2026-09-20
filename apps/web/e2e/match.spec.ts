@@ -14,10 +14,10 @@ import { continueTurn, playMatchQuickly, startCareer, state } from './helpers.js
 
 test.use({ ...devices['iPhone 13'], defaultBrowserType: 'chromium' })
 
-/** Seed 29: the first match has one goal, ours at 32', and no injury, so its pauses are the goal, half time and the whistle. */
-const SEED_GOAL = 29
-/** Seed 22: ours score at 1' and lose a player to injury at 2', with the bench full. */
-const SEED_INJURY = 22
+/** Seed 3 (on the 52-week calendar): the first match has two goals, ours at 10' and 30', and no injury, so its pauses are the goals, half time and the whistle. */
+const SEED_GOAL = 3
+/** Seed 43: ours lose a player to an injury needing a change at 15', with the bench full, and nobody scores. */
+const SEED_INJURY = 43
 
 interface Side {
   isHuman: boolean

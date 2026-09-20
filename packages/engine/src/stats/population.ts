@@ -177,6 +177,7 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
   const boughtFinishedShare = madePoints > 0 ? boughtFinished / madePoints : 0
   const match = matchAverages(world)
   const europe = europeanTitles(world)
+  const calendar = calendarStats(world)
   const decisions = decisionFairness(world)
   const follow = followStats(world)
   const signings = signingStats(world)
@@ -202,8 +203,11 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     line('awayWinShare', 'Away wins (league)', match.away, 'share'),
     line('yellowsPerGame', 'Yellow cards per match', match.yellows, 'number'),
     line('redsPerGame', 'Red cards per match', match.reds, 'number'),
-    line('europeanTitlesHomeShare', 'Seasons the European title came home', europe.homeShare, 'share'),
-    line('europeanTitlesOutsideTopThree', 'European titles won from outside the top three of tier 1', europe.outsideTopThree, 'share'),
+    line('championsCupHomeShare', 'Seasons the Champions Cup came home', europe.homeShare, 'share'),
+    line('championsCupOutsideTopThree', 'Champions Cups won from outside the top three of tier 1', europe.outsideTopThree, 'share'),
+    line('unscheduledFixtures', 'Matches played outside the season weeks', calendar.unscheduled, 'count'),
+    line('clubWeekMaxFixtures', 'Most matches by one club in one week', calendar.maxPerWeek, 'count'),
+    line('tier5CupThirdRound', "A tier-5 club's chance of reaching the Cup's third round in a season", calendar.tier5ThirdRound, 'share'),
     line('decisionFairnessGap', `Decisions: worst gap between bold and cautious means net of sampling noise, in bold spreads (${decisions.worstGapKind})`, decisions.worstGap, 'number'),
     line('decisionVarianceRatio', `Decisions: lowest bold-to-cautious variance ratio (${decisions.worstRatioKind})`, decisions.worstRatio, 'number'),
     line('signingsBeatShare', "Signings that beat the director's estimate", signings.beat, 'share'),
@@ -264,8 +268,8 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     'yellows per game': match.yellows,
     'reds per game': match.reds,
     'league matches': match.leagueMatches,
-    'european titles (home clubs)': europe.homeTitles,
-    'european finals played': europe.seasons,
+    'champions cups (home clubs)': europe.homeTitles,
+    'champions cup finals played': europe.seasons,
     'mean age at career end': ended.length ? ended.reduce((s, m) => s + m.age, 0) / ended.length : 0,
     'events logged': world.log.length,
   }
@@ -350,12 +354,39 @@ export function matchAverages(world: World): { goals: number; home: number; draw
 }
 
 /** The European trophy (DESIGN.md "World"): how often a home club lifts it, and from where in the table. */
+/** Calendar and cups (DESIGN.md "Validation targets"): matches outside the season weeks, the most by one club in a week, tier-5 clubs in the Cup's third round per season. */
+export function calendarStats(world: World): { unscheduled: number; maxPerWeek: number; tier5ThirdRound: number } {
+  let unscheduled = 0
+  const perClubWeek = new Map<string, number>()
+  let tier5 = 0
+  let seasons = 0
+  for (const e of world.log) {
+    if (e.type === 'season.end') seasons++
+    if (e.type === 'cup.tie' && e.payload['competition'] === 'nationalCup' && e.payload['round'] === 3) {
+      if (e.payload['homeTier'] === 5) tier5++
+      if (e.payload['awayTier'] === 5) tier5++
+      continue
+    }
+    if (e.type !== 'match.played') continue
+    if (e.week % T.SEASON_WEEKS >= T.MATCH_WEEKS) unscheduled++
+    for (const key of ['homeId', 'awayId'] as const) {
+      const k = `${e.week}:${String(e.payload[key])}`
+      perClubWeek.set(k, (perClubWeek.get(k) ?? 0) + 1)
+    }
+  }
+  let maxPerWeek = 0
+  for (const n of perClubWeek.values()) if (n > maxPerWeek) maxPerWeek = n
+  // Read per club: how often a given tier-5 club gets there in a season.
+  const tier5Clubs = T.TIER_SIZES[T.TIER_SIZES.length - 1] as number
+  return { unscheduled, maxPerWeek, tier5ThirdRound: seasons ? tier5 / seasons / tier5Clubs : 0 }
+}
+
 export function europeanTitles(world: World): { seasons: number; homeTitles: number; homeShare: number; outsideTopThree: number } {
   let seasons = 0
   let homeTitles = 0
   let outside = 0
   for (const e of world.log) {
-    if (e.type !== 'trophy' || e.payload['competition'] !== 'european') continue
+    if (e.type !== 'trophy' || e.payload['competition'] !== 'championsCup') continue
     seasons++
     const clubId = e.payload['clubId'] as number
     if (clubId >= T.EUROPEAN_OPPONENT_ID_BASE) continue

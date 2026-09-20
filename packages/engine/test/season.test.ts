@@ -161,7 +161,8 @@ describe('match model', () => {
     expect(goals / n).toBeLessThan(3.8)
     expect(home / n).toBeGreaterThan(0.38)
     expect(home / n).toBeLessThan(0.54)
-    expect(draw / n).toBeGreaterThan(0.18)
+    // Draws read lower still on the 52-week calendar's first season (more league rounds against unsorted tiers).
+    expect(draw / n).toBeGreaterThan(0.16)
     expect(draw / n).toBeLessThan(0.32)
   })
 
@@ -180,37 +181,41 @@ describe('match model', () => {
 })
 
 describe('cups', () => {
-  it('reduces any field to one winner in the tunable number of rounds', () => {
+  it('pares a field to a power of two, and counts the rounds that takes', () => {
     expect(matchesThisRound(116)).toBe(52)
     expect(matchesThisRound(64)).toBe(32)
-    expect(matchesThisRound(44)).toBe(12)
-    expect(roundsNeeded(116)).toBe(T.NATIONAL_CUP_ROUND_WEEKS.length)
-    expect(roundsNeeded(44)).toBe(T.LEAGUE_CUP_ROUND_WEEKS.length)
-    const euro = T.EUROPEAN_LEAGUE_PLACES + 1 + T.EUROPEAN_OPPONENTS
-    expect(roundsNeeded(euro)).toBe(T.EUROPEAN_ROUND_WEEKS.length)
+    expect(matchesThisRound(34)).toBe(2)
+    expect(roundsNeeded(64)).toBe(6)
+    expect(T.THE_CUP_ROUNDS).toHaveLength(9)
+    expect(T.LEAGUE_CUP_ROUNDS).toHaveLength(7)
   })
 })
 
 describe('cup draws', () => {
-  it('a round drawn before its week is played as drawn, one tie event per tie and a bye event per bye', async () => {
-    const { drawCupRound, drawnCupFixtures, playWeek } = await import('../src/season/season.js')
+  it('the opening rounds are drawn with the season: one tie event per tie, a bye event per bye, the ties played as drawn', async () => {
+    const { playWeek } = await import('../src/season/season.js')
+    const { roundFixtures } = await import('../src/season/cups.js')
     const world = createWorld(2)
-    runWeeks(world, 1) // season started, league cup round one (week 1) not yet played
+    runWeeks(world, 1) // the season started; the League Cup's first round (week 1, midweek) not yet played
     const cup = world.cups.find((c) => c.competition === 'leagueCup')!
     expect(cup.roundsPlayed).toBe(0)
-    const rng = createRng(99)
-    const drawn = drawCupRound(world, rng, cup, cup.roundWeeks[0]!)
-    expect(drawn).toHaveLength(matchesThisRound(cup.remaining.length))
-    expect(drawnCupFixtures(world, cup)).toEqual(drawn)
+    const round = cup.rounds[0]!
+    const drawn = roundFixtures(world, cup, round, 1)
+    expect(drawn).toHaveLength(36) // tiers 2–4, 72 clubs
+    expect(drawn.every((f) => f.week === round.week && f.slot === round.slot)).toBe(true)
     const ties = world.log.filter((e) => e.type === 'cup.tie' && e.payload['competition'] === 'leagueCup')
     const byes = world.log.filter((e) => e.type === 'cup.bye' && e.payload['competition'] === 'leagueCup')
     expect(ties).toHaveLength(drawn.length)
     expect(ties.length * 2 + byes.length).toBe(cup.remaining.length)
     const before = drawn.map((f) => `${f.homeId}-${f.awayId}`)
-    const played = playWeek(world, rng, cup.roundWeeks[0]!).filter((p) => p.fixture.competition === 'leagueCup')
+    const rng = createRng(99)
+    const played = playWeek(world, rng, round.week).filter((p) => p.fixture.competition === 'leagueCup')
     expect(played.map((p) => `${p.fixture.homeId}-${p.fixture.awayId}`)).toEqual(before)
     expect(cup.roundsPlayed).toBe(1)
-    expect(drawnCupFixtures(world, cup)).toHaveLength(0)
+    // The next round is drawn at once, and tier 1's clubs outside Europe have joined.
+    const next = roundFixtures(world, cup, cup.rounds[1]!, 1)
+    expect(next.length).toBeGreaterThan(0)
+    expect(next.every((f) => !f.played)).toBe(true)
   })
 })
 
@@ -236,13 +241,14 @@ describe('a full season', () => {
       expect(cup.winnerId).not.toBeNull()
       expect(cup.finalistIds).toHaveLength(2)
       expect(cup.finalistIds).toContain(cup.winnerId)
+      expect(cup.roundsPlayed).toBe(cup.rounds.length)
       const exits = world.log.filter((e) => e.type === 'cup.exit' && e.payload['competition'] === cup.competition)
-      const entrants = cup.competition === 'nationalCup' ? 116 : cup.competition === 'leagueCup' ? 44 : 32
+      const entrants = cup.competition === 'nationalCup' ? 116 : cup.competition === 'leagueCup' ? 92 : T.EUROPE_CLUBS
       expect(exits).toHaveLength(entrants - 1)
     }
     const trophies = world.log.filter((e) => e.type === 'trophy')
-    // Five league titles, three cups.
-    expect(trophies).toHaveLength(5 + 3)
+    // Five league titles, the Cup, the League Cup, three European.
+    expect(trophies).toHaveLength(5 + 2 + 3)
   })
 
   it('promotes and relegates three per boundary and keeps tier sizes', () => {
@@ -251,8 +257,11 @@ describe('a full season', () => {
     expect(promotions).toHaveLength(4 * T.UP_DOWN_PER_BOUNDARY)
     expect(relegations).toHaveLength(4 * T.UP_DOWN_PER_BOUNDARY)
     T.TIER_SIZES.forEach((size, i) => expect(world.clubs.filter((c) => c.tier === i + 1)).toHaveLength(size))
-    expect(world.europeanEntrants).toHaveLength(T.EUROPEAN_LEAGUE_PLACES + 1)
-    expect(new Set(world.europeanEntrants).size).toBe(T.EUROPEAN_LEAGUE_PLACES + 1)
+    const places = [...world.europeanPlaces.championsCup, ...world.europeanPlaces.europaCup, ...world.europeanPlaces.conferenceCup]
+    expect(world.europeanPlaces.championsCup).toHaveLength(T.EUROPE_LEAGUE_PLACES.championsCup)
+    expect(world.europeanPlaces.europaCup).toHaveLength(2)
+    expect(world.europeanPlaces.conferenceCup).toHaveLength(2)
+    expect(new Set(places).size).toBe(places.length)
   })
 
   it('writes a season record for every manager in a post, then ages everyone', () => {

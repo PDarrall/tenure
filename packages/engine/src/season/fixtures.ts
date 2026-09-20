@@ -1,7 +1,6 @@
 import type { Rng } from '../rng.js'
 import { T } from '../tunables.js'
 import type { ClubId, Fixture, Tier, World } from '../types.js'
-import { leagueRoundWeek } from './calendar.js'
 
 /**
  * Double round-robin by the circle method. Each pair meets twice, once at
@@ -34,7 +33,54 @@ export function roundRobin(ids: readonly ClubId[]): [ClubId, ClubId][][] {
   return [...first, ...second]
 }
 
-/** League fixtures for every tier, rounds spread over the match weeks. */
+/** The Cup weekends a tier has entered by: its league round moves to the midweek of those weeks. */
+export function cupWeekendsFor(tier: Tier): Set<number> {
+  const weeks = new Set<number>()
+  let entered = false
+  for (const round of T.THE_CUP_ROUNDS) {
+    if (round.entrants.includes(tier)) entered = true
+    if (entered && round.slot === 0) weeks.add(round.week)
+  }
+  return weeks
+}
+
+/** Every week and slot a cup round occupies, whichever competition. */
+export function cupSlots(): Set<string> {
+  const out = new Set<string>()
+  const add = (week: number, slot: number) => out.add(`${week}:${slot}`)
+  for (const r of [...T.THE_CUP_ROUNDS, ...T.LEAGUE_CUP_ROUNDS, ...T.EUROPE_KNOCKOUT_ROUNDS]) {
+    add(r.week, r.slot)
+    if (r.secondLeg) add(r.secondLeg.week, r.secondLeg.slot)
+  }
+  for (const week of T.EUROPE_GROUP_WEEKS) add(week, 1)
+  return out
+}
+
+/**
+ * The slots a tier's league rounds take, in order (DESIGN.md "World"): the
+ * weekend of every week but its idle ones; the midweek instead on the
+ * tier's Cup weekends; both slots in its double weeks, which the template
+ * keeps clear of every cup round.
+ */
+export function leagueSlotsFor(tier: Tier): { week: number; slot: 0 | 1 }[] {
+  const idle = new Set(T.LEAGUE_IDLE_WEEKS_BY_TIER[tier - 1] ?? [])
+  const doubles = new Set(T.LEAGUE_DOUBLE_WEEKS_BY_TIER[tier - 1] ?? [])
+  const cupWeekends = cupWeekendsFor(tier)
+  const taken = cupSlots()
+  const slots: { week: number; slot: 0 | 1 }[] = []
+  for (let week = 0; week < T.MATCH_WEEKS; week++) {
+    if (idle.has(week)) continue
+    if (doubles.has(week)) {
+      if (taken.has(`${week}:0`) || taken.has(`${week}:1`)) throw new Error(`tier ${tier}: double week ${week} collides with a cup round`)
+      slots.push({ week, slot: 0 }, { week, slot: 1 })
+      continue
+    }
+    slots.push(cupWeekends.has(week) ? { week, slot: 1 } : { week, slot: 0 })
+  }
+  return slots
+}
+
+/** League fixtures for every tier, each round on its slot from the template. */
 export function leagueFixtures(world: World, rng: Rng): Fixture[] {
   const fixtures: Fixture[] = []
   for (let index = 0; index < T.TIER_SIZES.length; index++) {
@@ -49,10 +95,14 @@ export function leagueFixtures(world: World, rng: Rng): Fixture[] {
     if (rounds.length !== expected) {
       throw new Error(`tier ${tier}: ${rounds.length} rounds generated, tunables say ${expected}`)
     }
+    const slots = leagueSlotsFor(tier)
+    if (slots.length !== rounds.length) {
+      throw new Error(`tier ${tier}: ${rounds.length} rounds but the calendar template gives ${slots.length} slots`)
+    }
     rounds.forEach((pairs, r) => {
-      const week = leagueRoundWeek(r, rounds.length)
+      const { week, slot } = slots[r] as { week: number; slot: 0 | 1 }
       for (const [homeId, awayId] of pairs) {
-        fixtures.push({ week, competition: 'league', round: r + 1, homeId, awayId, tier, played: false })
+        fixtures.push({ week, slot, competition: 'league', round: r + 1, homeId, awayId, tier, played: false })
       }
     })
   }

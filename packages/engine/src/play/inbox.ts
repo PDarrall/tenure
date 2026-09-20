@@ -29,26 +29,35 @@ export function competitionLabel(c: unknown): string {
     case 'league':
       return 'League'
     case 'nationalCup':
-      return 'National Cup'
+      return 'The Cup'
     case 'leagueCup':
-      return 'League Cup'
-    case 'european':
-      return 'European Cup'
+      return 'The League Cup'
+    case 'championsCup':
+      return 'Champions Cup'
+    case 'europaCup':
+      return 'Europa Cup'
+    case 'conferenceCup':
+      return 'Conference Cup'
     default:
       return String(c)
   }
 }
 
+/** The competition as a sentence names it after "the": "won the Cup", "won the league title". */
 export function competitionName(c: unknown): string {
   switch (c) {
     case 'league':
       return 'league title'
     case 'nationalCup':
-      return 'national cup'
+      return 'Cup'
     case 'leagueCup':
-      return 'league cup'
-    case 'european':
-      return 'European title'
+      return 'League Cup'
+    case 'championsCup':
+      return 'Champions Cup'
+    case 'europaCup':
+      return 'Europa Cup'
+    case 'conferenceCup':
+      return 'Conference Cup'
     default:
       return String(c)
   }
@@ -104,7 +113,7 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
       case 'match.played': {
         if (p['homeManagerId'] !== me && p['awayManagerId'] !== me) break
         const position = typeof p['positionAfter'] === 'number' && p['competition'] === 'league' ? ` You are ${ordinal(p['positionAfter'])}.` : ''
-        const comp = p['competition'] === 'league' ? '' : ` (${competitionName(p['competition'])}, round ${p['round']})`
+        const comp = p['competition'] === 'league' ? '' : ` (${competitionLabel(p['competition'])}, ${String(p['label'] ?? `round ${String(p['round'])}`).toLowerCase()}${p['leg'] === 1 ? ', first leg' : p['leg'] === 2 ? `, second leg, ${String(p['aggregateHome'])}–${String(p['aggregateAway'])} on aggregate` : ''})`
         const scorers = (p['homeManagerId'] === me ? p['homeScorers'] : p['awayScorers']) as { name: string; assist: string | null }[] | undefined
         const goals = scorers && scorers.length ? ` Goals: ${scorers.map((g) => (g.assist ? `${g.name} (${g.assist})` : g.name)).join(', ')}.` : ''
         push(e, 'match', `${renderMatch(world, e)}${comp}${position}${goals}`)
@@ -164,12 +173,22 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
         if (myClubId === null) break
         const home = p['homeId'] === myClubId
         const opponent = clubNameOf(world, (home ? p['awayId'] : p['homeId']) as number)
-        const key = p['final'] === true ? 'cup_draw_final' : home ? 'cup_draw_home' : 'cup_draw_away'
-        push(e, 'news', renderText('news', key, { competition: competitionLabel(p['competition']), round: p['round'] as number, opponent, week: (p['week'] as number) + 1 }, e.week))
+        const round = String(p['label'] ?? `round ${String(p['round'])}`).toLowerCase()
+        const key = p['legs'] === 2 ? (home ? 'cup_draw_legs_home' : 'cup_draw_legs_away') : p['neutral'] === true ? 'cup_draw_neutral' : home ? 'cup_draw_home' : 'cup_draw_away'
+        push(e, 'news', renderText('news', key, { competition: competitionLabel(p['competition']), round, opponent, week: (p['week'] as number) + 1 }, e.week))
         break
       }
       case 'cup.bye':
-        if (myClub(e)) push(e, 'news', renderText('news', 'cup_draw_bye', { competition: competitionLabel(p['competition']), round: p['round'] as number }, e.week))
+        if (myClub(e)) push(e, 'news', renderText('news', 'cup_draw_bye', { competition: competitionLabel(p['competition']), round: String(p['label'] ?? `round ${String(p['round'])}`).toLowerCase() }, e.week))
+        break
+      case 'europe.group': {
+        const ids = p['clubIds'] as number[]
+        if (myClubId === null || !ids.includes(myClubId)) break
+        push(e, 'news', renderText('news', 'europe_group', { competition: competitionLabel(p['competition']), group: String.fromCharCode(65 + (p['group'] as number)), others: ids.filter((id) => id !== myClubId).map((id) => clubNameOf(world, id)).join(', '), week: (p['week'] as number) + 1 }, e.week))
+        break
+      }
+      case 'europe.prize':
+        if (myClub(e)) push(e, 'board', renderText('news', 'europe_prize', { competition: competitionLabel(p['competition']), stage: String(p['stage']) === 'winner' ? 'the trophy' : String(p['stage']) === 'group' ? 'the group stage' : `the ${String(p['stage'])}-finals` }, e.week))
         break
       case 'manager.hired':
         if (mine(e)) push(e, 'board', renderText('board', 'welcome', { club: postName(world, p['post'] as Post), expectation: ordinal(p['expectation'] as number), years: p['years'] as number, salary: p['salary'] as number }, e.week))
@@ -342,6 +361,25 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
         if (mine(e)) push(e, 'staff', renderText('director', 'follow_moved', { name: String(p['name']), fee: p['fee'] as number, club: clubNameOf(world, p['clubId'] as number), wage: p['wage'] as number }, e.week))
         else push(e, 'news', renderText('director', 'news_follow', { name: String(p['name']), manager: nameOf(p['managerId']), club: clubNameOf(world, p['clubId'] as number), fee: p['fee'] as number }, e.week))
         break
+      case 'director.assessment': {
+        if (!mine(e)) break
+        const needs = (p['needs'] as { position: string; side: string; name: string | null }[]).map((n) => `${n.position}${n.position === 'GK' ? '' : n.side}${n.name ? ` (${n.name})` : ''}`).join(' and ')
+        const sell = (p['sell'] as { name: string; fee: number }[]).map((x) => `${x.name} (£${x.fee}m)`).join(', ')
+        push(e, 'staff', renderText('director', sell ? 'assessment' : 'assessment_no_sales', { director: String(p['director']), needs, sell, when: p['window'] ? 'Bids follow' : 'A free agent to sign now and targets for the window follow' }, e.week))
+        break
+      }
+      case 'target.agreed':
+        if (mine(e)) push(e, 'staff', renderText('director', 'target_agreed', { name: String(p['name']), fee: p['fee'] as number, club: (p['fromClubId'] as number) > 0 ? clubNameOf(world, p['fromClubId'] as number) : 'the pool' }, e.week))
+        break
+      case 'target.confirmed':
+        if (mine(e)) push(e, 'staff', renderText('director', 'target_confirmed', { name: String(p['name']), fee: p['fee'] as number, club: String(p['from']) }, e.week))
+        break
+      case 'target.lapsed':
+        if (mine(e)) push(e, 'staff', renderText('director', p['why'] === 'money' ? 'target_lapsed_money' : 'target_lapsed', { name: String(p['name']) }, e.week))
+        break
+      case 'target.cancelled':
+        if (mine(e)) push(e, 'staff', renderText('director', 'target_cancelled', { name: String(p['name']) }, e.week))
+        break
       case 'director.another':
         if (mine(e)) push(e, 'staff', renderText('director', 'another', {}, e.week))
         break
@@ -351,15 +389,25 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
       case 'request.answered': {
         if (!mine(e)) break
         const ask = String(p['ask'])
-        const vars: Record<string, string | number> = { name: String(p['name'] ?? ''), amount: (p['amount'] as number) ?? 0, pot: (p['pot'] as number) ?? 0, budget: (p['wageBudget'] as number) ?? 0, expectation: ordinal((p['expectation'] as number) ?? 0), refusals: (p['refusals'] as number) ?? 0, profile: String(p['profile'] ?? ''), fee: (p['fee'] as number) ?? 0, club: String(p['buyer'] ?? ''), starts: (p['starts'] as number) ?? 0, weeks: (p['weeks'] as number) ?? 0 }
+        const vars: Record<string, string | number> = { name: String(p['name'] ?? ''), amount: (p['amount'] as number) ?? 0, pot: (p['pot'] as number) ?? 0, budget: (p['wageBudget'] as number) ?? 0, expectation: ordinal((p['expectation'] as number) ?? 0), refusals: (p['refusals'] as number) ?? 0, profile: String(p['profile'] ?? ''), fee: (p['fee'] as number) ?? 0, club: String(p['buyer'] ?? ''), starts: (p['starts'] as number) ?? 0, weeks: (p['weeks'] as number) ?? 0, from: (p['from'] as number) ?? 0, to: (p['to'] as number) ?? 0, years: (p['years'] as number) ?? 0, salary: (p['salary'] as number) ?? 0 }
         const granted = p['granted'] === true
-        const key = ask === 'profile' ? 'profile_set' : ask === 'named' ? 'named_card' : ask === 'sell' ? (granted ? 'sell_found' : 'sell_none') : ask === 'loan' ? (granted ? 'loan_found' : 'loan_none') : `${ask}_${granted ? 'granted' : 'refused'}`
-        push(e, ask === 'budget' || ask === 'wages' || ask === 'backing' ? 'board' : ask === 'profile' || ask === 'named' || ask === 'sell' || ask === 'loan' ? 'staff' : 'players', renderText('requests', key, vars, e.week))
+        const key = ask === 'profile' ? 'profile_set' : ask === 'named' ? 'named_card' : ask === 'sell' ? (granted ? 'sell_found' : 'sell_none') : ask === 'loan' ? (granted ? 'loan_found' : 'loan_none') : ask === 'talks' ? 'talks_granted' : `${ask}_${granted ? 'granted' : 'refused'}`
+        // The board's answers are posts; a refusal is news (DESIGN.md "Requests").
+        const from: InboxFrom = p['to'] === 'board' ? (granted ? 'board' : 'news') : p['to'] === 'director' ? 'staff' : 'players'
+        push(e, from, renderText('requests', key, vars, e.week))
         if (p['third'] === true) push(e, 'board', renderText('requests', 'third_refusal', {}, e.week))
         break
       }
       case 'request.unavailable':
-        if (mine(e)) push(e, 'staff', renderText('requests', 'named_unavailable', { name: String(p['name'] ?? 'him'), why: renderText('requests', String(p['why']), {}, e.week) }, e.week))
+        if (!mine(e)) break
+        if (p['to'] === 'board') push(e, 'board', renderText('requests', 'board_unavailable', { why: renderText('requests', String(p['why']), {}, e.week) }, e.week))
+        else push(e, 'staff', renderText('requests', 'named_unavailable', { name: String(p['name'] ?? 'him'), why: renderText('requests', String(p['why']), {}, e.week) }, e.week))
+        break
+      case 'stadium.expanded':
+        if (mine(e)) push(e, 'board', renderText('requests', 'stadium_expanded', { from: p['from'] as number, to: p['to'] as number }, e.week))
+        break
+      case 'club.attendance':
+        if (mine(e)) push(e, 'board', renderText('requests', 'attendance', { attendance: p['attendance'] as number, capacity: p['capacity'] as number }, e.week))
         break
       case 'player.loanReturned':
         if (mine(e)) push(e, 'staff', renderText('requests', 'loan_returned', { name: String(p['name']), club: clubNameOf(world, p['fromClubId'] as number) }, e.week))

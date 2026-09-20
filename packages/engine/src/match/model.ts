@@ -60,14 +60,14 @@ function styleLean(v: SideView, better: boolean): number {
  * mentality, style, home advantage as a lean, the score (a leading side sits
  * deeper unless attacking) and momentum. Positive favours the home side.
  */
-export function pressureLean(home: SideView, away: SideView, homeGoals: number, awayGoals: number, momentum: number): number {
+export function pressureLean(home: SideView, away: SideView, homeGoals: number, awayGoals: number, momentum: number, neutral = false): number {
   const rh = sideRating(home)
   const ra = sideRating(away)
   let target = T.PRESSURE_PER_POINT * (rh - ra)
   target += T.PRESSURE_PER_MID * (midfieldPresence(home.bands) - midfieldPresence(away.bands))
   target += mentalityLean(home.mentality) - mentalityLean(away.mentality)
   target += styleLean(home, rh > ra) - styleLean(away, ra > rh)
-  target += T.HOME_PRESSURE_LEAN
+  if (!neutral) target += T.HOME_PRESSURE_LEAN
   if (homeGoals > awayGoals && home.mentality !== 'attack') target -= T.LEAD_SIT_DEEP
   if (awayGoals > homeGoals && away.mentality !== 'attack') target += T.LEAD_SIT_DEEP
   target += momentum
@@ -146,8 +146,8 @@ export function goalChance(attackerEff: number, keeperEff: number, defenderEff: 
 }
 
 /** A side's expected goals read once before kick-off, before the calibration table corrects for the minutes. */
-export function analyticGoals(home: SideView, away: SideView): { home: number; away: number; lean: number } {
-  const lean = pressureLean(home, away, 0, 0, 0)
+export function analyticGoals(home: SideView, away: SideView, neutral = false): { home: number; away: number; lean: number } {
+  const lean = pressureLean(home, away, 0, 0, 0, neutral)
   const minutes = T.MATCH_MINUTES + (T.STOPPAGE_FIRST[0] + T.STOPPAGE_FIRST[1] + T.STOPPAGE_SECOND[0] + T.STOPPAGE_SECOND[1]) / 2
   const rate = chanceRate(lean, home.mentality, away.mentality) * minutes
   const share = chanceShare(lean)

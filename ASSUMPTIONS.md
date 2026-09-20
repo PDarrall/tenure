@@ -43,17 +43,17 @@ single branch, so they live here instead.
   weeks; tier 1 plays 38 rounds with two blank weeks, tiers 2–5 play 46
   rounds with six double weeks, and cup ties land on top, so a club can
   play two or three matches in a week. (DESIGN.md v0.2 § Turn structure
-  makes each of those matches its own turn; see Match layer below.)
+  makes each of those matches its own turn; see Match layer below.) (Settled by DESIGN.md v0.10 § World: a 52-week year, 41 of season and 11 of summer, with every fixture scheduled by a template so no club plays more than twice in a week; the Cup, the League Cup and three European competitions in real formats.)
 - Three up, three down at every tier boundary, no play-offs. Nothing is
   relegated out of tier 5.
 - Cups are single-leg knockouts with random draws and byes in the first
   round; level ties go to a shoot-out weighted by strength. Every club
-  enters the national cup in round one.
+  enters the national cup in round one. (Settled by DESIGN.md v0.10 § World: tiered entry, single ties in the Cup, two-leg semi-finals in the League Cup, groups then two-leg knockouts in Europe.)
 - The European competition is a 32-club knockout: five home clubs (top
   four of tier 1 plus the cup winner, or fifth place) and 27 foreign
   clubs picked by strength. Foreign leagues are settled once a season by
   ranking strength, manager ability and noise; a season abroad counts as
-  34 games. (Settled by DESIGN.md v0.6 § World: there are no foreign leagues, jobs or careers abroad; the European competition's opponents are generated for each tie.)
+  34 games. (Settled by DESIGN.md v0.6 § World: there are no foreign leagues, jobs or careers abroad; the European competition's opponents are generated for each tie. DESIGN.md v0.10 § World replaces the one 32-club knockout with three competitions of groups of four then two-leg knockouts.)
 - Goals are Poisson from an expected-goals figure driven by the strength
   gap, form, morale and tactical ability; expected points come from the
   same distribution, so credit is judged against the model's own odds.
@@ -663,3 +663,107 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   there); the Match line's "a match plays in about a minute at full speed"
   was left as the brief did not name it, though the mode it describes no
   longer exists.
+
+## The 52-week calendar and the cups (DESIGN v0.10)
+
+- Weeks are 0-based in the code: 0–40 the season, 41–51 the summer.
+  Each week has two slots, the weekend and the midweek, and every
+  fixture has one; a club plays at most one fixture per slot, which is
+  what keeps it to two a week. The template in the tunables fixes the
+  cups' weeks; a tier's league round moves to the midweek on the Cup
+  weekends it has entered; tiers 2–5 play two league rounds in five
+  weeks kept clear of every cup; tier 1 sits out three weekends.
+- The Cup's field is not a power of two (48, then 48, then 68), so entry
+  rounds pair everyone and the fourth round, the first without entrants,
+  pares 34 to 32 with two ties on a midweek and thirty byes. The League
+  Cup pairs everyone in its entry rounds too (one bye when odd, which
+  depends on how many tier-1 clubs are in Europe) and pares in the
+  fourth round if it must. Byes are drawn at random.
+- Two-legged ties settle on aggregate; a level aggregate goes to a
+  shoot-out at the end of the second leg. No away-goals rule. The first
+  leg pays credit and form like a league match; the second leg pays the
+  tie in full. A group match pays like a league match.
+- Neutral ground means no home lean in the odds or the minute engine; the
+  side listed first still fields as "home" on the card.
+- Europe: 16 clubs a competition, four groups of four drawn at random
+  (home clubs can share a group), six matchdays, the top two through;
+  group winners meet runners-up of other groups in the quarter-finals,
+  the runner-up at home first. Opponents are generated per competition
+  and drawn again at each stage. Prize money and prestige land on wealth
+  and prestige by the stage reached (EUROPE_PRIZE), small numbers on a
+  0–100 scale. Season one's places go by prestige as if it were last
+  season's table.
+- Qualification passes down the table in the order the places are
+  listed: a Cup winner already in the top four hands the Europa place to
+  the next unplaced club, and the Conference Cup's sixth place moves down
+  behind it.
+- The summer window runs from the last match week to the third week of
+  the new season. The tenure model reads it at the season boundary:
+  ownership, the ceiling reset and the credit clamp use the turnover up
+  to the last summer week, and the new season's expectation is set then;
+  the three window weeks in the new season count for trading but not for
+  ownership. The winter window is read at its deadline as before.
+- The next cup round is drawn the moment the previous one is settled,
+  in the simulation and in a career alike, so the tie is on the card
+  from that week; the population simulation's random sequence moved
+  with the calendar (the simpath snapshot was retaken).
+- The "tier-5 club in the Cup's third round about once in twenty
+  seasons" line is read per club: a given tier-5 club reaches the third
+  round about once in twenty seasons. The model reads about once in ten
+  (a tier-5 side beats a tier-4 side about a third of the time), which
+  the band allows; per season, two or three tier-5 clubs get there.
+- Saves from the 46-week calendar are refused with a message: a week
+  number no longer means the same thing. There is no migration.
+- The weekly board roll and the monthly rolls happen in every week of
+  the longer year, so their per-week chances were scaled by 46/52 to
+  keep the per-season hazard where it was; the numbers are in the PR.
+
+## The director on arrival, Requests, the levels and the stadium (DESIGN v0.10)
+
+- On arrival the assessment names the two weakest slots of the best XI
+  (ARRIVAL_NEEDS) and the three players outside the XI who cost the most
+  wage for their rating (ARRIVAL_SELL_NAMES). In a window his first cards
+  are ordinary bids (ARRIVAL_CARDS). Outside one he brings one free agent
+  who can sign this week (ARRIVAL_FREE_CARDS) and fills the rest with
+  targets at other clubs, approved "in principle": the bid goes in the day
+  the window opens unless the manager calls it off from Home; a target who
+  has moved, or whom the pot no longer covers, lapses with a post. An AI
+  manager arriving outside a window bids for one free agent to his weakest
+  slot; inside one he takes a normal trade round.
+- Free agents' bids resolve in any week; bids for contracted players wait
+  in the list until a window opens.
+- With the summer window running into the season, every squad is trimmed
+  and topped up at the season boundary as well as at the deadline, so no
+  club starts a season short (tier-5 sides were reaching week 1 with
+  eleven players after a summer of wage sales).
+- The board's chance reads credit over the threshold, wealth (per 50
+  points), the table against the target (per five places) and solvency —
+  cash not in the red and the wage bill inside its budget — less each
+  refusal already this season. "One request a month" counts MONTH_WEEKS
+  from the last board ask; a refused ask is locked for REQUEST_LOCK_MONTHS
+  at that club. The director's and the players' asks have no cadence.
+- A level costs REQUEST_LEVEL_COST_SHARE of the normal budget, off the pot
+  first and cash after; each level already held lowers the chance; level 5
+  is the top. Levels come from wealth at world generation (one per twenty
+  points); AI clubs never ask, so theirs stay where wealth put them, and
+  every effect is neutral at level 3 so the population reads as before.
+- The stadium's capacity comes from tier and prestige; attendance is the
+  club's implied capacity times a base share moved by form, capped by the
+  seats on sale. "Near capacity" is 90% of them. The works cost
+  STADIUM_COST_SHARE of the normal budget (pot first, cash after), cut the
+  seats by STADIUM_WORKS_CUT for the rest of the season, add
+  STADIUM_EXPANSION_SHARE from the next, put the new seats' income onto the
+  summer pot (STADIUM_INCOME_PER_K) and lift wealth at each of the next
+  three season ends. The gate is reported once a season, at its end.
+- A new contract is REQUEST_NEW_CONTRACT_YEARS long (the player picks), at
+  the tier's rate for the reputation, never under the current salary, plus
+  REQUEST_NEW_CONTRACT_SALARY_RISE; each year asked lowers the chance. The
+  tenure model already reads years left for patience and payout.
+- "Open contract talks with a player" (the director) always opens them:
+  the player's demand arrives as a decision, the same card as talking terms
+  from his page; the player-facing "a new contract" ask keeps its roll.
+- Requests live on a screen off Career; the card on Home that listed them
+  is gone. Board refusals post as news; grants as the board.
+- The Champions Cup's generated opponents are a point stronger at every
+  stage than the calendar step set them: home clubs were winning it more
+  than one year in three.

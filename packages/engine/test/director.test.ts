@@ -46,6 +46,10 @@ describe('the windows', () => {
     expect(windowAt(T.JANUARY_WINDOW_WEEKS[1] + 1)).toBeNull()
     expect(windowAt(T.MATCH_WEEKS)).toBe('summer')
     expect(windowAt(T.SEASON_WEEKS - 1)).toBe('summer')
+    // The summer runs into the new season: open through its first weeks, shut after the deadline.
+    expect(windowAt(0)).toBe('summer')
+    expect(windowAt(T.SUMMER_WINDOW_CLOSES)).toBe('summer')
+    expect(windowAt(T.SUMMER_WINDOW_CLOSES + 1)).toBeNull()
     expect(windowAt(5)).toBeNull()
     expect(isDeadlineWeek(deadlineOf('january'))).toBe(true)
     expect(isDeadlineWeek(deadlineOf('summer'))).toBe(true)
@@ -55,7 +59,9 @@ describe('the windows', () => {
     expect(isCardClose(T.JANUARY_WINDOW_WEEKS[1] - 1)).toBeNull()
     expect(isCardClose(T.MATCH_WEEKS - 1)).toBeNull()
     expect(isCardClose(T.MATCH_WEEKS)).toBe('summer')
-    expect(isCardClose(T.SEASON_WEEKS - 2)).toBeNull()
+    expect(isCardClose(T.SEASON_WEEKS - 2)).toBe('summer')
+    expect(isCardClose(T.SEASON_WEEKS - 1)).toBe('summer')
+    expect(isCardClose(T.SUMMER_WINDOW_CLOSES - 1)).toBeNull()
   })
 
   it('reports the banner: open, which window, weeks to the deadline', () => {
@@ -217,7 +223,8 @@ describe('the director', () => {
 
 describe('the calendar in a career', () => {
   it('opens January with cards, shuts on deadline day with its own inbox line, and nothing else moves between windows', () => {
-    const { world } = seated(11, 0)
+    // Seated the week after the summer deadline: the calendar's first weeks are still the summer window.
+    const { world } = seated(11, T.SUMMER_WINDOW_CLOSES + 1)
     const me = human(world)
     const club = clubById(world, (me.status as { post: { clubId: number } }).post.clubId)
     club.transferPot = 40
