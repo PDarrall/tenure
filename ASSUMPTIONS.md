@@ -797,6 +797,15 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
   all four. The curve is implemented as DESIGN states it and the bands in
   the tests are what the model reliably reaches. **The four numbers are
   left for the design to settle.**
+- **The Champions Cup is now won from further down the table.** With every
+  tie more even, a club outside the top three of tier 1 lifts it far more
+  often than the 0–25% DESIGN names (29–57% of home wins across three
+  seeds, on seven to fourteen titles a run). It is the same compression
+  that makes cups worth playing, read at the other end, and it pulls
+  against the line above it: the generated opponents came down two points
+  so home clubs would lift it often enough at all, which also lets the
+  fourth- and fifth-placed clubs in. Left as it reads, with the other
+  mismatch lines, for the design to settle.
 - **The ceiling is a rule, not a hope.** "No league match in a thousand
   seasons past a margin of 7" is not something a distribution can promise,
   so a side seven clear stops creating and the scoreline table carries no
@@ -809,13 +818,16 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
 - **Match ratings were widened** (RATING_PER_POINT, RATING_WIN/LOSS)
   because compressing the scorelines closed the season averages up and the
   spread fell out of its band. Nothing else in the rating rule changed.
-- **The tenure lines moved and were left alone.** Results are less
-  predictable now, so credit moves further in a season: median career falls
-  about a third of a season and the top-tier long-tenure line falls with
-  it. Four candidate levers were tried over 500 careers a seed (the sack
-  roll up and down, credit sensitivity, the cup-exit penalty) and every one
-  of them moved the lines by less than the seed-to-seed noise, so none was
-  taken and the committed tuning stands.
+- **The top-tier long-tenure line fell and was left alone.** Results are
+  less predictable now, so credit moves further in a season and a
+  five-year tenure at a top-tier club is rarer: the line reads 1.07–1.51
+  per season against a floor of 2, where it read 1.97–2.26 before. Five
+  candidate levers were tried over 500 careers on each of three seeds (the
+  sack roll raised and lowered, credit sensitivity at 2.1, 1.8 and 1.6,
+  and the cup-exit penalty halved). None lifted the line, and the credit
+  cuts shortened median careers out of their own band, so none was taken
+  and the committed tuning stands. Median career itself came back into
+  band on two seeds of three.
 - **Squads are 25 senior players.** DESIGN says "plus academy players";
   the academy is phase 5 and has no separate pool yet, so for now the 25
   are the whole squad and nothing sits outside it.
