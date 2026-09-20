@@ -717,3 +717,53 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
 - The weekly board roll and the monthly rolls happen in every week of
   the longer year, so their per-week chances were scaled by 46/52 to
   keep the per-season hazard where it was; the numbers are in the PR.
+
+## The director on arrival, Requests, the levels and the stadium (DESIGN v0.10)
+
+- On arrival the assessment names the two weakest slots of the best XI
+  (ARRIVAL_NEEDS) and the three players outside the XI who cost the most
+  wage for their rating (ARRIVAL_SELL_NAMES). In a window his first cards
+  are ordinary bids (ARRIVAL_CARDS). Outside one he brings one free agent
+  who can sign this week (ARRIVAL_FREE_CARDS) and fills the rest with
+  targets at other clubs, approved "in principle": the bid goes in the day
+  the window opens unless the manager calls it off from Home; a target who
+  has moved, or whom the pot no longer covers, lapses with a post. An AI
+  manager arriving outside a window bids for one free agent to his weakest
+  slot; inside one he takes a normal trade round.
+- Free agents' bids resolve in any week; bids for contracted players wait
+  in the list until a window opens.
+- With the summer window running into the season, every squad is trimmed
+  and topped up at the season boundary as well as at the deadline, so no
+  club starts a season short (tier-5 sides were reaching week 1 with
+  eleven players after a summer of wage sales).
+- The board's chance reads credit over the threshold, wealth (per 50
+  points), the table against the target (per five places) and solvency —
+  cash not in the red and the wage bill inside its budget — less each
+  refusal already this season. "One request a month" counts MONTH_WEEKS
+  from the last board ask; a refused ask is locked for REQUEST_LOCK_MONTHS
+  at that club. The director's and the players' asks have no cadence.
+- A level costs REQUEST_LEVEL_COST_SHARE of the normal budget, off the pot
+  first and cash after; each level already held lowers the chance; level 5
+  is the top. Levels come from wealth at world generation (one per twenty
+  points); AI clubs never ask, so theirs stay where wealth put them, and
+  every effect is neutral at level 3 so the population reads as before.
+- The stadium's capacity comes from tier and prestige; attendance is the
+  club's implied capacity times a base share moved by form, capped by the
+  seats on sale. "Near capacity" is 90% of them. The works cost
+  STADIUM_COST_SHARE of the normal budget (pot first, cash after), cut the
+  seats by STADIUM_WORKS_CUT for the rest of the season, add
+  STADIUM_EXPANSION_SHARE from the next, put the new seats' income onto the
+  summer pot (STADIUM_INCOME_PER_K) and lift wealth at each of the next
+  three season ends. The gate is reported once a season, at its end.
+- A new contract is REQUEST_NEW_CONTRACT_YEARS long (the player picks), at
+  the tier's rate for the reputation, never under the current salary, plus
+  REQUEST_NEW_CONTRACT_SALARY_RISE; each year asked lowers the chance. The
+  tenure model already reads years left for patience and payout.
+- "Open contract talks with a player" (the director) always opens them:
+  the player's demand arrives as a decision, the same card as talking terms
+  from his page; the player-facing "a new contract" ask keeps its roll.
+- Requests live on a screen off Career; the card on Home that listed them
+  is gone. Board refusals post as news; grants as the board.
+- The Champions Cup's generated opponents are a point stronger at every
+  stage than the calendar step set them: home clubs were winning it more
+  than one year in three.
