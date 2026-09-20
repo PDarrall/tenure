@@ -19,6 +19,8 @@ interface Snapshot {
   clubId: number | null
   window: 'january' | 'summer' | null
   assessment: boolean
+  /** Wage room: the constraint on every route, a fee or not (DESIGN.md "Transfers"). */
+  room: boolean
   signingCards: { signNow: boolean; agreed: boolean }[]
   answered: { ask: string; granted: boolean }[]
 }
@@ -38,6 +40,7 @@ async function snap(page: Page): Promise<Snapshot> {
       clubId,
       window: jan ? 'january' : summer ? 'summer' : null,
       assessment: log.some((e) => e.type === 'director.assessment' && e.payload['managerId'] === me.id && e.payload['clubId'] === clubId),
+      room: clubId === null ? false : (w.clubs[clubId - 1].wageBudget as number) > (w.clubs[clubId - 1].playerIds as number[]).reduce((n: number, id: number) => n + ((w.players[id - 1]?.contract.wage ?? 0) * 52) / 1000, 0),
       signingCards: pending.filter((d) => d.kind === 'signing').map((d) => ({ signNow: d.payload['signNow'] === true, agreed: d.payload['agreed'] === true })),
       answered: log.filter((e) => e.type === 'request.answered' && e.payload['managerId'] === me.id).map((e) => ({ ask: String(e.payload['ask']), granted: e.payload['granted'] === true })),
     }
@@ -74,14 +77,31 @@ test('take a job mid-season: the director posts his assessment and his first car
   expect(await getAJob(page)).toBe(true)
   const s = await snap(page)
   expect(s.clubId).not.toBeNull()
-  console.log(`hired in week ${s.seasonWeek + 1}, window ${s.window ?? 'shut'}, ${s.signingCards.length} cards`)
+  const money = await page.evaluate(() => {
+    const w = (window as unknown as { __tenure: any }).__tenure
+    const me = w.managers[w.human.managerId - 1]
+    const clubId = me.status.kind === 'employed' && me.status.post.kind === 'home' ? me.status.post.clubId : null
+    if (clubId === null) return null
+    const club = w.clubs[clubId - 1]
+    const bill = (club.playerIds as number[]).reduce((n: number, id: number) => n + ((w.players[id - 1]?.contract.wage ?? 0) * 52) / 1000, 0)
+    return { pot: club.transferPot, wages: `${Math.round(bill * 10) / 10} of ${club.wageBudget}` }
+  })
+  console.log(`hired in week ${s.seasonWeek + 1}, window ${s.window ?? 'shut'}, ${s.signingCards.length} cards, money ${JSON.stringify(money)}`)
   // The assessment: the two positions that need cover, the players he would sell.
   expect(s.assessment).toBe(true)
-  // His first cards: bids in a window; outside one a free agent to sign now and targets agreed for the window.
-  expect(s.signingCards.length).toBeGreaterThan(0)
-  if (s.window === null) expect(s.signingCards.some((c) => c.signNow || c.agreed)).toBe(true)
-  else expect(s.signingCards.every((c) => !c.signNow && !c.agreed)).toBe(true)
-  if ((await state(page)) === 'employed') {
+  // His first cards: bids in a window; outside one a free agent to sign now
+  // and targets agreed for the window. A club with no pot and no wage room has
+  // nothing to bring, which is the market with no budget, not a missing card.
+  if (s.signingCards.length === 0) {
+    // Wage room, not cash, is the constraint: a club already over its wage
+    // budget cannot take anyone, on a fee, a free or a loan.
+    expect(s.room, 'no cards and yet wage room to sign into').toBe(false)
+  } else if (s.window === null) {
+    expect(s.signingCards.some((c) => c.signNow || c.agreed)).toBe(true)
+  } else {
+    expect(s.signingCards.every((c) => !c.signNow && !c.agreed)).toBe(true)
+  }
+  if ((await state(page)) === 'employed' && s.signingCards.length > 0) {
     const cards = page.getByTestId('decision-signing')
     expect(await cards.count()).toBe(s.signingCards.length)
     if (s.window === null) await expect(cards.first().locator('.label').first()).toContainText(/sign now|for the window/)

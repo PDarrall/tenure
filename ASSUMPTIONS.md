@@ -767,3 +767,76 @@ with `pnpm sim --seeds 1,2,3,4,5`. Readings taken while tuning:
 - The Champions Cup's generated opponents are a point stronger at every
   stage than the calendar step set them: home clubs were winning it more
   than one year in three.
+
+## Mismatch, squads of 25 and the market with no budget (DESIGN v0.11)
+
+- **The curve governs the difference, not the whole model.** DESIGN names
+  the mapping from a strength gap to expected goals (about half a goal at
+  ten points, a goal and a half at thirty, two and a half at sixty, nothing
+  beyond three). The three saturating terms it also names — the share of
+  chances, their quality and the rating edge a chance converts at — could
+  not compose into that curve without flattening the structural rules
+  (formations, styles, width, a defensive overload) to nothing. So all
+  three saturate *and* a governor caps the difference between the two sides
+  at the curve, with the total held under a soft ceiling. The governor
+  binds only where the model's own reading would run away, so ordinary
+  football passes through untouched and the structural rules still order
+  the close games.
+- **The lean is the gap.** The curve is fed by the pressure lean, which is
+  already in rating points and already carries strength, the midfield,
+  mentality, style, home advantage and the score. So a structural advantage
+  counts toward the gap exactly as a rating advantage does.
+- **Three of DESIGN's validation lines cannot all hold at once.** Under the
+  curve above, with the scoreline drawn from the usual distribution:
+  margins of 5 or more read about 2.5% of league matches against the 1%
+  DESIGN names; the bottom club beats the top about one meeting in eleven
+  against one in six; a two-tier cup underdog wins about one tie in six,
+  near the one in five named; and a tier-5 side beats a tier-1 side about
+  one tie in fourteen against the one in forty named. Pushing any of them
+  to its number moves the others further out, because the same curve feeds
+  all four. The curve is implemented as DESIGN states it and the bands in
+  the tests are what the model reliably reaches. **The four numbers are
+  left for the design to settle.**
+- **The ceiling is a rule, not a hope.** "No league match in a thousand
+  seasons past a margin of 7" is not something a distribution can promise,
+  so a side seven clear stops creating and the scoreline table carries no
+  mass past that margin. It reads as a side seeing the game out.
+- **The day is variance the manager cannot see.** It is drawn once per
+  match per side, after the odds he is shown, so the pre-match odds and the
+  night's odds differ. A cup widens both sides' draw and lifts the weaker
+  one, which is also how "the favourite's edge is shortened" is modelled:
+  there is no separate cup term.
+- **Match ratings were widened** (RATING_PER_POINT, RATING_WIN/LOSS)
+  because compressing the scorelines closed the season averages up and the
+  spread fell out of its band. Nothing else in the rating rule changed.
+- **The tenure lines moved and were left alone.** Results are less
+  predictable now, so credit moves further in a season: median career falls
+  about a third of a season and the top-tier long-tenure line falls with
+  it. Four candidate levers were tried over 500 careers a seed (the sack
+  roll up and down, credit sensitivity, the cup-exit penalty) and every one
+  of them moved the lines by less than the seed-to-seed noise, so none was
+  taken and the committed tuning stands.
+- **Squads are 25 senior players.** DESIGN says "plus academy players";
+  the academy is phase 5 and has no separate pool yet, so for now the 25
+  are the whole squad and nothing sits outside it.
+- **Depth is a share of the club's own level, not a flat gap.** A tier-5
+  club rated 8 cannot have a bench seven rating points below it, so each
+  place back costs a share of the club's level, steeper the lower the tier.
+  A tier-5 squad then reads as a strong XI and little else in its own
+  terms, which is what DESIGN describes.
+- **A handful of tier-5 clubs are generated at a strength of 1**, and a
+  rating cannot go below 1, so the anchor cannot put their best XI on their
+  club strength. That is world generation, older than this change, and the
+  squad test reads the anchor on clubs above the floor.
+- **Loans and exchanges settle at once, without a bid.** Neither costs a
+  fee worth haggling over, so approving the card completes the move with
+  the other club there and then. A loan runs to the January deadline or the
+  last match week; the parent pays the rest of the wage; a recall is a
+  weekly roll once he is playing well; a loan that went well multiplies
+  what he costs to buy afterwards.
+- **An exchange comes from the club's own surplus**: a player outside its
+  best, within a window of the incoming man's value, with the difference in
+  cash. The other club is not asked to agree beyond that.
+- **Wage room, not cash, decides.** The director brings frees, loans and
+  swaps whenever the pot is under NO_BUDGET_POT, and brings nothing at all
+  when the wage bill already fills the budget.

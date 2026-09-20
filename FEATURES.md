@@ -29,6 +29,7 @@ Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · �
 
 ## Match
 - Minute-by-minute engine, commentary naming players — ✓
+- Mismatch and upsets: the gap saturating, a rout stopping itself, a day drawn for each side — ✓
 - Continue to full time (one press, a ticker inside three seconds, the assistant on any forced change) or to key events (goals, reds, injuries needing a change, half time, full time), the toggle saved with the career — ✓
 - Substitutions and mentality changes while paused — ✓
 - Latest scores from the division; live table at full time — ✓
@@ -44,7 +45,7 @@ Status: ✓ in Tenure · ◐ partly · 3/4/5/6/8 = build phase in DESIGN.md · �
 - The director's assessment and first recommendations on arrival at a club — ✓
 - A shortlist and search, used to name targets for the director — ✓
 - Transfer and wage budgets from the board — ✓ (the pot by tier and wealth, the wage budget, requests for more, a level upgrade as a request)
-- Loans, free agents and exchanges when there is no budget — 4
+- Loans, free agents and exchanges when there is no budget — ✓ (the director leads with them when the pot is empty; wage room is the constraint; a loan can be recalled and a good one costs more to keep)
 - Agents, clauses, instalments, haggling rounds, sell-on fees — ✗
 
 ## Decisions
