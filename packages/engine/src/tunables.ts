@@ -1250,6 +1250,34 @@ export const T = {
   /** A candidate from abroad is generated this far above the floor the slot needs. */
   DIRECTOR_ABROAD_GAIN: 2,
   /** The club id a candidate from abroad carries until he signs or is forgotten. */
+  /**
+   * The market with no budget (DESIGN.md "Transfers"): a pot under this and
+   * the director leads with free agents, loans and exchanges. A loan runs
+   * half a season or a whole one, the parent paying the rest of the wage and
+   * sometimes taking a fee; he can be recalled once he is playing well, and a
+   * loan that went well raises what he costs to keep. An exchange swaps two
+   * players of about the same value with the difference in cash.
+   * Serves: a club with nothing to spend still has a market.
+   */
+  NO_BUDGET_POT: 1,
+  LOAN_HALF_SEASON_P: 0.35,
+  LOAN_WAGE_SHARE_RANGE: [0.4, 0.8] as readonly [number, number],
+  LOAN_FEE_P: 0.3,
+  LOAN_FEE_SHARE: 0.05,
+  /** How far below its own level a club will lend from: a squad player, not a starter. */
+  LOAN_BENCH_GAP: 3,
+  /** The parent's recall: not before this many weeks, and only for a man playing this well this often. */
+  LOAN_RECALL_FROM: 8,
+  LOAN_RECALL_APPS: 6,
+  LOAN_RECALL_RATING: 7.1,
+  LOAN_RECALL_P: 0.06,
+  /** A loan that went well: this many appearances at this rating, and his price rises by the premium. */
+  LOAN_GOOD_APPS: 10,
+  LOAN_GOOD_RATING: 7,
+  LOAN_GOOD_PREMIUM: 1.25,
+  /** An exchange pairs players within this share of the incoming man's value, plus a floor for the cheap end. */
+  EXCHANGE_VALUE_WINDOW: 0.5,
+  EXCHANGE_VALUE_FLOOR: 0.5,
   ABROAD_CLUB_ID: -1,
 
   // ---------------------------------------------------------------------------

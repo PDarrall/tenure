@@ -19,6 +19,7 @@ import { aiPlayerRequests, queuePlayerRequests, queueExpiringContracts } from '.
 import { agentWeekly } from '../market/agent.js'
 import { aiTradeRounds, closeWindow, deadlineOf, forgetAbroadCandidates, humanClub, isCardClose, isDeadlineWeek, refreshPot, resolveBids, settleSoldShines, windowAt, windowSummaries } from '../market/director.js'
 import { directorWeek } from '../play/transfers.js'
+import { loanWeek } from '../market/loans.js'
 import { confirmAgreedTargets } from '../market/arrival.js'
 import { checkPromises, returnLoans } from '../play/requests.js'
 
@@ -86,6 +87,8 @@ export function closeWeekHooks(world: World, rng: Rng, sw: number): void {
     tenure.newSeason(world)
   }
   tenure.weekly(world, rng)
+  // Loans run their term, and a parent club can want a man back once he is playing (DESIGN.md "Transfers").
+  loanWeek(world, rng)
   market.weekly(world, rng)
   if (world.human) agentWeekly(world)
   // Last of all: once the deadline has gone, nobody from abroad is left

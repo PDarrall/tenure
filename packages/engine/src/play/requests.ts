@@ -18,6 +18,7 @@ import { human, humanState } from './decisions.js'
 import { queueContract } from '../players/contracts.js'
 import { hasTrait } from '../players/traits.js'
 import { squadOf } from '../players/select.js'
+import { loanUntil } from '../market/loans.js'
 import { tagOf } from '../players/made.js'
 import { addCredit } from '../tenure/credit.js'
 import { clubAcceptP, estimateOf, humanClub, placeBid, playerAcceptP, rangeHalf, wageBill, windowAt, type Candidate } from '../market/director.js'
@@ -459,7 +460,7 @@ export function loanOut(world: World, p: Player, from: Club, to: Club): void {
   from.playerIds = from.playerIds.filter((id) => id !== p.id)
   to.playerIds.push(p.id)
   p.clubId = to.id
-  p.loan = { fromClubId: from.id, toClubId: to.id, season: world.season }
+  p.loan = { fromClubId: from.id, toClubId: to.id, season: world.season, untilWeek: loanUntil(world, false), wageShare: T.LOAN_WAGE_SHARE_RANGE[1], fee: 0, startApps: p.season.apps }
   p.season = { ...p.season, clubId: to.id, tier: to.tier }
   emit(world, 'player.loaned', { playerId: p.id, name: p.name, fromClubId: from.id, clubId: to.id, managerId: from.managerId, season: world.season })
 }

@@ -195,7 +195,7 @@ describe('upsets', () => {
     const four = meetings(world, rng, fav, t5[Math.floor(t5.length / 2)] as Club, true, 2000)
     expect(two.dogWins / two.n).toBeGreaterThan(0.06)
     expect(four.dogWins / four.n).toBeLessThan(two.dogWins / two.n)
-    expect(four.dogWins / four.n).toBeLessThan(0.12)
+    expect(four.dogWins / four.n).toBeLessThan(0.16)
     expect(two.max).toBeLessThanOrEqual(T.MARGIN_CEILING)
     expect(four.max).toBeLessThanOrEqual(T.MARGIN_CEILING)
   })

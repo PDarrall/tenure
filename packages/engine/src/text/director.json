@@ -118,5 +118,29 @@
   ],
   "target_cancelled": [
     "You called off the move for {name}."
+  ],
+  "card_loan": [
+    "{name}, {age}, {position}. Nobody is buying, but his club will lend him {term}: we pay {share}% of the wage, £{wage}k. He reads {lo}–{hi}, potential {plo}–{phi}."
+  ],
+  "card_exchange": [
+    "{name}, {age}, {position}. No money, so a swap: {out} goes the other way{withCash}. He reads {lo}–{hi}, potential {plo}–{phi}."
+  ],
+  "loaned_in": [
+    "{name} joins on loan {term}. We pay £{wage}k a week of it; he is theirs again when it ends."
+  ],
+  "loan_recalled": [
+    "{name} has been recalled. He played {apps} times and they want him back — that was the bet."
+  ],
+  "loan_ended": [
+    "{name} goes back at the end of his loan: {apps} games for us."
+  ],
+  "loan_ended_well": [
+    "{name} goes back after {apps} games at {rating}. Keeping him will cost more now; everyone saw the same season."
+  ],
+  "exchanged": [
+    "{name} is ours and {out} is theirs.{withCash}"
+  ],
+  "no_budget_lead": [
+    "No pot to speak of, so I am looking at frees, loans and swaps. Wage room is what we have left to spend."
   ]
 }

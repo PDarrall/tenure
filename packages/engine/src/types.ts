@@ -162,8 +162,10 @@ export interface Player {
   soldBy?: SoldBy | null
   /** A candidate from abroad, generated for a card; forgotten if nobody signs him by the deadline. */
   abroad?: boolean
-  /** Out on loan for the season, if so. */
+  /** Out on loan, if so. */
   loan?: Loan | null
+  /** What a loan that went well added to his price, as a multiplier on his value. */
+  loanPremium?: number
   /** Has played a first-team match. */
   debuted: boolean
   retired: boolean
@@ -454,11 +456,18 @@ export interface PlayingPromise {
   startsNeeded: number
 }
 
-/** A player loaned out for the season (DESIGN.md "Requests": loan out); he returns at the season's end. */
+/** A player out on loan (DESIGN.md "Transfers"): a season or half of one, the parent club paying part of the wage, sometimes with a fee. */
 export interface Loan {
   fromClubId: ClubId
   toClubId: ClubId
   season: number
+  /** The week the loan runs to: the January deadline for half a season, the last match week for a whole one. */
+  untilWeek: number
+  /** The share of the wage the borrowing club pays. */
+  wageShare: number
+  fee: number
+  /** His season appearances when the loan began, so the loan's own games can be counted off it. */
+  startApps: number
 }
 
 /** A foreign side generated for a European competition (DESIGN.md "World"): a name, a strength drawn by competition and stage, a squad while a tie against a home club is on. */
@@ -901,6 +910,8 @@ export interface HumanState {
   agentWithdrawn: VacancyId[]
   /** What the manager asked the director for; null when nothing is asked. */
   targetProfile?: TargetProfile | null
+  /** The director has said once that the pot is empty and he is looking at frees, loans and swaps. */
+  noBudgetTold?: boolean
   /** The manager's shortlist: players to name to the director. */
   shortlist?: PlayerId[]
   /** Candidates declined this window, so the director does not bring the same name back. */
