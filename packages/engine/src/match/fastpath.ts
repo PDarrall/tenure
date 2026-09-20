@@ -101,7 +101,8 @@ export function jointPmf(lambdaHome: number, lambdaAway: number, rho: number): n
   for (let h = 0; h <= T.MAX_GOALS; h++) {
     const row: number[] = []
     for (let a = 0; a <= T.MAX_GOALS; a++) {
-      const p = Math.max(0, (ph[h] as number) * (pa[a] as number) * tau(h, a))
+      // No mass past the ceiling: a side that far clear stops creating, so the scoreline cannot happen.
+      const p = Math.abs(h - a) > T.MARGIN_CEILING ? 0 : Math.max(0, (ph[h] as number) * (pa[a] as number) * tau(h, a))
       row.push(p)
       total += p
     }

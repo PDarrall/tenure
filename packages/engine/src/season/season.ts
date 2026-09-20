@@ -84,7 +84,7 @@ export function lineupFor(world: World, rng: Rng, id: ClubId, ctx: MatchContext,
     const morale = lineup.xi.length ? lineup.xi.reduce((s, pid) => s + (playerById(world, pid)?.morale ?? T.MORALE_INITIAL), 0) / lineup.xi.length : club.squad.morale
     return {
       lineup,
-      participant: { id, strength: bands.strength, tactical, form: club.form, morale, mentality: club.mentality, style: club.style, bands },
+      participant: { id, strength: bands.strength, tactical, form: club.form, morale, mentality: club.mentality, style: club.style, bands, tier: club.tier },
     }
   }
   const opponent = europeanOpponentById(world, id)
@@ -96,7 +96,7 @@ export function lineupFor(world: World, rng: Rng, id: ClubId, ctx: MatchContext,
     const bands = picked.xi.length === 11 ? xiBands(world, picked.xi, formation, ctx) : plainBands(opponent.strength, structureOf(formation))
     return {
       lineup: { ...picked, changed: [] },
-      participant: { id, strength: bands.strength, tactical: T.CARETAKER_ABILITY, form: [], morale: T.MORALE_INITIAL, mentality: 'balanced', style: 'possession', bands },
+      participant: { id, strength: bands.strength, tactical: T.CARETAKER_ABILITY, form: [], morale: T.MORALE_INITIAL, mentality: 'balanced', style: 'possession', bands, tier: 1 },
     }
   }
   throw new Error(`lineupFor: unknown club ${id}`)
@@ -367,7 +367,7 @@ export function settleFixture(world: World, rng: Rng, prepared: PreparedFixture,
 /** Play one fixture on the fast path: read it, draw a scoreline from the odds, settle it. */
 export function playFixture(world: World, rng: Rng, fixture: Fixture): PlayedFixture {
   const prepared = prepareFixture(world, rng, fixture)
-  const outcome = playMatch(rng, prepared.homeSide.participant, prepared.awaySide.participant, prepared.knockout, { neutral: prepared.neutral, aggregate: prepared.aggregate })
+  const outcome = playMatch(rng, prepared.homeSide.participant, prepared.awaySide.participant, prepared.knockout, { neutral: prepared.neutral, aggregate: prepared.aggregate, cup: fixture.competition !== 'league' })
   return settleFixture(world, rng, prepared, { homeGoals: outcome.homeGoals, awayGoals: outcome.awayGoals, shootoutWinnerId: outcome.shootoutWinnerId ?? null }, null)
 }
 
@@ -395,7 +395,7 @@ export function createFixtureMatch(world: World, rng: Rng, prepared: PreparedFix
       formation: homeFormation(world, id, side.participant),
     }
   }
-  return createMatch(world, rng, setup('home'), setup('away'), prepared.knockout, prepared.homeBigGame || prepared.awayBigGame, { neutral: prepared.neutral, aggregate: prepared.aggregate })
+  return createMatch(world, rng, setup('home'), setup('away'), prepared.knockout, prepared.homeBigGame || prepared.awayBigGame, { neutral: prepared.neutral, aggregate: prepared.aggregate, cup: prepared.fixture.competition !== 'league' })
 }
 
 /** Settle a finished minute-engine match into the world. */

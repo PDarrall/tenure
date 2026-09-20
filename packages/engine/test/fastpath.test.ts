@@ -100,14 +100,37 @@ describe('the fast path against the minute engine', () => {
       if (home.id === away.id) continue
       const h = setupFor(world, rng, home)
       const a = setupFor(world, rng, away)
-      const odds = matchOdds(h.participant, a.participant)
       const state = createMatch(world, rng, h, a, false)
+      // The day is drawn at kick-off and both paths must read the same one.
+      const odds = matchOdds({ ...h.participant, day: state.home.day, keeperDay: state.home.keeperDay }, { ...a.participant, day: state.away.day, keeperDay: state.away.keeperDay })
       const hv = sideView(state, state.home)
       hv.strength = hv.bands.strength
       const av = sideView(state, state.away)
       av.strength = av.bands.strength
       expect(pressureLean(hv, av, 0, 0, 0)).toBeCloseTo(odds.lean, 6)
     }
+  })
+
+  it('keeps the day out of the odds the manager is shown', () => {
+    // DESIGN.md "Match": every match carries variance the manager cannot see.
+    const world = createWorld(33)
+    runWeeks(world, 2)
+    const rng = createRng(5)
+    let differed = 0
+    for (let i = 0; i < 30; i++) {
+      const home = rng.pick(world.clubs)
+      const away = rng.pick(world.clubs)
+      if (home.id === away.id) continue
+      const h = setupFor(world, rng, home)
+      const a = setupFor(world, rng, away)
+      const shown = matchOdds(h.participant, a.participant)
+      const state = createMatch(world, rng, h, a, false)
+      const played = matchOdds({ ...h.participant, day: state.home.day, keeperDay: state.home.keeperDay }, { ...a.participant, day: state.away.day, keeperDay: state.away.keeperDay })
+      expect(h.participant.day ?? 0).toBe(0)
+      if (Math.abs(shown.lean - played.lean) > 1e-9) differed++
+    }
+    // Every match has a day; the odds shown never carry it.
+    expect(differed).toBeGreaterThan(20)
   })
 
   it('is fast enough for the population sim', () => {

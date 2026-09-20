@@ -8,7 +8,7 @@
 import type { Rng } from '../rng.js'
 import { T } from '../tunables.js'
 import type { XiBands } from '../players/select.js'
-import { sideRating, type SideView } from '../match/model.js'
+import { drawMatchDays, sideRating, type SideView } from '../match/model.js'
 import { fastOdds, sampleScoreline } from '../match/fastpath.js'
 
 export interface Participant extends SideView {
@@ -72,11 +72,16 @@ export interface PlayOptions {
   neutral?: boolean
   /** The first leg's score carried into a second leg, from the home side's view; a knockout is level on aggregate. */
   aggregate?: { home: number; away: number } | null
+  /** A cup tie: the day's draw is wider and the underdog is lifted (DESIGN.md "Match": mismatch and upsets). */
+  cup?: boolean
 }
 
 export function playMatch(rng: Rng, home: Participant, away: Participant, knockout: boolean, options: PlayOptions = {}): MatchOutcome {
+  // The odds the manager saw, before the night: the day is variance he cannot read.
   const odds = matchOdds(home, away, options.neutral === true)
-  const { homeGoals, awayGoals } = sampleScoreline(rng.float(), odds.pmf)
+  const days = drawMatchDays(rng, home, away, options.cup === true)
+  const played = matchOdds({ ...home, ...days.home }, { ...away, ...days.away }, options.neutral === true)
+  const { homeGoals, awayGoals } = sampleScoreline(rng.float(), played.pmf)
   const outcome: MatchOutcome = { homeGoals, awayGoals, odds }
   const agg = options.aggregate ?? { home: 0, away: 0 }
   if (knockout && homeGoals + agg.home === awayGoals + agg.away) {
