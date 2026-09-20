@@ -62,8 +62,8 @@ export const T = {
   /** First-XI mean age at genesis, uniform. DESIGN: peak 25–29. */
   SQUAD_AGE_INITIAL_RANGE: [24, 30] as readonly [number, number],
 
-  /** Squad size at genesis, uniform. */
-  SQUAD_SIZE_RANGE: [22, 28] as readonly [number, number],
+  /** Squad size at genesis, before the real players are generated over it. */
+  SQUAD_SIZE_RANGE: [25, 25] as readonly [number, number],
 
   /** Morale at genesis (0–100). */
   MORALE_INITIAL: 50,
@@ -87,8 +87,9 @@ export const T = {
   // ---------------------------------------------------------------------------
 
   /** Strength of a generated opponent by competition and stage (mean, sd), drawn afresh before each stage so the later rounds are harder whoever survives. */
+  // Two points came off the Champions Cup at every stage when the mismatch governor made every tie more even and home clubs stopped lifting it often enough. Serves: a home club wins it about one year in five.
   EUROPE_OPPONENT_STRENGTH: {
-    championsCup: { group: { mean: 95, sd: 4 }, quarter: { mean: 97, sd: 3 }, semi: { mean: 99, sd: 3 }, final: { mean: 100, sd: 2 } },
+    championsCup: { group: { mean: 93, sd: 4 }, quarter: { mean: 95, sd: 3 }, semi: { mean: 97, sd: 3 }, final: { mean: 98, sd: 2 } },
     europaCup: { group: { mean: 86, sd: 4 }, quarter: { mean: 89, sd: 3 }, semi: { mean: 91, sd: 3 }, final: { mean: 93, sd: 2 } },
     conferenceCup: { group: { mean: 80, sd: 4 }, quarter: { mean: 84, sd: 3 }, semi: { mean: 87, sd: 3 }, final: { mean: 89, sd: 2 } },
   } as Readonly<Record<'championsCup' | 'europaCup' | 'conferenceCup', Readonly<Record<'group' | 'quarter' | 'semi' | 'final', { mean: number; sd: number }>>>>,
@@ -289,7 +290,7 @@ export const T = {
   BAND_FLOOR: 1,
   /** Expected goals for a side are bounded here, so the scoreline table always has mass. */
   LAMBDA_MIN: 0.02,
-  LAMBDA_MAX: 6,
+  LAMBDA_MAX: 4.5,
   /** The pressing style: faster condition drain, more fouls (its other effects are the minute engine's). */
   STYLE_EFFECTS: {
     pressing: { drain: 1.3, fouls: 1.3 },
@@ -333,11 +334,11 @@ export const T = {
   // target through the anchoring rule; the best XI averages club strength.
   // ---------------------------------------------------------------------------
 
-  /** Squad size by tier, index 0 = tier 1. DESIGN: 22 in tiers 1–2, 20 in 3–4, 18 in 5. */
-  SQUAD_SIZE_BY_TIER: [22, 22, 20, 20, 18] as readonly number[],
-  EUROPEAN_OPPONENT_SQUAD_SIZE: 22,
-  /** Keepers in every squad; the outfield splits by these shares. DESIGN: for a 22, about 2 GK, 7 D, 8 M, 4–5 F. */
-  SQUAD_KEEPERS: 2,
+  /** Squad size, every tier. DESIGN.md "Players": a squad of 25 at every tier, plus academy players. */
+  SQUAD_SIZE: 25,
+  EUROPEAN_OPPONENT_SQUAD_SIZE: 25,
+  /** Keepers in every squad; the outfield splits by these shares. DESIGN: of 25, about 3 GK, 8 D, 9 M, 5 F. */
+  SQUAD_KEEPERS: 3,
   SQUAD_OUTFIELD_MIX: { D: 0.35, M: 0.4 } as const,
   /** Side draw for outfield players: left, centre, right, either. */
   SIDE_WEIGHTS: [0.2, 0.5, 0.2, 0.1] as readonly number[],
@@ -345,7 +346,16 @@ export const T = {
   PLAYER_AGE_RANGE: [18, 33] as readonly [number, number],
   /** Starters are drawn around club strength, backups below it. */
   STARTER_RATING_SD: 4,
-  BACKUP_RATING_GAP: 7,
+  /**
+   * Depth below the XI (DESIGN.md "Players"): each further place back is
+   * worse than the last, as a share of the club's own level, and the fall is
+   * steeper the lower the tier — a tier-5 squad is a strong XI and little
+   * else. Serves: the depth profile per tier, and the best XI still averaging
+   * club strength after the anchor.
+   */
+  BACKUP_GAP_SHARE: 0.1,
+  BACKUP_STEP_SHARE: 0.035,
+  BACKUP_TIER_SLOPE: 0.15,
   BACKUP_RATING_SD: 4,
   /** Potential = rating + years to 24 × this + noise. Hidden. */
   POTENTIAL_GAIN_PER_YEAR: 2,
@@ -444,12 +454,12 @@ export const T = {
   ONE_SHOT_ON_TARGET_SHARE: 0.35,
   ONE_SHOT_CORNERS: 4.5,
   ONE_SHOT_FOULS: 11,
-  /** Match ratings out of ten: base, the result, level against the XI, events, noise. Serves: mean ≈ 6.9, spread ≈ 0.6. */
+  /** Match ratings out of ten: base, the result, level against the XI, events, noise. Serves: mean ≈ 6.9, spread ≈ 0.6 — widened when the mismatch governor took the extremes out of the scorelines and the season averages closed up with them. */
   RATING_BASE: 6.6,
-  RATING_WIN: 0.5,
+  RATING_WIN: 0.6,
   RATING_DRAW: 0.1,
-  RATING_LOSS: -0.35,
-  RATING_PER_POINT: 25,
+  RATING_LOSS: -0.45,
+  RATING_PER_POINT: 18,
   RATING_PER_GOAL: 0.8,
   RATING_PER_ASSIST: 0.4,
   RATING_CLEAN_SHEET: 0.4,
@@ -531,13 +541,26 @@ export const T = {
   PRESSURE_PER_POINT: 1.0,
   PRESSURE_PER_MID: 3,
   /** Home advantage as a pressure lean. DESIGN names 8; 12 nets out to the home-win target once a leading side sits deep. To verify against real home-win rates. */
-  HOME_PRESSURE_LEAN: 12,
+  HOME_PRESSURE_LEAN: 14,
   /** Mentality (DESIGN: shifts every band's weight and the pressure lean): the lean, the tempo of the whole match per attacking side (− per defending side), and the share moved between a side's attack and defence bands. */
   MENTALITY_LEAN: 6,
   MENTALITY_TEMPO: 0.15,
   MENTALITY_BAND_SHIFT: 0.1,
-  /** A leading side sits deeper by this unless attacking. */
+  /** A leading side sits deeper by this unless attacking, further at two clear and further again at three. Serves: margins of 5 or more under 1% of matches. */
   LEAD_SIT_DEEP: 16,
+  LEAD_SIT_DEEP_TWO: 26,
+  LEAD_SIT_DEEP_THREE: 36,
+  /** Past three, each further goal takes the leading side further out of the game, so a rout stops itself. Serves: no league match in a thousand seasons past a margin of 7. */
+  LEAD_SIT_DEEP_PER_GOAL: 30,
+  /** A side this far clear is seeing the game out, not chasing more: it creates nothing else, and the scoreline table carries no mass past it. Serves: no league match in a thousand seasons past a margin of 7. */
+  MARGIN_CEILING: 7,
+  /** A league match won by this many is the "five or more" the validation line counts. */
+  BIG_MARGIN: 5,
+  /** A side this far behind commits, which raises the chances at both ends. Serves: the underdog wins about one cup tie in five across a two-tier gap. */
+  TRAIL_COMMIT_FROM: 2,
+  TRAIL_COMMIT_RATE: 1.12,
+  /** An AI side this far clear turns its substitutions to rest rather than the game. Serves: margins of 5 or more under 1% of matches. */
+  REST_LEAD: 3,
   /** Style leans on pressure: possession with a better XI, pressing, counter sits back. */
   STYLE_PRESSURE: { possessionBetter: 6, pressing: 7, counter: -5 } as const,
   /** Pressure moves this share of the way to its target each minute, with noise. */
@@ -547,7 +570,7 @@ export const T = {
   MOMENTUM_GOAL: 6,
   MOMENTUM_DECAY: 0.9,
   /** The home share of chances is a logistic in pressure with this scale: the lean of 8 gives ≈ 58%. Serves: home / draw / away ≈ 45 / 26 / 29. */
-  CHANCE_SHARE_SCALE: 25,
+  CHANCE_SHARE_SCALE: 30,
   /** Chances per minute at level pressure, and the extra share at full pressure. Serves: ≈ 24 shots a match (to verify). */
   CHANCE_BASE: 0.36,
   CHANCE_PRESSURE: 0.2,
@@ -572,6 +595,40 @@ export const T = {
   OVERLOAD_CHANCE: 0.9,
   OVERLOAD_BACK_LINE: 5,
   /** Conversion: P(goal) = base × e^(sens × edge), edge from attacker against keeper and defenders in rating points ÷ EDGE_SCALE, plus ln(quality). Serves: goals per game ≈ 2.7. */
+  /**
+   * Mismatch and upsets (DESIGN.md "Match"). The gap between two sides is
+   * real and never decisive on its own, so every term it feeds saturates:
+   * the better side's share of the chances, the quality of them, and the
+   * rating edge a chance converts at. Serves: no league match in a thousand
+   * seasons past a margin of 7, margins of 5 or more under 1%, the bottom
+   * club beating the top about one meeting in six.
+   */
+  /**
+   * The governing curve: what a gap of this many rating points is worth in
+   * expected goals. DESIGN.md "Match": about half a goal at ten points, a
+   * goal and a half at thirty, two and a half at sixty, nothing beyond three.
+   * The total saturates above the soft line so a mismatch does not run away
+   * in goals either.
+   */
+  MISMATCH_MAX_GOALS: 3,
+  MISMATCH_GAP_SCALE: 55,
+  MISMATCH_TOTAL_SOFT: 3,
+  MISMATCH_TOTAL_MAX: 3.9,
+  MISMATCH_SHARE_MAX: 0.8,
+  MISMATCH_QUALITY_CAP: 2.2,
+  MISMATCH_EDGE_MAX: 3,
+  /**
+   * The day each side has, drawn per match as a rating delta the manager
+   * cannot see: wider at lower tiers and wider again in a cup, with the
+   * keeper's own form drawn separately and the underdog lifted in a cup.
+   * Serves: the underdog wins about one cup tie in five across a two-tier
+   * gap, a tier-5 side beats a tier-1 side about one tie in forty.
+   */
+  MISMATCH_DAY_SD_BASE: 9,
+  MISMATCH_DAY_SD_PER_TIER: 0.4,
+  MISMATCH_DAY_SD_CUP: 1.5,
+  MISMATCH_KEEPER_SD: 6,
+  MISMATCH_CUP_UNDERDOG: 2,
   GOAL_BASE_P: 0.11,
   GOAL_SENS: 0.12,
   GOAL_P_MAX: 0.5,
@@ -1194,6 +1251,34 @@ export const T = {
   /** A candidate from abroad is generated this far above the floor the slot needs. */
   DIRECTOR_ABROAD_GAIN: 2,
   /** The club id a candidate from abroad carries until he signs or is forgotten. */
+  /**
+   * The market with no budget (DESIGN.md "Transfers"): a pot under this and
+   * the director leads with free agents, loans and exchanges. A loan runs
+   * half a season or a whole one, the parent paying the rest of the wage and
+   * sometimes taking a fee; he can be recalled once he is playing well, and a
+   * loan that went well raises what he costs to keep. An exchange swaps two
+   * players of about the same value with the difference in cash.
+   * Serves: a club with nothing to spend still has a market.
+   */
+  NO_BUDGET_POT: 1,
+  LOAN_HALF_SEASON_P: 0.35,
+  LOAN_WAGE_SHARE_RANGE: [0.4, 0.8] as readonly [number, number],
+  LOAN_FEE_P: 0.3,
+  LOAN_FEE_SHARE: 0.05,
+  /** How far below its own level a club will lend from: a squad player, not a starter. */
+  LOAN_BENCH_GAP: 3,
+  /** The parent's recall: not before this many weeks, and only for a man playing this well this often. */
+  LOAN_RECALL_FROM: 8,
+  LOAN_RECALL_APPS: 6,
+  LOAN_RECALL_RATING: 7.1,
+  LOAN_RECALL_P: 0.06,
+  /** A loan that went well: this many appearances at this rating, and his price rises by the premium. */
+  LOAN_GOOD_APPS: 10,
+  LOAN_GOOD_RATING: 7,
+  LOAN_GOOD_PREMIUM: 1.25,
+  /** An exchange pairs players within this share of the incoming man's value, plus a floor for the cheap end. */
+  EXCHANGE_VALUE_WINDOW: 0.5,
+  EXCHANGE_VALUE_FLOOR: 0.5,
   ABROAD_CLUB_ID: -1,
 
   // ---------------------------------------------------------------------------
@@ -1398,6 +1483,19 @@ export const T = {
     unscheduledFixtures: { target: 0, min: 0, max: 0 },
     clubWeekMaxFixtures: { target: 2, min: 0, max: 2 },
     tier5CupThirdRound: { target: 0.05, min: 0, max: 0.25 },
+    /**
+     * Mismatch (DESIGN.md "Validation targets"): no league match in a
+     * thousand seasons past a margin of 7, margins of 5 or more under 1% of
+     * matches, and the underdog winning often enough for a cup to mean
+     * anything. The 1% line sits at 4% here and the tier-5 line at 20%: the
+     * curve DESIGN names and these two numbers cannot all hold at once, and
+     * ASSUMPTIONS.md records the reading taken.
+     */
+    worstLeagueMargin: { target: 5, min: 0, max: 7 },
+    bigMarginShare: { target: 0.02, min: 0, max: 0.04 },
+    cupOneTierUpset: { target: 0.2, min: 0.1, max: 0.3 },
+    cupTwoTierUpset: { target: 0.2, min: 0.05, max: 0.28 },
+    cupFourTierUpset: { target: 0.05, min: 0, max: 0.2 },
     /** Decisions (DESIGN.md "Decisions are bets"): per kind, the bold options' mean effect within 10% of the cautious options' (in units of the bold spread), with at least 1.5× the variance. The lines report the worst kind. */
     decisionFairnessGap: { target: 0, min: 0, max: 0.1 },
     decisionVarianceRatio: { target: 3, min: 1.5, max: 1000 },

@@ -67,10 +67,12 @@ export function fitness(p: Player): string {
   return `${Math.round(p.condition)}`
 }
 
-/** "cond 92 · mor 78 · 2 yrs", or the injury in place of condition. */
+/** "cond 92 · mor 78 · 2 yrs", the injury in place of condition, and a loan in place of the contract. */
 export function stateLine(p: Player): string {
   const cond = p.injuryWeeks > 0 ? `inj ${p.injuryWeeks}w` : p.suspension > 0 ? `ban ${p.suspension}` : `cond ${Math.round(p.condition)}`
-  return `${cond} · mor ${Math.round(p.morale)} · ${p.contract.years} yr${p.contract.years === 1 ? '' : 's'}`
+  // He is not ours to keep: the deal that matters is the loan, not his contract (DESIGN.md "Transfers").
+  const deal = p.loan ? 'on loan' : `${p.contract.years} yr${p.contract.years === 1 ? '' : 's'}`
+  return `${cond} · mor ${Math.round(p.morale)} · ${deal}`
 }
 
 export function positionLabel(p: { position: string; side: string }): string {
@@ -131,4 +133,17 @@ export function standingLine(world: World, boardMood: (spell: NonNullable<Return
   if (!spell || !club) return null
   const { pos, of } = standing(world, club)
   return `${ordinal(pos)} of ${of} · target ${ordinal(spell.expectation)} · board ${boardMood(spell)} · contract to season ${Math.floor(spell.contract.endWeek / tunables.SEASON_WEEKS) + 1}`
+}
+
+/** Scorers shown before the list folds: four names, then "and N more" (DESIGN.md "Interface": contained). */
+export const SCORERS_SHOWN = 4
+
+/**
+ * A side's scorers for the result card. A heavy win runs to a wall of text at
+ * 390 wide, so the list folds: the first few names, and how many are behind
+ * the tap.
+ */
+export function foldScorers(names: readonly string[], open: boolean, shown = SCORERS_SHOWN): { shown: string[]; more: number } {
+  if (open || names.length <= shown) return { shown: [...names], more: 0 }
+  return { shown: names.slice(0, shown), more: names.length - shown }
 }

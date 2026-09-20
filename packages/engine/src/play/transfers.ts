@@ -8,7 +8,7 @@ import type { Rng } from '../rng.js'
 import { emit } from '../events.js'
 import { T } from '../tunables.js'
 import { clubById, playerById } from '../lookup.js'
-import type { Decision, DecisionOption, PlayerId, World } from '../types.js'
+import type { Club, Decision, DecisionOption, Player, PlayerId, World } from '../types.js'
 import { renderText } from '../text/render.js'
 import { plainOption } from './bets.js'
 import { hasPending, humanState, pendingDecisions, queueDecision } from './decisions.js'
@@ -16,6 +16,7 @@ import { humanClub, placeBid, proposeSale, proposeSignings, refuseSale, sellPlay
 import { bidToFollow, type Follower } from '../market/follow.js'
 import { agreeTarget } from '../market/arrival.js'
 import { seasonWeek } from '../season/calendar.js'
+import { exchange, loanIn, noBudget, wageRoom } from '../market/loans.js'
 
 /** How a card is answered when no window is open (DESIGN.md "Transfers", On arrival): a free agent signs now; a target is agreed in principle for the window. */
 export interface CardFlags {
@@ -32,9 +33,13 @@ export function queueSigning(world: World, c: Candidate, pot: number, flags: Car
   const phi = Math.round(c.potentialEstimate + c.halfWidth)
   const after = Math.round((pot - c.fee) * 10) / 10
   const from = p.clubId > 0 ? clubById(world, p.clubId).name : p.abroad ? 'abroad' : 'a free agent'
-  const key = flags.signNow ? 'card_free_now' : flags.agreed ? 'card_agreed' : `card_${c.reason}`
-  const body = renderText('director', key, { name: p.name, age: p.age, position: p.position, lo, hi, plo, phi, fee: c.fee, wage: c.wage, after }, world.week)
-  const approveLabel = flags.signNow ? 'Sign him now (a free)' : flags.agreed ? `Agree in principle (£${c.fee}m at the window)` : c.fee > 0 ? `Approve the bid (£${c.fee}m)` : 'Approve (a free)'
+  const key = c.kind === 'loan' ? 'card_loan' : c.kind === 'exchange' ? 'card_exchange' : flags.signNow ? 'card_free_now' : flags.agreed ? 'card_agreed' : c.kind === 'free' ? 'card_free_now' : `card_${c.reason}`
+  const outName = c.exchangeOutId !== undefined ? (world.players[c.exchangeOutId - 1]?.name ?? 'one of ours') : ''
+  const term = c.loan ? (c.loan.half ? 'to January' : 'for the season') : ''
+  const share = c.loan ? Math.round(c.loan.wageShare * 100) : 0
+  const withCash = (c.cash ?? 0) > 0 ? ` and £${c.cash}m with him` : ''
+  const body = renderText('director', key, { name: p.name, age: p.age, position: p.position, lo, hi, plo, phi, fee: c.fee, wage: c.wage, after, out: outName, term, share, cash: c.cash ?? 0, withCash }, world.week)
+  const approveLabel = c.kind === 'loan' ? `Take him on loan (${term}, £${c.wage}k a week)` : c.kind === 'exchange' ? `Swap ${outName} for him${(c.cash ?? 0) > 0 ? ` plus £${c.cash}m` : ''}` : flags.signNow ? 'Sign him now (a free)' : flags.agreed ? `Agree in principle (£${c.fee}m at the window)` : c.fee > 0 ? `Approve the bid (£${c.fee}m)` : 'Approve (a free)'
   const approve: DecisionOption = plainOption('signing', 'approve', approveLabel, c.confidence, {}, world.week, `the director: ${c.confidence}`)
   const options: DecisionOption[] = [approve, plainOption('signing', 'decline', 'Decline', 'sure thing', {}, world.week), plainOption('signing', 'another', 'Ask for a different profile', 'sure thing', {}, world.week)]
   return queueDecision(world, {
@@ -67,6 +72,9 @@ export function queueSigning(world: World, c: Candidate, pot: number, flags: Car
       potentialEstimate: c.potentialEstimate,
       halfWidth: c.halfWidth,
       gain: c.gain,
+      kind: c.kind ?? 'buy',
+      ...(c.loan ? { loanHalf: c.loan.half, loanWageShare: c.loan.wageShare, loanFee: c.loan.fee } : {}),
+      ...(c.exchangeOutId !== undefined ? { exchangeOutId: c.exchangeOutId, cash: c.cash ?? 0 } : {}),
       pot,
       after,
       need: c.need.slot,
@@ -135,9 +143,14 @@ export function directorWeek(world: World, rng: Rng, window: WindowName): void {
   }
   const open = T.DIRECTOR_CARDS_PER_WEEK - pendingDecisions(world).filter((d) => d.kind === 'signing').length
   if (open <= 0) return
-  if (club.transferPot <= 0 && freeAgentless(world)) {
-    emit(world, 'director.note', { clubId: club.id, managerId: manager.id, note: 'no_money', season: world.season })
+  // No pot is not no market: frees, loans and swaps remain while there is wage room (DESIGN.md "Transfers").
+  if (wageRoom(club, wageBill(world, club)) <= 0) {
+    emit(world, 'director.note', { clubId: club.id, managerId: manager.id, note: 'no_room', season: world.season })
     return
+  }
+  if (noBudget(club) && !state.noBudgetTold) {
+    state.noBudgetTold = true
+    emit(world, 'director.note', { clubId: club.id, managerId: manager.id, note: 'no_budget_lead', season: world.season })
   }
   const cards = proposeSignings(world, rng, club, open, state.targetProfile ?? null, exclude, window)
   for (const c of cards) queueSigning(world, c, club.transferPot)
@@ -172,6 +185,11 @@ export function applySigning(world: World, decision: Decision, key: string): voi
       gain: decision.payload['gain'] as number,
       need: { slot: decision.payload['need'] as Candidate['need']['slot'], playerId: null, rating: 0 },
     }
+    const kind = (decision.payload['kind'] as string | undefined) ?? 'buy'
+    if (kind === 'loan' || kind === 'exchange') {
+      settleNoBudgetMove(world, club, manager.id, p, decision, kind)
+      return
+    }
     const open = windowAt(seasonWeek(world.week)) !== null
     // A free agent signs whenever; a target outside a window is agreed for the window; anything else needs the window open.
     if (decision.payload['agreed'] === true && !open) {
@@ -190,6 +208,29 @@ export function applySigning(world: World, decision: Decision, key: string): voi
     emit(world, 'director.another', { clubId: club.id, managerId: manager.id, playerId, season: world.season })
     // Nothing else changes: the profile the manager asked for (if any) stands; the declined name is not brought back.
   }
+}
+
+/**
+ * A loan or an exchange the manager approved: both are settled with the other
+ * club there and then, because neither costs a fee worth haggling over
+ * (DESIGN.md "Transfers": no budget is not no market).
+ */
+function settleNoBudgetMove(world: World, club: Club, managerId: number, p: Player, decision: Decision, kind: string): void {
+  const other = p.clubId > 0 ? clubById(world, p.clubId) : undefined
+  if (!other) return
+  if (kind === 'loan') {
+    const terms = { half: decision.payload['loanHalf'] === true, wageShare: decision.payload['loanWageShare'] as number, fee: decision.payload['loanFee'] as number }
+    loanIn(world, p, other, club, terms, managerId)
+    p.contract = { ...p.contract, wage: decision.payload['wage'] as number }
+    return
+  }
+  const outId = decision.payload['exchangeOutId'] as PlayerId | undefined
+  const out = outId === undefined ? undefined : playerById(world, outId)
+  if (!out || out.clubId !== club.id) {
+    emit(world, 'bid.failed', { clubId: club.id, managerId, playerId: p.id, name: p.name, reason: 'club', season: world.season })
+    return
+  }
+  exchange(world, out, p, club, other, (decision.payload['cash'] as number) ?? 0, managerId)
 }
 
 /** The human's answer on a sale. */

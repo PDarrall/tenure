@@ -134,6 +134,13 @@ describe('500 AI careers (DESIGN.md validation targets, to verify)', () => {
     }
   })
 
+  it('mismatch: no league match past a margin of seven, few by five or more, and cups the underdog can win', () => {
+    for (const key of ['worstLeagueMargin', 'bigMarginShare', 'cupOneTierUpset', 'cupTwoTierUpset', 'cupFourTierUpset'] as const) {
+      const l = line(key)
+      expect(l.pass, describeLine(l)).toBe(true)
+    }
+  })
+
   it('follow-you moves average about one per two job changes and never exceed two per move', () => {
     const per = line('followMovesPerJobChange')
     const most = line('followMaxPerMove')

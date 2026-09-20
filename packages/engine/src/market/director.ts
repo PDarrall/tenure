@@ -25,6 +25,7 @@ import { bumpReputation } from '../tenure/exits.js'
 import { averageRating } from '../match/aftermath.js'
 import { levelOf, normalBudget, moveOn, refreshStrength, topUpSquad, trimSquad, windowTurnover, type WindowSummary } from '../season/squad.js'
 import { ensureFacilities, levelFromWealth, scoutingJudgementBonus, stadiumIncome } from '../club/facilities.js'
+import { buyPremium, exchangeOut, lendable, loanTermsFor, loanWage, noBudget, wageRoom, type LoanTerms } from './loans.js'
 
 // ---------------------------------------------------------------------------
 // Windows
@@ -166,6 +167,14 @@ export function needs(world: World, club: Club): Need[] {
 
 export interface Candidate {
   player: Player
+  /** How he would come (DESIGN.md "Transfers"): bought, a free, on loan, or in exchange for one of ours. */
+  kind?: 'buy' | 'free' | 'loan' | 'exchange'
+  /** A loan's terms, when that is how he comes. */
+  loan?: LoanTerms
+  /** The player going the other way in an exchange, and the cash on top. */
+  exchangeOutId?: PlayerId
+  cash?: number
+  player2?: never
   fee: number
   /** £k a week. */
   wage: number
@@ -181,8 +190,9 @@ export interface Candidate {
 
 function feeFor(p: Player): number {
   if (p.clubId === 0) return 0
-  if (p.abroad) return p.value
-  return round1(p.value * (p.contract.years <= 1 ? T.EXPIRING_FEE_SHARE : T.DIRECTOR_FEE_PREMIUM))
+  // A loan that went well raises his price: the parent saw the same season everyone else did.
+  if (p.abroad) return round1(p.value * buyPremium(p))
+  return round1(p.value * (p.contract.years <= 1 ? T.EXPIRING_FEE_SHARE : T.DIRECTOR_FEE_PREMIUM) * buyPremium(p))
 }
 
 function matchesProfile(p: Player, profile: TargetProfile | null | undefined, estimate: number): boolean {
@@ -229,7 +239,8 @@ export type MarketIndex = Record<Position, Player[]>
 export function marketIndex(world: World): MarketIndex {
   const index: MarketIndex = { GK: [], D: [], M: [], F: [] }
   for (const p of world.players) {
-    if (!p || p.retired || p.clubId < 0 || p.abroad || p.loan) continue
+    // A generated European side's players are made for the tie and go with it: they are nobody's to buy.
+    if (!p || p.retired || p.clubId < 0 || p.clubId >= T.EUROPEAN_OPPONENT_ID_BASE || p.abroad || p.loan) continue
     index[p.position].push(p)
   }
   for (const position of ['GK', 'D', 'M', 'F'] as const) index[position].sort((a, b) => b.rating - a.rating || a.id - b.id)
@@ -290,7 +301,44 @@ export function proposeSignings(world: World, rng: Rng, club: Club, count: numbe
       const score = (c: Candidate) => c.estimate - (c.fee / Math.max(1, club.transferPot)) * T.DIRECTOR_FEE_WEIGHT
       if (!best || score(candidate) > score(best)) best = candidate
     }
-    if (fromAbroad && pool === 'any') {
+    // With nothing in the pot the director leads with the three routes that cost no fee (DESIGN.md "Transfers").
+    if (noBudget(club) && pool === 'any') {
+      const room = wageRoom(club, bill)
+      const squad = squadOf(world, club)
+      for (const p of index[need.slot.position]) {
+        if (p.rating > ceiling) continue
+        if (p.rating < floor) break
+        if (used.has(p.id) || p.retired || p.clubId === club.id) continue
+        const wage = Math.round(wageDemand(p) * (1 + T.SIGNING_WAGE_PREMIUM))
+        const { estimate, potentialEstimate } = estimateOf(rng, director, p)
+        if (!matchesProfile(p, profile, estimate)) continue
+        const gain = round1(estimate - need.rating)
+        const base = { player: p, estimate, potentialEstimate, halfWidth: half, confidence: confidenceFor(gain, half), gain, need }
+        if (p.clubId === 0) {
+          // A free agent: wages alone, in or out of a window.
+          if (wage > room) continue
+          const c: Candidate = { ...base, kind: 'free', fee: 0, wage, reason: 'bargain' }
+          if (!best || c.estimate > (best as Candidate).estimate) best = c
+          continue
+        }
+        if (lendable(world, p)) {
+          const terms = loanTermsFor(rng, p, world)
+          if (terms.fee > club.transferPot) continue
+          if (loanWage(wage, terms) > room) continue
+          const c: Candidate = { ...base, kind: 'loan', loan: terms, fee: terms.fee, wage: loanWage(wage, terms), reason: 'need' }
+          if (!best || c.estimate > (best as Candidate).estimate) best = c
+          continue
+        }
+        const out = exchangeOut(world, club, p, squad)
+        if (out) {
+          const cash = round1(Math.max(0, p.value - out.value))
+          if (cash > club.transferPot) continue
+          if (wage - Math.round(wageDemand(out)) > room) continue
+          const c: Candidate = { ...base, kind: 'exchange', exchangeOutId: out.id, cash, fee: cash, wage, reason: 'need' }
+          if (!best || c.estimate > (best as Candidate).estimate) best = c
+        }
+      }
+    } else if (fromAbroad && pool === 'any') {
       const target = clamp(Math.max(floor + T.DIRECTOR_ABROAD_GAIN, aim), floor, ceiling)
       consider(abroadCandidate(world, rng, club, need, target), 'need')
     } else {
@@ -633,9 +681,6 @@ export function settleSoldShines(world: World): void {
  * summary goes in the log.
  */
 export function closeWindow(world: World, rng: Rng, window: WindowName): void {
-  for (const p of world.players) {
-    if (p && !p.retired && p.abroad && p.clubId === T.ABROAD_CLUB_ID) forgetPlayer(world, p)
-  }
   for (const club of world.clubs) {
     trimSquad(world, rng, club)
     topUpSquad(world, rng, club)
@@ -658,7 +703,23 @@ export function closeWindow(world: World, rng: Rng, window: WindowName): void {
       emit(world, 'window.deadline', { clubId: club.id, managerId: club.managerId, window, signings, sales, spend: round1(spend), pot: club.transferPot, season: world.season })
     }
   }
+  // Last, so nobody generated while the squads settled is left waiting.
+  forgetAbroadCandidates(world)
   emit(world, 'window.closed', { window, season: world.season })
+}
+
+/**
+ * Outside a window there are no candidates from abroad waiting: the ones
+ * nobody signed are forgotten, and one who did sign is a home player now,
+ * not a candidate. Run at the close and again on any week with no window, so
+ * the invariant does not depend on what happened inside the week.
+ */
+export function forgetAbroadCandidates(world: World): void {
+  for (const p of world.players) {
+    if (!p || p.retired || !p.abroad) continue
+    if (p.clubId === T.ABROAD_CLUB_ID) forgetPlayer(world, p)
+    else p.abroad = false
+  }
 }
 
 // ---------------------------------------------------------------------------

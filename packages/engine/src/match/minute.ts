@@ -14,7 +14,7 @@ import { slotsOf, structureOf } from '../players/formations.js'
 import { assisterWeight, effectiveRating, scorerWeight, type Rateable, type XiBands } from '../players/select.js'
 import { renderText } from '../text/render.js'
 import { cardChance, emptyStats, injuryChance, injuryWeeks, matchRating, type PlayerFacts, type Scorer, type SideFacts, type SideStats } from './aftermath.js'
-import { chanceGate, chanceProfile, chanceRate, chanceShare, goalChance, pressureLean, sideRating, type SideView } from './model.js'
+import { chanceGate, chanceProfile, chanceRate, chanceShare, drawMatchDays, goalChance, keeperEffOf, mismatchScale, pressureLean, sideRating, type SideView } from './model.js'
 import type { Formation, FormationSlot, Mentality, PlayerId, Result, Style, Trait, World } from '../types.js'
 import type { Participant } from '../season/match.js'
 
@@ -60,6 +60,11 @@ export interface MatchSide {
   goals: number
   scorers: Scorer[]
   stats: SideStats
+  /** The club's tier, for the width of the day's draw. */
+  tier: number | null
+  /** The day this side has and its keeper's form, drawn once at kick-off (DESIGN.md "Match": mismatch and upsets). */
+  day: number
+  keeperDay: number
 }
 
 export type EventKind = 'kickoff' | 'goal' | 'save' | 'miss' | 'block' | 'foul' | 'yellow' | 'red' | 'injury' | 'sub' | 'halftime' | 'secondhalf' | 'fulltime' | 'shootout' | 'mentality' | 'pressure'
@@ -146,6 +151,8 @@ export interface SideSetup {
 export interface MatchOptions {
   neutral?: boolean
   aggregate?: { home: number; away: number } | null
+  /** A cup tie: the day's draw is wider and the underdog is lifted (DESIGN.md "Match": mismatch and upsets). */
+  cup?: boolean
 }
 
 export function createMatch(world: World, rng: Rng, home: SideSetup, away: SideSetup, knockout: boolean, bigGame = false, options: MatchOptions = {}): MatchState {
@@ -176,6 +183,9 @@ export function createMatch(world: World, rng: Rng, home: SideSetup, away: SideS
       goals: 0,
       scorers: [],
       stats: emptyStats(),
+      tier: s.participant.tier ?? null,
+      day: 0,
+      keeperDay: 0,
     }
   }
   const seed = rng.int(1, 2147483647)
@@ -200,6 +210,12 @@ export function createMatch(world: World, rng: Rng, home: SideSetup, away: SideS
   if (options.aggregate) state.aggregate = { ...options.aggregate }
   const r = rngFromState(state.rng)
   state.stoppage = r.int(T.STOPPAGE_FIRST[0], T.STOPPAGE_FIRST[1])
+  // The day both sides have, drawn once: variance the manager cannot see.
+  const days = drawMatchDays(r, sideView(state, state.home), sideView(state, state.away), options.cup === true || knockout)
+  state.home.day = days.home.day
+  state.home.keeperDay = days.home.keeperDay
+  state.away.day = days.away.day
+  state.away.keeperDay = days.away.keeperDay
   push(state, 0, 'kickoff', null, undefined, false, {})
   return state
 }
@@ -285,7 +301,7 @@ export function liveBands(state: MatchState, side: MatchSide): XiBands {
 export function sideView(state: MatchState, side: MatchSide): SideView {
   const on = onPitch(side)
   const morale = on.length ? on.reduce((s, p) => s + p.morale, 0) / on.length : T.MORALE_INITIAL
-  return { strength: 0, tactical: side.tactical, form: side.form, morale, mentality: side.mentality, style: side.style, bands: liveBands(state, side) }
+  return { strength: 0, tactical: side.tactical, form: side.form, morale, mentality: side.mentality, style: side.style, bands: liveBands(state, side), tier: side.tier, day: side.day, keeperDay: side.keeperDay }
 }
 
 function withStrength(v: SideView): SideView {
@@ -310,7 +326,7 @@ function draw<P>(rng: Rng, items: P[], weight: (p: P) => number): P | null {
 }
 
 /** A chance for `us`: who takes it, and what comes of it. */
-function chance(state: MatchState, rng: Rng, usKey: 'home' | 'away', themView: SideView, quality: number): void {
+function chance(state: MatchState, rng: Rng, usKey: 'home' | 'away', themView: SideView, quality: number, scale: number): void {
   const us = state[usKey]
   const them = state[usKey === 'home' ? 'away' : 'home']
   const ctx = { bigGame: state.bigGame }
@@ -320,7 +336,8 @@ function chance(state: MatchState, rng: Rng, usKey: 'home' | 'away', themView: S
   const keeper = keeperOf(them)
   const defenders = onPitch(them).filter((p) => p.slot?.position === 'D')
   const attEff = effectiveRating(attacker, slotOf(attacker), ctx)
-  const pGoal = goalChance(attEff, themView.bands.keeperEff, themView.bands.defenderEff, quality)
+  // The governor: the same saturating curve the fast path reads, applied to the minute (DESIGN.md "Match": mismatch and upsets).
+  const pGoal = Math.min(T.GOAL_P_MAX, goalChance(attEff, keeperEffOf(themView), themView.bands.defenderEff, quality) * scale)
   us.stats.shots++
   attacker.shots++
   const vars: Record<string, string | number> = { player: attacker.name, club: us.name, keeper: keeper ? keeper.name : 'the keeper' }
@@ -505,8 +522,11 @@ function aiDecisions(state: MatchState, rng: Rng, key: 'home' | 'away', views: {
     push(state, state.minute, 'mentality', key, undefined, false, { club: side.name, mentality: 'defend' })
     return
   }
-  if (canSub && state.minute >= T.SUB_TIRED_FROM) {
-    const tired = onPitch(side).filter((p) => p.condition < T.SUB_TIRED_BELOW && p.slot?.position !== 'GK').sort((a, b) => a.condition - b.condition)[0]
+  // Three clear and the changes turn to rest: the freshest legs come off, not the tiredest on (DESIGN.md "Match": mismatch and upsets).
+  const clear = side.goals - other.goals >= T.REST_LEAD
+  if (canSub && (clear || state.minute >= T.SUB_TIRED_FROM)) {
+    const outfield = onPitch(side).filter((p) => p.slot?.position !== 'GK')
+    const tired = clear ? outfield.sort((a, b) => b.minutes - a.minutes)[0] : outfield.filter((p) => p.condition < T.SUB_TIRED_BELOW).sort((a, b) => a.condition - b.condition)[0]
     if (tired) aiReplace(state, key, tired)
   }
 }
@@ -544,14 +564,20 @@ export function tick(state: MatchState): MatchEvent[] {
     }
   }
   // A chance?
-  if (rng.chance(chanceRate(state.pressure, state.home.mentality, state.away.mentality))) {
+  const chase = Math.abs(state.home.goals - state.away.goals)
+  if (rng.chance(chanceRate(state.pressure, state.home.mentality, state.away.mentality, chase))) {
     const homeChance = rng.float() < share
     const usKey: 'home' | 'away' = homeChance ? 'home' : 'away'
     const us = homeChance ? home : away
     const them = homeChance ? away : home
     const underPressure = homeChance ? state.pressure < 0 : state.pressure > 0
-    const profile = chanceProfile(us, them, underPressure)
-    if (rng.chance(chanceGate(profile.frequency))) chance(state, rng, usKey, them, profile.quality)
+    // A side this far clear is seeing the game out: it creates nothing else (DESIGN.md "Match": a leading side eases off).
+    const clearBy = state[usKey].goals - state[usKey === 'home' ? 'away' : 'home'].goals
+    if (clearBy < T.MARGIN_CEILING) {
+      const profile = chanceProfile(us, them, underPressure)
+      const scale = mismatchScale(home, away, state.pressure, chase)
+      if (rng.chance(chanceGate(profile.frequency))) chance(state, rng, usKey, them, profile.quality, homeChance ? scale.home : scale.away)
+    }
   }
   fouls(state, rng)
   injuries(state, rng)

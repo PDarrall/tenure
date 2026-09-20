@@ -160,7 +160,9 @@ describe('a human career', () => {
   })
 
   it('resigns, chooses an activity, and retires', () => {
-    const world = createCareer(5, { name: 'Test Player', background: 'coach' })
+    // Seed 3: the manager is young enough at his first job that resigning
+    // leaves him unemployed rather than ending the career on the same week.
+    const world = createCareer(3, { name: 'Test Player', background: 'coach' })
     const player = me(world)
     getFirstJob(world, () => 'top-half:1')
     advanceWeek(world, { resign: true })

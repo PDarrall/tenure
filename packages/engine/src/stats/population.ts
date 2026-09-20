@@ -178,6 +178,7 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
   const match = matchAverages(world)
   const europe = europeanTitles(world)
   const calendar = calendarStats(world)
+  const margins = marginStats(world)
   const decisions = decisionFairness(world)
   const follow = followStats(world)
   const signings = signingStats(world)
@@ -208,6 +209,11 @@ export function populationStats(world: World, tracked: ManagerId[], longTenureSa
     line('unscheduledFixtures', 'Matches played outside the season weeks', calendar.unscheduled, 'count'),
     line('clubWeekMaxFixtures', 'Most matches by one club in one week', calendar.maxPerWeek, 'count'),
     line('tier5CupThirdRound', "A tier-5 club's chance of reaching the Cup's third round in a season", calendar.tier5ThirdRound, 'share'),
+    line('worstLeagueMargin', 'Worst league margin', margins.worstLeague, 'count'),
+    line('bigMarginShare', 'League matches won by five or more', margins.bigShare, 'share'),
+    line('cupOneTierUpset', 'Cup ties won by a side one tier below', margins.upsets[1] ?? 0, 'share'),
+    line('cupTwoTierUpset', 'Cup ties won by a side two tiers below', margins.upsets[2] ?? 0, 'share'),
+    line('cupFourTierUpset', 'Cup ties won by a side four tiers below', margins.upsets[4] ?? 0, 'share'),
     line('decisionFairnessGap', `Decisions: worst gap between bold and cautious means net of sampling noise, in bold spreads (${decisions.worstGapKind})`, decisions.worstGap, 'number'),
     line('decisionVarianceRatio', `Decisions: lowest bold-to-cautious variance ratio (${decisions.worstRatioKind})`, decisions.worstRatio, 'number'),
     line('signingsBeatShare', "Signings that beat the director's estimate", signings.beat, 'share'),
@@ -355,6 +361,52 @@ export function matchAverages(world: World): { goals: number; home: number; draw
 
 /** The European trophy (DESIGN.md "World"): how often a home club lifts it, and from where in the table. */
 /** Calendar and cups (DESIGN.md "Validation targets"): matches outside the season weeks, the most by one club in a week, tier-5 clubs in the Cup's third round per season. */
+/**
+ * Mismatch (DESIGN.md "Validation targets"): the worst league margin, how
+ * often a league match is won by five or more, and how often a cup tie goes
+ * to the side from a lower tier — read by the size of the gap, from the draw
+ * that named the two tiers.
+ */
+export function marginStats(world: World): { worstLeague: number; bigShare: number; upsets: Record<number, number> } {
+  const tiers = new Map<string, { h: number; a: number }>()
+  let league = 0
+  let big = 0
+  let worstLeague = 0
+  const played: Record<number, number> = {}
+  const won: Record<number, number> = {}
+  for (const e of world.log) {
+    if (e.type === 'cup.tie') {
+      const c = String(e.payload['competition'])
+      tiers.set(`${c}:${String(e.payload['homeId'])}:${String(e.payload['awayId'])}`, { h: e.payload['homeTier'] as number, a: e.payload['awayTier'] as number })
+      tiers.set(`${c}:${String(e.payload['awayId'])}:${String(e.payload['homeId'])}`, { h: e.payload['awayTier'] as number, a: e.payload['homeTier'] as number })
+      continue
+    }
+    if (e.type !== 'match.played') continue
+    const hg = e.payload['homeGoals'] as number
+    const ag = e.payload['awayGoals'] as number
+    const margin = Math.abs(hg - ag)
+    if (e.payload['competition'] === 'league') {
+      league++
+      if (margin >= T.BIG_MARGIN) big++
+      if (margin > worstLeague) worstLeague = margin
+      continue
+    }
+    const t = tiers.get(`${String(e.payload['competition'])}:${String(e.payload['homeId'])}:${String(e.payload['awayId'])}`)
+    if (!t) continue
+    const gap = Math.abs(t.h - t.a)
+    if (gap === 0) continue
+    played[gap] = (played[gap] ?? 0) + 1
+    const lowerIsHome = t.h > t.a
+    if ((lowerIsHome ? hg : ag) > (lowerIsHome ? ag : hg)) won[gap] = (won[gap] ?? 0) + 1
+  }
+  const upsets: Record<number, number> = {}
+  for (const key of Object.keys(played)) {
+    const g = Number(key)
+    upsets[g] = (won[g] ?? 0) / (played[g] as number)
+  }
+  return { worstLeague, bigShare: league ? big / league : 0, upsets }
+}
+
 export function calendarStats(world: World): { unscheduled: number; maxPerWeek: number; tier5ThirdRound: number } {
   let unscheduled = 0
   const perClubWeek = new Map<string, number>()

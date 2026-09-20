@@ -15,7 +15,7 @@ import { human, pendingDecisions } from '../src/play/decisions.js'
 import { startSpell } from '../src/tenure/spell.js'
 import { squadOf } from '../src/players/select.js'
 import { seasonWeek } from '../src/season/calendar.js'
-import { clubAcceptP, deadlineOf, estimateSd, isCardClose, isDeadlineWeek, needs, playerAcceptP, proposeSale, proposeSignings, rangeHalf, resolveBids, revealSignings, scoutedView, wageBill, windowAt, windowState, placeBid } from '../src/market/director.js'
+import { clubAcceptP, deadlineOf, estimateSd, isCardClose, isDeadlineWeek, marketIndex, needs, playerAcceptP, proposeSale, proposeSignings, rangeHalf, resolveBids, revealSignings, scoutedView, wageBill, windowAt, windowState, placeBid } from '../src/market/director.js'
 import { directorWeek } from '../src/play/transfers.js'
 import type { World } from '../src/types.js'
 
@@ -222,6 +222,31 @@ describe('the director', () => {
 })
 
 describe('the calendar in a career', () => {
+  it('never offers a player from a generated European side', () => {
+    // They are made for the tie and go with it; before, one could reach a card
+    // and the render would ask for a home club that does not exist.
+    const world = createWorld(5)
+    advanceWeek(world, {})
+    const index = marketIndex(world)
+    for (const position of ['GK', 'D', 'M', 'F'] as const) {
+      for (const p of index[position]) expect(p.clubId, p.name).toBeLessThan(T.EUROPEAN_OPPONENT_ID_BASE)
+    }
+  })
+
+  it('leaves nobody from abroad waiting once a window has shut', () => {
+    // The AI market trades after the window closes inside the same week, so a
+    // candidate generated then used to survive the close and sit in the world
+    // between windows.
+    const world = createWorld(5)
+    for (let i = 0; i < T.SEASON_WEEKS * 2; i++) {
+      advanceWeek(world, {})
+      const sw = seasonWeek(world.week)
+      if (windowAt(sw)) continue
+      const waiting = world.players.filter((p) => p && !p.retired && p.abroad)
+      expect(waiting.map((p) => p!.name), `season week ${sw}`).toEqual([])
+    }
+  })
+
   it('opens January with cards, shuts on deadline day with its own inbox line, and nothing else moves between windows', () => {
     // Seated the week after the summer deadline: the calendar's first weeks are still the summer window.
     const { world } = seated(11, T.SUMMER_WINDOW_CLOSES + 1)

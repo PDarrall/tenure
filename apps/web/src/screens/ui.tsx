@@ -34,9 +34,9 @@ export function Seg<T extends string>({ options, value, onChange, small = false,
   )
 }
 
-export function Card({ label, children, testId, ariaLabel }: { label?: ReactNode; children: ReactNode; testId?: string; ariaLabel?: string }) {
+export function Card({ label, children, testId, ariaLabel, ...rest }: { label?: ReactNode; children: ReactNode; testId?: string; ariaLabel?: string } & Record<`data-${string}`, string | undefined>) {
   return (
-    <section className="card" data-testid={testId} aria-label={ariaLabel}>
+    <section className="card" data-testid={testId} aria-label={ariaLabel} {...rest}>
       {label && <div className="label">{label}</div>}
       {children}
     </section>

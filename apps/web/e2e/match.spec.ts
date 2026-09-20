@@ -1,5 +1,5 @@
 import { devices, expect, test, type Page } from '@playwright/test'
-import { continueTurn, playMatchQuickly, startCareer, state } from './helpers.js'
+import { continueTurn, inMatch, playMatchQuickly, startCareer, state } from './helpers.js'
 
 /**
  * The match screen's Continue (DESIGN.md "Interface", Result first; "Match",
@@ -16,8 +16,13 @@ test.use({ ...devices['iPhone 13'], defaultBrowserType: 'chromium' })
 
 /** Seed 3 (on the 52-week calendar): the first match has two goals, ours at 10' and 30', and no injury, so its pauses are the goals, half time and the whistle. */
 const SEED_GOAL = 3
-/** Seed 43: ours lose a player to an injury needing a change at 15', with the bench full, and nobody scores. */
+/**
+ * An injury needing a change is rare in any one match and the seed that
+ * produced it moves whenever the match model does, so these tests play on
+ * until one turns up rather than pinning a seed to it.
+ */
 const SEED_INJURY = 43
+const INJURY_HUNT_TURNS = 60
 
 interface Side {
   isHuman: boolean
@@ -52,6 +57,31 @@ async function toMatchScreen(page: Page, seed: number): Promise<void> {
   await continueTurn(page)
   await expect(page.getByTestId('score')).toBeVisible()
   await expect(page.getByTestId('minute')).toHaveText("0'")
+}
+
+/**
+ * Play on in To key events until a match stops for an injury the human must
+ * answer, leaving the page on that stop. Returns false if none turned up.
+ */
+async function huntForcedChange(page: Page): Promise<boolean> {
+  for (let turn = 0; turn < INJURY_HUNT_TURNS; turn++) {
+    if ((await state(page)) === 'match') {
+      for (let i = 0; i < 25; i++) {
+        if ((await page.getByTestId('choice-default').count()) > 0) return true
+        const next = await page.getByTestId('continue').getAttribute('data-next')
+        if (next === 'result') break
+        await page.getByTestId('continue').click()
+      }
+      if ((await page.getByTestId('choice-default').count()) > 0) return true
+      if ((await page.getByTestId('continue').count()) > 0 && (await page.getByTestId('continue').getAttribute('data-next')) === 'result') await page.getByTestId('continue').click()
+      if ((await page.getByTestId('continue-after-match').count()) > 0) await page.getByTestId('continue-after-match').click()
+      continue
+    }
+    const st = await state(page)
+    if (st === 'over' || st === 'unemployed') return false
+    await continueTurn(page)
+  }
+  return false
 }
 
 test('to full time: one press from kick-off to the result card, inside three seconds', async ({ page }) => {
@@ -108,15 +138,11 @@ test('to key events: pauses at the goal, half time and the whistle; a mentality 
 })
 
 test('to key events: an injury needing a change replaces Continue until a substitute is chosen; switching to full time takes effect on the next press', async ({ page }) => {
+  test.setTimeout(8 * 60 * 1000)
   await toMatchScreen(page, SEED_INJURY)
   await page.getByTestId('play-keyEvents').click()
-  let forced = false
-  for (let i = 0; i < 20 && !forced; i++) {
-    if ((await page.getByTestId('continue').getAttribute('data-next')) === 'result') break
-    await page.getByTestId('continue').click()
-    forced = (await page.getByTestId('choice-default').count()) > 0
-  }
-  expect(forced).toBe(true)
+  const forced = await huntForcedChange(page)
+  expect(forced, 'no injury needing a change turned up in the matches played').toBe(true)
   await expect(page.getByTestId('match-state')).toHaveText(/injury/i)
   expect(await page.getByTestId('continue').count()).toBe(0)
   await expect(page.locator('.foot .foot-title')).toHaveText(/is injured/)
@@ -138,13 +164,41 @@ test('to key events: an injury needing a change replaces Continue until a substi
 })
 
 test('to full time: the assistant makes the change an injury needs', async ({ page }) => {
+  test.setTimeout(8 * 60 * 1000)
   await toMatchScreen(page, SEED_INJURY)
-  await page.getByTestId('continue').click()
-  await expect(page.getByTestId('continue-after-match')).toBeVisible({ timeout: 10_000 })
-  const { key, side, m } = await ours(page)
-  const injury = m.events.find((e) => e.kind === 'injury' && e.side === key)
-  expect(injury).toBeDefined()
-  const change = m.events.find((e) => e.kind === 'sub' && e.side === key && e.minute === injury!.minute)
+  // Play matches to full time until one costs us a player to injury.
+  let found: { key: string; side: Side; m: Match } | null = null
+  for (let i = 0; i < INJURY_HUNT_TURNS && !found; i++) {
+    const st = await state(page)
+    if (st === 'over' || st === 'unemployed') break
+    if (st === 'match') {
+      await page.getByTestId('continue').click()
+      await expect(page.getByTestId('continue-after-match')).toBeVisible({ timeout: 20_000 })
+      const seen = await ours(page)
+      if (seen.m.events.some((e) => e.kind === 'injury' && e.side === seen.key)) {
+        found = seen
+        break
+      }
+      await page.getByTestId('continue-after-match').click()
+      continue
+    }
+    await continueTurn(page)
+    if (await inMatch(page)) {
+      await page.getByTestId('continue').click()
+      await expect(page.getByTestId('continue-after-match')).toBeVisible({ timeout: 20_000 })
+      const seen = await ours(page)
+      if (seen.m.events.some((e) => e.kind === 'injury' && e.side === seen.key)) {
+        found = seen
+        break
+      }
+      await page.getByTestId('continue-after-match').click()
+    }
+  }
+  expect(found, 'nobody was injured in the matches played').not.toBeNull()
+  const { key, side, m } = found!
+  const injury = m.events.find((e) => e.kind === 'injury' && e.side === key)!
+  // The assistant made the change at the minute it happened, with nobody left off the pitch.
+  const change = m.events.find((e) => e.kind === 'sub' && e.side === key && e.minute === injury.minute)
   expect(change).toBeDefined()
   expect(side.subsUsed).toBeGreaterThanOrEqual(1)
   expect(side.players.filter((p) => p.on).length).toBe(11 - side.stats.reds)

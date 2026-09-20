@@ -1,8 +1,9 @@
 import { useEffect, useReducer, useState } from 'react'
 import { bestReplacement, competitionLabel, tableFor, type MatchEvent, type MatchPlay, type MatchPlayer, type MatchSide, type MatchState, type Mentality, type PlayerId, type Tier, type World } from '@tenure/engine'
 import { forcedChange, humanMatch, humanSide, matchPlay, mentalityWatched, playToFullTime, playToNextPause, substituteWatched, watched, withMatchPlay, type Session } from '../controller.js'
-import { humanClub, ordinalOf, positionLabel, weekLabel } from './common.js'
+import { foldScorers, humanClub, ordinalOf, positionLabel, weekLabel } from './common.js'
 import { Choices, Continue, Foot, FootSpace, SectionLabel, Seg, Star } from './ui.js'
+
 import { Table } from './Fixtures.js'
 
 /** The ticker: the finished match replayed as minutes and goals, inside three seconds (DESIGN.md "Interface", Result first). */
@@ -94,8 +95,33 @@ function liveTable(world: World, matches: MatchState[], tier: Tier) {
   return rows.sort((x, y) => y.points - x.points || y.goalsFor - y.goalsAgainst - (x.goalsFor - x.goalsAgainst) || y.goalsFor - x.goalsFor)
 }
 
-function scorers(side: MatchSide): string {
-  return side.scorers.map((s) => `${s.name} ${s.minute}'`).join(', ')
+function scorerNames(side: MatchSide): string[] {
+  return side.scorers.map((s) => `${s.name} ${s.minute}'`)
+}
+
+/**
+ * The scorers under a side's name. A heavy win runs to a wall of text at 390
+ * wide, so four names show and the rest wait behind a tap (DESIGN.md
+ * "Interface": contained).
+ */
+function Scorers({ side, testId }: { side: MatchSide; testId: string }) {
+  const [open, setOpen] = useState(false)
+  const names = scorerNames(side)
+  if (names.length === 0) return <div className="sc">{' '}</div>
+  const { shown, more } = foldScorers(names, open)
+  return (
+    <div className="sc" data-testid={testId} data-scorers={names.length}>
+      {shown.join(', ')}
+      {more > 0 && (
+        <>
+          {' '}
+          <button type="button" className="text-btn more" onClick={() => setOpen(true)} data-testid={`${testId}-more`}>
+            and {more} more
+          </button>
+        </>
+      )}
+    </div>
+  )
 }
 
 function playerNote(p: MatchPlayer): string | null {
@@ -142,7 +168,7 @@ function ScoreHead({ home, away, homeGoals, awayGoals, live }: { home: MatchSide
     <div className="score-head">
       <div className="side home">
         <div className="nm">{home.name}</div>
-        <div className="sc">{scorers(home) || ' '}</div>
+        <Scorers side={home} testId="scorers-home" />
       </div>
       <div className={`scoreline${live ? ' live' : ''}`} data-testid="score" aria-label={`${home.name} ${homeGoals}, ${away.name} ${awayGoals}`}>
         {homeGoals}
@@ -151,7 +177,7 @@ function ScoreHead({ home, away, homeGoals, awayGoals, live }: { home: MatchSide
       </div>
       <div className="side away">
         <div className="nm">{away.name}</div>
-        <div className="sc">{scorers(away) || ' '}</div>
+        <Scorers side={away} testId="scorers-away" />
       </div>
     </div>
   )

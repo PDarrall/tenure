@@ -131,7 +131,7 @@ export function generateSquad(world: World, rng: Rng, club: { id: number; player
     const sides = sidesFor(rng, position, count, formation)
     for (let i = 0; i < count; i++) {
       const starter = i < starters
-      const rating = starter ? strength + rng.normal(0, T.STARTER_RATING_SD) : strength - T.BACKUP_RATING_GAP + rng.normal(0, T.BACKUP_RATING_SD)
+      const rating = starter ? strength + rng.normal(0, T.STARTER_RATING_SD) : strength - depthGap(strength, i - starters + 1, tier) + rng.normal(0, T.BACKUP_RATING_SD)
       const age = rng.int(T.PLAYER_AGE_RANGE[0], T.PLAYER_AGE_RANGE[1])
       const p = makePlayer(world, rng, club.id, tier, { position, side: sides[i] as Side, age, rating }, nativeShare, native)
       club.playerIds.push(p.id)
@@ -162,8 +162,21 @@ export function anchorSquad(world: World, club: { playerIds: PlayerId[] }, stren
   return total
 }
 
-export function squadSizeFor(tier: Tier): number {
-  return T.SQUAD_SIZE_BY_TIER[tier - 1] as number
+/** DESIGN.md "Players": a squad of 25 at every tier. */
+export function squadSizeFor(_tier: Tier): number {
+  return T.SQUAD_SIZE
+}
+
+/**
+ * How far below the club's level the j-th man back at a position sits
+ * (DESIGN.md "Players"): depth falls away below the XI, and further down at
+ * lower tiers. A share of the club's own level, so a tier-5 squad falls away
+ * as steeply in its own terms as a tier-1 squad does in its.
+ */
+export function depthGap(strength: number, place: number, tier: Tier | null): number {
+  if (place <= 0) return 0
+  const steepness = 1 + T.BACKUP_TIER_SLOPE * ((tier ?? 1) - 1)
+  return strength * (T.BACKUP_GAP_SHARE + T.BACKUP_STEP_SHARE * (place - 1)) * steepness
 }
 
 /** Genesis squads for every home club. */

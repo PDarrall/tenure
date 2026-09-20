@@ -403,7 +403,23 @@ function render(world: World, events: Event[], fromWeek: number, toWeek: number)
         if (p['to'] === 'board') push(e, 'board', renderText('requests', 'board_unavailable', { why: renderText('requests', String(p['why']), {}, e.week) }, e.week))
         else push(e, 'staff', renderText('requests', 'named_unavailable', { name: String(p['name'] ?? 'him'), why: renderText('requests', String(p['why']), {}, e.week) }, e.week))
         break
-      case 'stadium.expanded':
+      case 'player.loanedIn':
+        if (mine(e)) push(e, 'staff', renderText('director', 'loaned_in', { name: String(p['name']), term: p['half'] === true ? 'to January' : 'for the season', wage: Number(p['wage'] ?? 0) }, e.week))
+        break
+      case 'player.loanEnded': {
+        if (!mine(e)) break
+        const recalled = String(p['reason']) === 'recall'
+        const key = recalled ? 'loan_recalled' : p['wentWell'] === true ? 'loan_ended_well' : 'loan_ended'
+        push(e, recalled ? 'news' : 'staff', renderText('director', key, { name: String(p['name']), apps: Number(p['apps'] ?? 0), rating: Number(p['rating'] ?? 0) }, e.week))
+        break
+      }
+      case 'player.exchanged': {
+        if (!mine(e)) break
+        const cash = Number(p['cash'] ?? 0)
+        push(e, 'staff', renderText('director', 'exchanged', { name: String(p['name']), out: String(p['outName']), withCash: cash > 0 ? ` £${cash}m went with him.` : '' }, e.week))
+        break
+      }
+    case 'stadium.expanded':
         if (mine(e)) push(e, 'board', renderText('requests', 'stadium_expanded', { from: p['from'] as number, to: p['to'] as number }, e.week))
         break
       case 'club.attendance':
