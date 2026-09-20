@@ -7,6 +7,7 @@ import { PlayerProfile } from './PlayerProfile.js'
 import { Tactics } from './Tactics.js'
 import { Fixtures } from './Fixtures.js'
 import { Career } from './Career.js'
+import { Requests } from './Requests.js'
 import { Home } from './Home.js'
 import { MatchView } from './MatchView.js'
 import { FirstOffer, defaultPick, type OfferPick } from './FirstOffer.js'
@@ -27,6 +28,7 @@ export function Game({ session, onChange, onContinue, onExport, onImport, onRese
   const [tab, setTab] = useState<Tab>('home')
   const [turnsBack, setTurnsBack] = useState(0)
   const [openPlayer, setOpenPlayer] = useState<number | null>(null)
+  const [openRequests, setOpenRequests] = useState(false)
   const [kickedOff, setKickedOff] = useState(false)
   const [firstPick, setFirstPick] = useState<OfferPick | null>(null)
   // Turn-scoped state: an unrolled inbox or a kick-off belongs to the turn it was made in.
@@ -65,13 +67,15 @@ export function Game({ session, onChange, onContinue, onExport, onImport, onRese
       {tab === 'squad' && openPlayer !== null && <PlayerProfile session={session} playerId={openPlayer} onChange={onChange} onBack={() => setOpenPlayer(null)} />}
       {tab === 'tactics' && <Tactics session={session} onChange={onChange} />}
       {tab === 'fixtures' && <Fixtures world={world} />}
-      {tab === 'career' && <Career session={session} onChange={onChange} onExport={onExport} onImport={onImport} onReset={onReset} />}
+      {tab === 'career' && !openRequests && <Career session={session} onChange={onChange} onExport={onExport} onImport={onImport} onReset={onReset} onRequests={() => setOpenRequests(true)} />}
+      {tab === 'career' && openRequests && <Requests session={session} onChange={onChange} onBack={() => setOpenRequests(false)} />}
       {tab !== 'home' && <TurnFoot session={session} onContinue={() => onContinue()} onKickOff={kickOff} onHome={() => setTab('home')} />}
       <TabBar
         tab={tab}
         onTab={(t) => {
           setTab(t)
           setOpenPlayer(null)
+          setOpenRequests(false)
         }}
       />
     </main>

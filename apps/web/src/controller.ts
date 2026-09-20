@@ -131,6 +131,20 @@ export function shortlistOf(s: Session): PlayerId[] {
   return [...ids]
 }
 
+/** Call off a target agreed in principle before the window opens (DESIGN.md "Transfers", On arrival). */
+export function withCancelAgreed(s: Session, playerId: PlayerId): Session {
+  const cancelAgreed = [...(s.inputs.cancelAgreed ?? []).filter((id) => id !== playerId), playerId]
+  return bump(s, { ...s.inputs, cancelAgreed })
+}
+
+export function withKeepAgreed(s: Session, playerId: PlayerId): Session {
+  return bump(s, { ...s.inputs, cancelAgreed: (s.inputs.cancelAgreed ?? []).filter((id) => id !== playerId) })
+}
+
+export function cancellingAgreed(s: Session, playerId: PlayerId): boolean {
+  return (s.inputs.cancelAgreed ?? []).includes(playerId)
+}
+
 export function withContractOffer(s: Session, playerId: PlayerId): Session {
   const contractOffers = [...(s.inputs.contractOffers ?? []).filter((id) => id !== playerId), playerId]
   return bump(s, { ...s.inputs, contractOffers })

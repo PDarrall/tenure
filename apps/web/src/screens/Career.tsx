@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { careerSummary, competitionName, ordinal, type World } from '@tenure/engine'
+import { careerSummary, competitionName, ordinal, requestOptions, seasonWeek, tunables, type World } from '@tenure/engine'
 import { withResign, withRetire, type Session } from '../controller.js'
-import { bandLine, player, seasonLine } from './common.js'
-import { Head, SectionLabel, Star, Stat } from './ui.js'
+import { bandLine, humanClub, player, seasonLine, weekLabel } from './common.js'
+import { Chevron, Head, SectionLabel, Star, Stat } from './ui.js'
 import { buildStamp } from '../build.js'
 
 const BACKGROUND: Record<string, string> = { 'ex-pro': 'Ex-pro', coach: 'Coach', analyst: 'Analyst' }
@@ -117,10 +117,39 @@ interface Props {
   onExport: () => void
   onImport: (file: File) => void
   onReset: () => void
+  onRequests: () => void
+}
+
+/** The row into Requests (DESIGN.md "Requests": their own screen, reached from Career, never on Home). */
+function RequestsRow({ session, onRequests }: { session: Session; onRequests: () => void }) {
+  const world = session.world
+  const club = humanClub(world)
+  const queued = (session.inputs.requests ?? []).length
+  const rows = club ? requestOptions(world) : []
+  const board = rows.filter((r) => r.to === 'board')
+  const nextBoard = board.find((r) => r.likelihood.available)
+  const monthly = board.length > 0 && board.every((r) => r.likelihood.why === 'monthly')
+  const asked = world.human?.boardAskedWeek
+  const line = !club
+    ? 'No club, nobody to ask.'
+    : monthly && asked !== undefined
+      ? `The board hear one a month: next from ${weekLabel(seasonWeek(asked + tunables.MONTH_WEEKS)).toLowerCase()}.`
+      : nextBoard
+        ? `${board.filter((r) => r.likelihood.available).length} board asks open · the director and the players any week.`
+        : 'The director and the players any week.'
+  return (
+    <button type="button" className="list-row req-open" onClick={onRequests} disabled={!club} data-testid="open-requests">
+      <div className="between center">
+        <span className="row-name">Requests{queued ? ` · ${queued} queued` : ''}</span>
+        <Chevron dir="right" />
+      </div>
+      <div className="caption">{line}</div>
+    </button>
+  )
 }
 
 /** The career tab: the page, then what you can do with the career itself. */
-export function Career({ session, onChange, onExport, onImport, onReset }: Props) {
+export function Career({ session, onChange, onExport, onImport, onReset, onRequests }: Props) {
   const world = session.world
   const me = player(world)
   const s = careerSummary(world)
@@ -130,6 +159,7 @@ export function Career({ session, onChange, onExport, onImport, onReset }: Props
     <>
       <Head eyebrow={seasonLine(world)} title={`${s.name}, ${s.age}`} sub={`${BACKGROUND[s.background] ?? s.background} · ${bandLine(s.reputation)} · ${s.score.games} games`} />
       <div className="scroll" aria-label="Career page">
+        <RequestsRow session={session} onRequests={onRequests} />
         <CareerBody world={world} />
         <SectionLabel>This career</SectionLabel>
         <div className="stack g8" style={{ padding: '6px 0 16px' }}>
